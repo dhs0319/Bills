@@ -9,7 +9,7 @@ plugins {
 val appVersionName: String = (project.findProperty("versionName") as String?) ?: "1.0"
 
 android {
-    namespace = "com.naaammme.bbspace.feature.bbspace"
+    namespace = "com.dhs0319.bills.feature.bbspace"
     compileSdk = 36
 
     defaultConfig {

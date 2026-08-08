@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.core.video"
+    namespace = "com.dhs0319.bills.core.video"
     compileSdk = 36
 
     defaultConfig {

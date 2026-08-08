@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.infra.crypto"
+    namespace = "com.dhs0319.bills.infra.crypto"
     compileSdk = 36
 
     defaultConfig {

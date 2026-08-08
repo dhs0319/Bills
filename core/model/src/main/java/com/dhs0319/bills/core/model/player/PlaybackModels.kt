@@ -1,0 +1,282 @@
+package com.dhs0319.bills.core.model
+
+import androidx.compose.runtime.Immutable
+
+enum class PlayBiz(
+    val reportType: Int
+) {
+    UGC(3),
+    PGC(4),
+    PUGV(10);
+
+    companion object {
+        fun from(raw: String?): PlayBiz {
+            return entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: UGC
+        }
+    }
+}
+
+@Immutable
+data class PlayBizInfo(
+    val biz: PlayBiz,
+    val type: Int? = null,
+    val playType: Int? = null,
+    val subType: Int? = null,
+    val seasonId: Long? = null,
+    val epId: Long? = null,
+    val roomId: Long? = null,
+    val inlineScene: String? = null,
+    val materialNo: String? = null,
+    val securityLevel: String? = null
+)
+
+@Immutable
+data class PlayReportParams(
+    val biz: PlayBiz,
+    val ids: ResolvedVideoIds,
+    val subType: Int? = null
+) {
+    val type: Int
+        get() = biz.reportType
+
+    val aid: Long
+        get() = ids.aid
+
+    val cid: Long
+        get() = ids.cid
+
+    val bvid: String?
+        get() = ids.bvid
+
+    val seasonId: Long?
+        get() = ids.seasonId.takeIf { it > 0L }
+
+    val epId: Long?
+        get() = ids.epId.takeIf { it > 0L }
+}
+
+@Immutable
+data class VideoRequestIds(
+    val aid: Long = 0L,
+    val cid: Long = 0L,
+    val epId: Long = 0L,
+    val seasonId: Long = 0L,
+    val bvid: String? = null
+)
+
+@Immutable
+data class ResolvedVideoIds(
+    val aid: Long = 0L,
+    val cid: Long = 0L,
+    val epId: Long = 0L,
+    val seasonId: Long = 0L,
+    val bvid: String? = null
+) {
+    val hasAny: Boolean
+        get() = aid > 0L || cid > 0L || epId > 0L || seasonId > 0L || !bvid.isNullOrBlank()
+
+    val danmakuReady: Boolean
+        get() = aid > 0L && cid > 0L
+}
+
+fun ResolvedVideoIds.toUgcTarget(src: VideoSrc): VideoTarget.Ugc {
+    return VideoTarget.Ugc(
+        aid = aid,
+        cid = cid,
+        bvid = bvid,
+        src = src
+    )
+}
+
+fun ResolvedVideoIds.toReportParams(
+    biz: PlayBiz,
+    subType: Int? = null
+): PlayReportParams {
+    return PlayReportParams(
+        biz = biz,
+        ids = this,
+        subType = subType
+    )
+}
+
+enum class PlaybackControlMode {
+    Default,
+    Simple
+}
+
+@Immutable
+data class PlayableParams(
+    val ids: VideoRequestIds,
+    val src: VideoSrc = VideoTargetTool.feed(),
+    val biz: PlayBizInfo,
+    val fromScene: String = DEFAULT_FROM_SCENE,
+    val adExtra: String? = null,
+    val extraResolve: Map<String, String> = emptyMap()
+) {
+    fun getResolveParams(
+        seekToMs: Long? = null,
+        preferredQuality: Int? = null,
+        controlMode: PlaybackControlMode = PlaybackControlMode.Default
+    ): PlaybackRequest {
+        return PlaybackRequest(
+            playable = this,
+            seekToMs = seekToMs,
+            preferredQuality = preferredQuality,
+            controlMode = controlMode
+        )
+    }
+
+    fun getResolveExtraContent(): Map<String, String> {
+        return buildMap {
+            src.trackId?.takeIf(String::isNotBlank)?.let { put("track_id", it) }
+            src.reportFlowData?.takeIf(String::isNotBlank)?.let { put("report_flow_data", it) }
+            biz.epId?.takeIf { it > 0L }?.let { put("ep_id", it.toString()) }
+            biz.seasonId?.takeIf { it > 0L }?.let { put("season_id", it.toString()) }
+            biz.roomId?.takeIf { it > 0L }?.let { put("room_id", it.toString()) }
+            biz.inlineScene?.takeIf(String::isNotBlank)?.let { put("inline_scene", it) }
+            biz.materialNo?.takeIf(String::isNotBlank)?.let { put("material_no", it) }
+            biz.securityLevel?.takeIf(String::isNotBlank)?.let { put("security_level", it) }
+            if (biz.biz == PlayBiz.PUGV) {
+                put("biz_type", PUGV_BIZ_TYPE)
+            }
+            putAll(extraResolve)
+        }
+    }
+
+    private companion object {
+        const val DEFAULT_FROM_SCENE = "normal"
+        const val PUGV_BIZ_TYPE = "3"
+    }
+}
+
+@Immutable
+data class PlaybackRequest(
+    val playable: PlayableParams,
+    val seekToMs: Long? = null,
+    val preferredQuality: Int? = null,
+    val controlMode: PlaybackControlMode = PlaybackControlMode.Default
+) {
+    val ids: VideoRequestIds
+        get() = playable.ids
+}
+
+@Immutable
+data class StreamLimitInfo(
+    val title: String?,
+    val message: String?,
+    val uri: String?
+)
+
+@Immutable
+data class QualityOption(
+    val quality: Int,
+    val format: String,
+    val description: String,
+    val displayDescription: String?,
+    val needVip: Boolean,
+    val needLogin: Boolean,
+    val vipFree: Boolean,
+    val supportDrm: Boolean,
+    val limit: StreamLimitInfo?
+)
+
+@Immutable
+data class ProgressiveSegment(
+    val url: String,
+    val durationMs: Long?
+)
+
+@Immutable
+sealed interface PlaybackStream {
+    val quality: Int
+    val format: String
+    val description: String
+    val width: Int?
+    val height: Int?
+    val mimeType: String?
+    val needVip: Boolean
+    val needLogin: Boolean
+    val supportDrm: Boolean
+
+    @Immutable
+    data class Dash(
+        override val quality: Int,
+        override val format: String,
+        override val description: String,
+        override val width: Int?,
+        override val height: Int?,
+        override val mimeType: String?,
+        override val needVip: Boolean,
+        override val needLogin: Boolean,
+        override val supportDrm: Boolean,
+        val videoUrl: String,
+        val videoBackupUrls: List<String>,
+        val audioId: Int?,
+        val bandwidth: Int,
+        val codecId: Int,
+        val frameRate: String?
+    ) : PlaybackStream
+
+    @Immutable
+    data class Progressive(
+        override val quality: Int,
+        override val format: String,
+        override val description: String,
+        override val width: Int?,
+        override val height: Int?,
+        override val mimeType: String?,
+        override val needVip: Boolean,
+        override val needLogin: Boolean,
+        override val supportDrm: Boolean,
+        val segments: List<ProgressiveSegment>
+    ) : PlaybackStream
+}
+
+@Immutable
+data class PlaybackAudio(
+    val id: Int,
+    val url: String,
+    val backupUrls: List<String>,
+    val bandwidth: Int,
+    val codecId: Int,
+    val mimeType: String?
+)
+
+@Immutable
+data class PlaybackSource(
+    val biz: PlayBiz,
+    val durationMs: Long,
+    val streams: List<PlaybackStream>,
+    val audios: List<PlaybackAudio>,
+    val qualityOptions: List<QualityOption>,
+    val resumePositionMs: Long?,
+    val isPreview: Boolean,
+    val supportProject: Boolean,
+    val supplementType: String?
+)
+
+@Immutable
+data class PlaybackCdn(
+    val videoUrl: String,
+    val audioUrl: String?
+)
+
+sealed interface PlaybackError {
+    data class RequestFailed(val message: String, val cause: Throwable? = null) : PlaybackError
+    data class NoPlayableStream(val message: String) : PlaybackError
+}
+
+@Immutable
+data class PlayerSessionState(
+    val request: PlaybackRequest? = null,
+    val biz: PlayBiz,
+    val ids: ResolvedVideoIds = ResolvedVideoIds(),
+    val detail: VideoDetail? = null,
+    val detailLoading: Boolean = false,
+    val detailError: String? = null,
+    val playbackSource: PlaybackSource? = null,
+    val currentStream: PlaybackStream? = null,
+    val currentAudio: PlaybackAudio? = null,
+    val isPreparing: Boolean = false,
+    val error: PlaybackError? = null
+)

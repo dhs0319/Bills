@@ -22,7 +22,7 @@ val hasReleaseSigning: Boolean =
         !signingKeyPassword.isNullOrBlank()
 
 android {
-    namespace = "com.naaammme.bbspace"
+    namespace = "com.dhs0319.bills"
     compileSdk = 36
 
     signingConfigs {
@@ -37,7 +37,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.naaammme.bbspace"
+        applicationId = "com.dhs0319.bills"
         minSdk = 24
         targetSdk = 36
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1

@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.feature.search"
+    namespace = "com.dhs0319.bills.feature.search"
     compileSdk = 36
 
     defaultConfig {

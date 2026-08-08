@@ -36,7 +36,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "bbspace"
+rootProject.name = "Bills"
 include(":app")
 
 // Infra 层

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.core.live"
+    namespace = "com.dhs0319.bills.core.live"
     compileSdk = 36
 
     defaultConfig {

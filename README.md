@@ -5,23 +5,23 @@
 <h2 align="center">哔哔空间</h2>
 
 <p align="center">
-  <a href="https://github.com/naaammme/bbspace/stargazers">
-    <img src="https://img.shields.io/github/stars/naaammme/bbspace?style=flat" alt="stars" />
+  <a href="https://github.com/dhs0319/Bills/stargazers">
+    <img src="https://img.shields.io/github/stars/dhs0319/Bills?style=flat" alt="stars" />
   </a>
-  <a href="https://github.com/naaammme/bbspace/releases">
-    <img src="https://img.shields.io/github/v/release/naaammme/bbspace?style=flat" alt="release" />
+  <a href="https://github.com/dhs0319/Bills/releases">
+    <img src="https://img.shields.io/github/v/release/dhs0319/Bills?style=flat" alt="release" />
   </a>
-  <a href="https://github.com/naaammme/bbspace/releases">
-    <img src="https://img.shields.io/github/downloads/naaammme/bbspace/total?style=flat" alt="downloads" />
+  <a href="https://github.com/dhs0319/Bills/releases">
+    <img src="https://img.shields.io/github/downloads/dhs0319/Bills/total?style=flat" alt="downloads" />
   </a>
-  <a href="https://github.com/naaammme/bbspace/releases/latest">
-    <img src="https://img.shields.io/github/downloads/naaammme/bbspace/latest/total?style=flat" alt="latest release downloads" />
+  <a href="https://github.com/dhs0319/Bills/releases/latest">
+    <img src="https://img.shields.io/github/downloads/dhs0319/Bills/latest/total?style=flat" alt="latest release downloads" />
   </a>
   <a href="https://developer.android.com/about/versions/nougat">
     <img src="https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat&logo=android&logoColor=white" alt="android 7+" />
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/github/license/naaammme/bbspace?style=flat" alt="license" />
+    <img src="https://img.shields.io/github/license/dhs0319/Bills?style=flat" alt="license" />
   </a>
 </p>
 
@@ -30,9 +30,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/naaammme/bbspace/releases"><strong>下载 APK</strong></a>
+  <a href="https://github.com/dhs0319/Bills/releases"><strong>下载 APK</strong></a>
   ·
-  <a href="https://github.com/naaammme/bbspace/issues"><strong>反馈问题</strong></a>
+  <a href="https://github.com/dhs0319/Bills/issues"><strong>反馈问题</strong></a>
   ·
   <a href="https://t.me/ourbbspace"><strong>Telegram</strong></a>
 </p>
@@ -105,18 +105,19 @@
 
 ## 下载与运行
 
-- 用户安装：前往 [Releases](https://github.com/naaammme/bbspace/releases) 下载最新 APK
+- 用户安装：前往 [Releases](https://github.com/dhs0319/Bills/releases) 下载最新 APK
 - 系统要求：Android 7.0 及以上
 - 开发环境：JDK 17、Android SDK 36
 
 ## 说明
 
-BBSpace 与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
+Bills 与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
 
 如果这个项目帮你省下了找实现细节和踩坑的时间，欢迎点个 Star。
 
 ## 致谢
 
+- [bbspace](https://github.com/naaammme/bbspace)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
 - [PiliPlus](https://github.com/bggRGjQaUbCoE/PiliPlus)
 - [androidx/media](https://github.com/androidx/media)
@@ -129,4 +130,4 @@ BBSpace 与哔哩哔哩官方无关。项目主要用于学习、研究和 Andro
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=naaammme/bbspace&type=Date)](https://star-history.com/#naaammme/bbspace&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=dhs0319/Bills&type=Date)](https://star-history.com/#dhs0319/Bills&Date)

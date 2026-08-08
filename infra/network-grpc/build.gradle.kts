@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.infra.grpc"
+    namespace = "com.dhs0319.bills.infra.grpc"
     compileSdk = 36
 
     defaultConfig {

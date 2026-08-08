@@ -1,0 +1,109 @@
+package com.dhs0319.bills.infra.network.di
+
+import android.content.Context
+import com.dhs0319.bills.infra.crypto.BuvidFetcher
+import com.dhs0319.bills.infra.crypto.DeviceIdentity
+import com.dhs0319.bills.infra.crypto.GuestIdGenerator
+import com.dhs0319.bills.infra.crypto.HwIdGenerator
+import com.dhs0319.bills.infra.crypto.LegalRegionCache
+import com.dhs0319.bills.infra.crypto.RegionCodeCache
+import com.dhs0319.bills.infra.crypto.TicketGenerator
+import com.dhs0319.bills.infra.network.dns.BiliDns
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
+import okhttp3.brotli.BrotliInterceptor
+import java.util.concurrent.TimeUnit
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+    @Provides
+    @Singleton
+    fun provideDeviceIdentity(@ApplicationContext context: Context): DeviceIdentity {
+        return DeviceIdentity(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideHwIdGenerator(deviceIdentity: DeviceIdentity): HwIdGenerator {
+        return HwIdGenerator(deviceIdentity)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBiliDns(
+        @ApplicationContext context: Context,
+        regionCodeCache: RegionCodeCache
+    ): BiliDns {
+        return BiliDns(context, regionCodeCache)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpConnectionPool(): ConnectionPool {
+        return ConnectionPool(10, 5, TimeUnit.MINUTES)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        biliDns: BiliDns,
+        connectionPool: ConnectionPool
+    ): OkHttpClient {
+        return OkHttpClient.Builder()
+            .dns(biliDns)
+            .connectionPool(connectionPool)
+            .addInterceptor(BrotliInterceptor)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTicketGenerator(
+        @ApplicationContext context: Context,
+        deviceIdentity: DeviceIdentity,
+        okHttpClient: OkHttpClient
+    ): TicketGenerator {
+        return TicketGenerator(context, deviceIdentity, okHttpClient)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGuestIdGenerator(
+        @ApplicationContext context: Context,
+        deviceIdentity: DeviceIdentity,
+        okHttpClient: OkHttpClient
+    ): GuestIdGenerator {
+        return GuestIdGenerator(context, deviceIdentity, okHttpClient)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRegionCodeCache(): RegionCodeCache {
+        return RegionCodeCache()
+    }
+
+    @Provides
+    @Singleton
+    fun provideLegalRegionCache(
+        @ApplicationContext context: Context
+    ): LegalRegionCache {
+        return LegalRegionCache(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBuvidFetcher(
+        okHttpClient: OkHttpClient,
+        deviceIdentity: DeviceIdentity
+    ): BuvidFetcher {
+        return BuvidFetcher(okHttpClient, deviceIdentity)
+    }
+}

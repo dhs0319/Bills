@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.infra.web"
+    namespace = "com.dhs0319.bills.infra.web"
     compileSdk = 36
 
     defaultConfig {

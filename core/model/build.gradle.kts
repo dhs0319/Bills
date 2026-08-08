@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.naaammme.bbspace.core.model"
+    namespace = "com.dhs0319.bills.core.model"
     compileSdk = 36
 
     defaultConfig {
