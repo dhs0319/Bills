@@ -1,0 +1,93 @@
+pluginManagement {
+    includeBuild("build-logic")
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
+//includeBuild("../DanmakuFlameMaster") {
+//    dependencySubstitution {
+//        substitute(module("com.github.naaammme:DanmakuFlameMaster"))
+//            .using(project(":DanmakuFlameMaster"))
+//    }
+//}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io") {
+            content {
+                includeGroup("com.github.naaammme")
+            }
+        }
+    }
+}
+
+rootProject.name = "bbspace"
+include(":app")
+
+// Infra 层
+include(":infra:protobuf")
+include(":infra:crypto")
+include(":infra:network-http")
+include(":infra:network-web")
+include(":infra:network-grpc")
+include(":infra:coldstart")
+include(":infra:player")
+
+// Core 层
+include(":core:model")
+include(":core:common")
+include(":core:auth")
+include(":core:article")
+include(":core:comment")
+include(":core:danmaku")
+include(":core:download")
+include(":core:dynamic")
+include(":core:feed")
+include(":core:favorite")
+include(":core:history")
+include(":core:im")
+include(":core:listen")
+include(":core:live")
+include(":core:playback")
+include(":core:published")
+include(":core:search")
+include(":core:settings")
+include(":core:space")
+include(":core:video")
+include(":core:designsystem")
+include(":core:navigation")
+
+// Feature 层
+include(":feature:home")
+include(":feature:video")
+include(":feature:comment")
+include(":feature:dynamic")
+include(":feature:search")
+include(":feature:space")
+include(":feature:user")
+include(":feature:auth")
+include(":feature:settings")
+include(":feature:bbspace")
+include(":feature:live")
+include(":feature:history")
+include(":feature:favorite")
+include(":feature:download")
+include(":feature:webview")
+include(":feature:listen")
+include(":feature:im")
+

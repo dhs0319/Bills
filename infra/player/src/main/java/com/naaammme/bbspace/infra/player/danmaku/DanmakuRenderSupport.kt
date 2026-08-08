@@ -1,0 +1,188 @@
+package com.naaammme.bbspace.infra.player.danmaku
+
+import android.graphics.Color
+import android.os.SystemClock
+import com.naaammme.bbspace.core.model.DanmakuConfig
+import com.naaammme.bbspace.core.model.DanmakuItem
+import master.flame.danmaku.api.DanmakuItemMapper
+import master.flame.danmaku.api.DanmakuItemUtils
+import master.flame.danmaku.api.PlayerTimeProvider
+import master.flame.danmaku.danmaku.model.BaseDanmaku
+import master.flame.danmaku.danmaku.model.IDisplayer
+import master.flame.danmaku.danmaku.model.android.DanmakuContext
+import kotlin.math.roundToInt
+
+internal fun createDanmakuContext(
+    density: Float
+): DanmakuContext {
+    return DanmakuContext.create()
+        .setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, DANMAKU_STROKE_WIDTH)
+        .setDanmakuMargin((density * DANMAKU_ROW_GAP_DP).roundToInt().coerceAtLeast(1))
+}
+
+internal class DefaultDanmakuItemMapper : DanmakuItemMapper<DanmakuItem> {
+
+    override fun map(
+        item: DanmakuItem,
+        danmakuContext: DanmakuContext
+    ): BaseDanmaku? {
+        val text = item.content.trim()
+        if (text.isEmpty()) {
+            return null
+        }
+
+        val danmaku = DanmakuItemUtils.createTextDanmaku(
+            danmakuContext,
+            mapDanmakuType(item.mode),
+            item.progressMs.toLong().coerceAtLeast(0L),
+            text
+        ) ?: return null
+
+        danmaku.textColor = normalizeDanmakuColor(item.color)
+        danmaku.textShadowColor = Color.BLACK
+        danmaku.textSize = resolveDanmakuTextSize(
+            fontSize = item.fontSize,
+            density = danmakuContext.displayer.density
+        )
+        danmaku.priority = if (item.pool != 0) 1 else 0
+        return danmaku
+    }
+}
+
+internal class DanmakuPlayerTimeProvider(
+    positionMs: Long = 0L,
+    isPlaying: Boolean = false,
+    speed: Float = 1f
+) : PlayerTimeProvider {
+    @Volatile
+    private var anchorPosMs = positionMs.coerceAtLeast(0L)
+
+    @Volatile
+    private var playing = isPlaying
+
+    @Volatile
+    private var playSpd = speed.coerceAtLeast(0f)
+
+    @Volatile
+    private var anchorElapsedMs = SystemClock.elapsedRealtime()
+
+    fun overrideState(
+        positionMs: Long,
+        isPlaying: Boolean,
+        speed: Float
+    ) {
+        setAnchor(positionMs, isPlaying, speed)
+    }
+
+    fun release() {
+    }
+
+    override fun getCurrentTimeMs(): Long {
+        val posMs = anchorPosMs
+        if (!playing) return posMs
+        val deltaMs = (SystemClock.elapsedRealtime() - anchorElapsedMs).coerceAtLeast(0L)
+        return posMs + (deltaMs * playSpd).toLong()
+    }
+
+    override fun isPlaying(): Boolean {
+        return playing
+    }
+
+    override fun getSyncThresholdTimeMs(): Long {
+        return DANMAKU_SEEK_SYNC_THRESHOLD_MS
+    }
+
+    private fun setAnchor(
+        positionMs: Long,
+        isPlaying: Boolean,
+        speed: Float
+    ) {
+        anchorPosMs = positionMs.coerceAtLeast(0L)
+        playing = isPlaying
+        playSpd = speed.coerceAtLeast(0f)
+        anchorElapsedMs = SystemClock.elapsedRealtime()
+    }
+}
+
+private fun mapDanmakuType(mode: Int): Int {
+    return when (mode) {
+        BaseDanmaku.TYPE_FIX_BOTTOM -> BaseDanmaku.TYPE_FIX_BOTTOM
+        BaseDanmaku.TYPE_FIX_TOP -> BaseDanmaku.TYPE_FIX_TOP
+        BaseDanmaku.TYPE_SCROLL_LR -> BaseDanmaku.TYPE_SCROLL_LR
+        else -> BaseDanmaku.TYPE_SCROLL_RL
+    }
+}
+
+private fun normalizeDanmakuColor(color: Int): Int {
+    return if (color ushr 24 == 0) {
+        color or 0xFF000000.toInt()
+    } else {
+        color
+    }
+}
+
+private fun resolveDanmakuTextSize(
+    fontSize: Int,
+    density: Float
+): Float {
+    return fontSize.coerceIn(18, 36).toFloat() * (density - 0.6f).coerceAtLeast(1f)
+}
+
+internal fun DanmakuContext.applyConfig(config: DanmakuConfig) {
+    setDanmakuTransparency(config.opacity)
+    setScaleTextSize(config.textScale.coerceIn(0.5f, 2f) * 0.6f)
+    setScrollSpeedFactor(2f / config.speed.coerceIn(0.5f, 2f))
+    setDuplicateMergingEnabled(config.mergeDuplicates)
+    setMaximumVisibleSizeInScreen(config.maximumVisibleSize)
+    setMaximumLines(config.maximumLines)
+    preventOverlapping(config.overlappingRules)
+    setR2LDanmakuVisibility(config.showScrollRl)
+    setL2RDanmakuVisibility(true)
+    setFTDanmakuVisibility(config.showTop)
+    setFBDanmakuVisibility(config.showBottom)
+}
+
+private val DanmakuConfig.maximumVisibleSize: Int
+    get() = when (densityLevel) {
+        0 -> 20
+        1 -> -1
+        2 -> 0
+        else -> -1
+    }
+
+private val DanmakuConfig.maximumLines: Map<Int, Int>
+    get() {
+        val lines = when (areaPercent) {
+            25 -> 3
+            50 -> 6
+            75 -> 9
+            else -> 12
+        }
+        return hashMapOf(
+            BaseDanmaku.TYPE_SCROLL_RL to lines,
+            BaseDanmaku.TYPE_SCROLL_LR to lines
+        )
+    }
+
+private val DanmakuConfig.overlappingRules: Map<Int, Boolean>?
+    get() = when (densityLevel) {
+        0 -> hashMapOf(
+            BaseDanmaku.TYPE_SCROLL_RL to true,
+            BaseDanmaku.TYPE_SCROLL_LR to true,
+            BaseDanmaku.TYPE_FIX_TOP to true,
+            BaseDanmaku.TYPE_FIX_BOTTOM to true
+        )
+
+        1 -> hashMapOf(
+            BaseDanmaku.TYPE_SCROLL_RL to true,
+            BaseDanmaku.TYPE_SCROLL_LR to true,
+            BaseDanmaku.TYPE_FIX_TOP to true,
+            BaseDanmaku.TYPE_FIX_BOTTOM to true
+        )
+
+        else -> null
+    }
+
+internal const val DANMAKU_SEEK_SYNC_THRESHOLD_MS = 1_000L
+private const val DANMAKU_STROKE_WIDTH = 2f
+private const val DANMAKU_ROW_GAP_DP = 4f

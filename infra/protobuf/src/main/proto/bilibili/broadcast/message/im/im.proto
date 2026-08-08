@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package bilibili.broadcast.message.im;
+
+option java_multiple_files = true;
+option java_package = "com.bapis.bilibili.broadcast.message.im";
+option optimize_for = LITE_RUNTIME;
+
+import "bilibili/app/im/v1/im.proto";
+import "google/protobuf/empty.proto";
+
+enum CmdId {
+  EN_CMD_ID_INVALID = 0;
+  EN_CMD_ID_MSG_NOTIFY = 1;
+  EN_CMD_ID_KICK_OUT = 2;
+}
+
+enum PLType {
+  EN_PAYLOAD_NORMAL = 0;
+  EN_PAYLOAD_BASE64 = 1;
+}
+
+message NotifyRsp {
+  uint64 uid = 1;
+  uint64 cmd = 2;
+  bytes payload = 3;
+  PLType payload_type = 4;
+}
+
+message NotifyInfo {
+  uint32 msg_type = 1;
+  uint64 talker_id = 2;
+  uint32 session_type = 3;
+}
+
+message Msg {
+  uint64 sender_uid = 1;
+  int32 receiver_type = 2;
+  uint64 receiver_id = 3;
+  uint64 cli_msg_id = 4;
+  int32 msg_type = 5;
+  string content = 6;
+  uint64 msg_seqno = 7;
+  uint64 timestamp = 8;
+  repeated uint64 at_uids = 9 [packed = true];
+  repeated uint64 recver_ids = 10 [packed = true];
+  uint64 msg_key = 11;
+  uint32 msg_status = 12;
+  bool sys_cancel = 13;
+  uint32 is_multi_chat = 14;
+  uint64 withdraw_seqno = 15;
+  string notify_code = 16;
+  uint32 msg_source = 17;
+}
+
+message UpdateTotalUnreadCommand {
+}
+
+message UpdateSessionListCommand {
+}
+
+message UpdateQuickLinkCommand {
+}
+
+message FetchMessageCommand {
+  .bilibili.app.im.v1.SessionId session_id = 1;
+}
+
+message UpdateSessionOneCommand {
+  .bilibili.app.im.v1.SessionId session_id = 1;
+}
+
+message CommandMsg {
+  oneof command {
+    UpdateTotalUnreadCommand update_total_unread_command = 1;
+    UpdateSessionListCommand update_session_list_command = 2;
+    UpdateQuickLinkCommand update_quick_link_command = 3;
+    FetchMessageCommand fetch_message_command = 4;
+    UpdateSessionOneCommand update_session_one_command = 5;
+  }
+}
+
+message ReqServerNotify {
+  uint64 lastest_seqno = 1;
+  Msg instant_msg = 2;
+  NotifyInfo notify_info = 3;
+  repeated CommandMsg command_msgs = 4;
+}
+
+service Notify {
+  rpc WatchNotify(google.protobuf.Empty) returns (stream NotifyRsp);
+}
