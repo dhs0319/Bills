@@ -116,8 +116,6 @@ fun BiliTheme(
         config.seedColor,
         config.useDynamicColor,
         config.paletteStyle,
-        config.swapBaseColors,
-        config.isPureBlack
     ) {
         val base = when {
             config.paletteStyle == PaletteStyle.MONOCHROME -> createMonochromeColorScheme(darkTheme)
@@ -128,8 +126,7 @@ fun BiliTheme(
         }
         val styled = if (config.paletteStyle == PaletteStyle.MONOCHROME) base
         else applyPaletteStyle(base, config.paletteStyle, darkTheme)
-        val neutralized = applyNeutralBackgroundScheme(styled, darkTheme, config.isPureBlack)
-        if (config.swapBaseColors) applyBaseColorSwap(neutralized) else neutralized
+        styled
     }
 
     val density = remember(baseDensity, uiScale) {
@@ -401,66 +398,8 @@ private fun applyPaletteStyle(
     )
 }
 
-private fun applyNeutralBackgroundScheme(
-    base: ColorScheme,
-    isDark: Boolean,
-    usePureBackground: Boolean
-): ColorScheme {
-    if (!usePureBackground) {
-        return base
-    }
-    return if (isDark) {
-        base.copy(
-            background = Color.Black,
-            surface = Color.Black,
-            surfaceDim = Color.Black,
-            surfaceBright = Color(0xFF161616),
-            surfaceContainerLowest = Color.Black,
-            surfaceContainerLow = Color(0xFF0A0A0A),
-            surfaceContainer = Color(0xFF121212),
-            surfaceContainerHigh = Color(0xFF181818),
-            surfaceContainerHighest = Color(0xFF202020)
-        )
-    } else {
-        base.copy(
-            background = Color.White,
-            surface = Color.White,
-            surfaceDim = Color(0xFFF5F5F5),
-            surfaceBright = Color.White,
-            surfaceContainerLowest = Color.White,
-            surfaceContainerLow = Color(0xFFFAFAFA),
-            surfaceContainer = Color(0xFFF7F7F7),
-            surfaceContainerHigh = Color(0xFFF2F2F2),
-            surfaceContainerHighest = Color(0xFFEDEDED)
-        )
-    }
-}
-
 private fun createMonochromeColorScheme(isDark: Boolean): ColorScheme {
     return if (isDark) MonochromeDarkColorScheme else MonochromeLightColorScheme
-}
-
-private fun applyBaseColorSwap(base: ColorScheme): ColorScheme {
-    return base.copy(
-        background = base.secondaryContainer,
-        onBackground = base.onSecondaryContainer,
-        surface = base.secondaryContainer,
-        onSurface = base.onSecondaryContainer,
-        surfaceDim = base.secondaryContainer,
-        surfaceBright = base.secondaryContainer,
-        surfaceContainerLowest = base.background,
-        surfaceContainerLow = base.background,
-        surfaceContainer = base.background,
-        surfaceContainerHigh = base.background,
-        surfaceContainerHighest = base.background,
-        surfaceVariant = base.background,
-        onSurfaceVariant = base.onBackground,
-        surfaceTint = base.onSecondaryContainer,
-        inverseSurface = base.secondaryContainer,
-        inverseOnSurface = base.onSecondaryContainer,
-        secondaryContainer = base.background,
-        onSecondaryContainer = base.onBackground
-    )
 }
 
 private fun Color.tone(

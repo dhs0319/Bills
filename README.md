@@ -2,7 +2,7 @@
   <img src="images/banner.jpg" alt="BBSpace banner" width="920" />
 </p>
 
-<h2 align="center">哔哔空间</h2>
+<h2 align="center">Bills</h2>
 
 <p align="center">
   <a href="https://github.com/dhs0319/Bills/stargazers">
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  一个强大的第三方哔哩哔哩 Android 客户端。持续施工中...
+  一个好用的第三方哔哩哔哩 Android 客户端。持续施工中...
 </p>
 
 <p align="center">

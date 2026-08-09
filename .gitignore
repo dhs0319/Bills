@@ -7,6 +7,9 @@ build/
 local.properties
 .externalNativeBuild/
 .cxx/
+*.jks
+*.keystore
+*.keystores
 
 # IntelliJ / Android Studio
 .idea/

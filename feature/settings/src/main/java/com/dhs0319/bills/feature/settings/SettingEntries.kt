@@ -11,9 +11,7 @@ data class SettingEntry(val title: String, val subtitle: String, val route: Stri
 val appearanceEntries = listOf(
     SettingEntry("主题模式", "浅色 深色 或跟随系统", APPEARANCE_ROUTE),
     SettingEntry("动态取色", "Android 12 以上从壁纸提取颜色", APPEARANCE_ROUTE),
-    SettingEntry("反转颜色", "交换页面背景和低饱和容器色", APPEARANCE_ROUTE),
     SettingEntry("主题色", "选择应用主题颜色", APPEARANCE_ROUTE),
-    SettingEntry("纯色背景", "深色纯黑 浅色纯白", APPEARANCE_ROUTE),
     SettingEntry("字体大小", "调整应用字体大小", APPEARANCE_ROUTE),
     SettingEntry("动画速度", "调整界面动画速度", APPEARANCE_ROUTE),
     SettingEntry("过渡动画", "调整页面切换动画样式", APPEARANCE_ROUTE),

@@ -9,14 +9,12 @@ data class ThemeConfig(
     val seedColor: Color = Color(0xFFFB7299),
     val useDynamicColor: Boolean = true,
     val paletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT,
-    val swapBaseColors: Boolean = false,
     val fontScale: Float = 1.0f,
     val uiScale: Float = 1.0f,
     val roundScreenSafePaddingScale: Float = DEFAULT_ROUND_SCREEN_SAFE_PADDING_SCALE,
     val pullRefreshDistanceDp: Float = DEFAULT_PULL_REFRESH_DISTANCE_DP,
     val animationSpeed: AnimationSpeed = AnimationSpeed.NORMAL,
     val transitionStyle: TransitionStyle = TransitionStyle.SHARED_AXIS_Z,
-    val isPureBlack: Boolean = false,
     val preferredFrameRate: FrameRateMode = FrameRateMode.AUTO,
     val cornerStyle: CornerStyle = CornerStyle.STANDARD
 )

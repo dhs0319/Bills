@@ -27,6 +27,7 @@ import com.dhs0319.bills.core.designsystem.theme.PresetColors
 import com.dhs0319.bills.core.designsystem.theme.PaletteStyle
 import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
+import com.dhs0319.bills.feature.settings.components.SettingDropdown
 import com.dhs0319.bills.feature.settings.components.SettingSwitch
 import kotlin.math.roundToInt
 
@@ -43,7 +44,7 @@ fun AppearanceSettingsScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("外观设计") },
+                title = { Text("外观设置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
@@ -83,27 +84,9 @@ fun AppearanceSettingsScreen(
             }
 
             item {
-                SettingSwitch(
-                    title = "反转颜色",
-                    subtitle = "交换页面背景和低饱和容器色，强调色保持不变",
-                    checked = config.swapBaseColors,
-                    onCheckedChange = viewModel::updateSwapBaseColors
-                )
-            }
-
-            item {
                 ColorPaletteSelector(
                     selected = config.seedColor,
                     onSelect = viewModel::updateSeedColor
-                )
-            }
-
-            item {
-                SettingSwitch(
-                    title = "纯色背景",
-                    subtitle = "深色用纯黑，浅色用纯白，会参与背景层级反转",
-                    checked = config.isPureBlack,
-                    onCheckedChange = viewModel::updateIsPureBlack
                 )
             }
 
@@ -173,34 +156,19 @@ private fun ThemeModeSelector(
     selected: ThemeMode,
     onSelect: (ThemeMode) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("主题模式", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ThemeMode.entries.forEach { mode ->
-                    FilterChip(
-                        modifier = Modifier.weight(1f),
-                        selected = selected == mode,
-                        onClick = { onSelect(mode) },
-                        label = {
-                            Text(
-                                when (mode) {
-                                    ThemeMode.LIGHT -> "浅色"
-                                    ThemeMode.DARK -> "深色"
-                                    ThemeMode.SYSTEM -> "跟随系统"
-                                },
-                                maxLines = 1
-                            )
-                        }
-                    )
-                }
-            }
-        }
-    }
+    SettingDropdown(
+        title = "主题模式",
+        selected = selected,
+        options = ThemeMode.entries,
+        optionLabel = ::themeModeLabel,
+        onSelect = onSelect
+    )
+}
+
+private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
+    ThemeMode.LIGHT -> "浅色"
+    ThemeMode.DARK -> "深色"
+    ThemeMode.SYSTEM -> "跟随系统"
 }
 
 @Composable
@@ -512,39 +480,13 @@ private fun TransitionStyleSelector(
     selected: TransitionStyle,
     onSelect: (TransitionStyle) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("过渡动画", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            TransitionStyle.entries.forEach { style ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = { onSelect(style) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = transitionStyleLabel(style),
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    if (style == selected) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    } else {
-                        Spacer(Modifier.size(24.dp))
-                    }
-                }
-            }
-        }
-    }
+    SettingDropdown(
+        title = "过渡动画",
+        selected = selected,
+        options = TransitionStyle.entries,
+        optionLabel = ::transitionStyleLabel,
+        onSelect = onSelect
+    )
 }
 
 private fun transitionStyleLabel(style: TransitionStyle): String = when (style) {
@@ -569,35 +511,20 @@ private fun AnimationSpeedSelector(
     speed: AnimationSpeed,
     onSelect: (AnimationSpeed) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("动画速度", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AnimationSpeed.entries.forEach { s ->
-                    FilterChip(
-                        modifier = Modifier.weight(1f),
-                        selected = speed == s,
-                        onClick = { onSelect(s) },
-                        label = {
-                            Text(
-                                when (s) {
-                                    AnimationSpeed.OFF -> "关闭"
-                                    AnimationSpeed.FAST -> "快速"
-                                    AnimationSpeed.NORMAL -> "标准"
-                                    AnimationSpeed.SLOW -> "慢速"
-                                },
-                                maxLines = 1
-                            )
-                        }
-                    )
-                }
-            }
-        }
-    }
+    SettingDropdown(
+        title = "动画速度",
+        selected = speed,
+        options = AnimationSpeed.entries,
+        optionLabel = ::animationSpeedLabel,
+        onSelect = onSelect
+    )
+}
+
+private fun animationSpeedLabel(speed: AnimationSpeed): String = when (speed) {
+    AnimationSpeed.OFF -> "关闭"
+    AnimationSpeed.FAST -> "快速"
+    AnimationSpeed.NORMAL -> "标准"
+    AnimationSpeed.SLOW -> "慢速"
 }
 
 @Composable
@@ -605,33 +532,18 @@ private fun CornerStyleSelector(
     selected: CornerStyle,
     onSelect: (CornerStyle) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("圆角风格", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CornerStyle.entries.forEach { s ->
-                    FilterChip(
-                        modifier = Modifier.weight(1f),
-                        selected = selected == s,
-                        onClick = { onSelect(s) },
-                        label = {
-                            Text(
-                                when (s) {
-                                    CornerStyle.SQUARE -> "直角"
-                                    CornerStyle.STANDARD -> "标准"
-                                    CornerStyle.ROUNDED -> "圆润"
-                                    CornerStyle.CIRCULAR -> "圆形"
-                                },
-                                maxLines = 1
-                            )
-                        }
-                    )
-                }
-            }
-        }
-    }
+    SettingDropdown(
+        title = "圆角风格",
+        selected = selected,
+        options = CornerStyle.entries,
+        optionLabel = ::cornerStyleLabel,
+        onSelect = onSelect
+    )
+}
+
+private fun cornerStyleLabel(style: CornerStyle): String = when (style) {
+    CornerStyle.SQUARE -> "直角"
+    CornerStyle.STANDARD -> "标准"
+    CornerStyle.ROUNDED -> "圆润"
+    CornerStyle.CIRCULAR -> "圆形"
 }

@@ -141,12 +141,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun updateSwapBaseColors(enabled: Boolean) {
-        viewModelScope.launch {
-            appSettings.updateSwapBaseColors(enabled)
-        }
-    }
-
     fun updateFontScale(scale: Float) {
         viewModelScope.launch {
             appSettings.updateFontScale(scale)
@@ -180,12 +174,6 @@ class SettingsViewModel @Inject constructor(
     fun updateTransitionStyle(style: TransitionStyle) {
         viewModelScope.launch {
             appSettings.updateTransitionStyle(style)
-        }
-    }
-
-    fun updateIsPureBlack(isPure: Boolean) {
-        viewModelScope.launch {
-            appSettings.updateIsPureBlack(isPure)
         }
     }
 

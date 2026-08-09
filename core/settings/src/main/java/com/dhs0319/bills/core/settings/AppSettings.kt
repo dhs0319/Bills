@@ -43,14 +43,12 @@ class AppSettings @Inject constructor(
     private val seedColorKey = intPreferencesKey("seed_color")
     private val useDynamicColorKey = booleanPreferencesKey("use_dynamic_color")
     private val paletteStyleKey = stringPreferencesKey("palette_style")
-    private val swapBaseColorsKey = booleanPreferencesKey("swap_base_colors")
     private val fontScaleKey = floatPreferencesKey("font_scale")
     private val uiScaleKey = floatPreferencesKey("ui_scale")
     private val roundScreenSafePaddingScaleKey = floatPreferencesKey("round_screen_safe_padding_scale")
     private val pullRefreshDistanceKey = floatPreferencesKey("pull_refresh_distance")
     private val animationSpeedKey = stringPreferencesKey("animation_speed")
     private val transitionStyleKey = stringPreferencesKey("transition_style")
-    private val isPureBlackKey = booleanPreferencesKey("is_pure_black")
     private val frameRateModeKey = stringPreferencesKey("frame_rate_mode")
     private val cornerStyleKey = stringPreferencesKey("corner_style")
     private val hdFeedKey = booleanPreferencesKey("hd_feed")
@@ -70,7 +68,6 @@ class AppSettings @Inject constructor(
             useDynamicColor = prefs[useDynamicColorKey] ?: defaultThemeConfig.useDynamicColor,
             paletteStyle = prefs[paletteStyleKey]?.let { PaletteStyle.valueOf(it) }
                 ?: defaultThemeConfig.paletteStyle,
-            swapBaseColors = prefs[swapBaseColorsKey] ?: defaultThemeConfig.swapBaseColors,
             fontScale = prefs[fontScaleKey] ?: defaultThemeConfig.fontScale,
             uiScale = prefs[uiScaleKey] ?: defaultThemeConfig.uiScale,
             roundScreenSafePaddingScale = prefs[roundScreenSafePaddingScaleKey]
@@ -81,7 +78,6 @@ class AppSettings @Inject constructor(
                 ?: defaultThemeConfig.animationSpeed,
             transitionStyle = prefs[transitionStyleKey]?.let { TransitionStyle.valueOf(it) }
                 ?: defaultThemeConfig.transitionStyle,
-            isPureBlack = prefs[isPureBlackKey] ?: defaultThemeConfig.isPureBlack,
             preferredFrameRate = prefs[frameRateModeKey]?.let { FrameRateMode.valueOf(it) }
                 ?: defaultThemeConfig.preferredFrameRate,
             cornerStyle = prefs[cornerStyleKey]?.let { CornerStyle.valueOf(it) }
@@ -103,10 +99,6 @@ class AppSettings @Inject constructor(
 
     suspend fun updatePaletteStyle(style: PaletteStyle) {
         context.appSettingsDataStore.edit { it[paletteStyleKey] = style.name }
-    }
-
-    suspend fun updateSwapBaseColors(enabled: Boolean) {
-        context.appSettingsDataStore.edit { it[swapBaseColorsKey] = enabled }
     }
 
     suspend fun updateFontScale(scale: Float) {
@@ -131,10 +123,6 @@ class AppSettings @Inject constructor(
 
     suspend fun updateTransitionStyle(style: TransitionStyle) {
         context.appSettingsDataStore.edit { it[transitionStyleKey] = style.name }
-    }
-
-    suspend fun updateIsPureBlack(isPure: Boolean) {
-        context.appSettingsDataStore.edit { it[isPureBlackKey] = isPure }
     }
 
     suspend fun updateFrameRateMode(mode: FrameRateMode) {
