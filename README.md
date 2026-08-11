@@ -105,7 +105,7 @@
 
 ## 说明
 
-Bills基于[bbspace](https://github.com/naaammme/bbspace)二次开发，与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
+Bills基于[bbspace](https://github.com/naaammme/bbspace)项目二次开发，与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
 
 如果这个项目帮你省下了找实现细节和踩坑的时间，欢迎点个 Star。
 
