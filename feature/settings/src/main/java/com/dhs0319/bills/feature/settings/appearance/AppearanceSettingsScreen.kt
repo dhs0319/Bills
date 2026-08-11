@@ -56,7 +56,8 @@ fun AppearanceSettingsScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .navigationBarsPadding(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -495,7 +496,6 @@ private fun transitionStyleLabel(style: TransitionStyle): String = when (style) 
     TransitionStyle.SHARED_AXIS_Y -> "垂直滑动"
     TransitionStyle.SHARED_AXIS_Z -> "缩放"
     TransitionStyle.FADE_THROUGH -> "淡入淡出"
-    TransitionStyle.SLIDE -> "滑动"
 }
 
 private fun paletteStyleLabel(style: PaletteStyle): String = when (style) {

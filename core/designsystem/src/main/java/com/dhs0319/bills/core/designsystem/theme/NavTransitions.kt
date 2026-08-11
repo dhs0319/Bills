@@ -147,33 +147,5 @@ fun <T> buildNavTransitions(style: TransitionStyle, speed: AnimationSpeed): NavT
                 fadeOut(tween(shortDur, easing = Standard))
             }
         )
-        TransitionStyle.SLIDE -> NavTransitions(
-            enter = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(dur, easing = Emphasized)
-                )
-            },
-            exit = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(dur, easing = Emphasized),
-                    targetOffset = { it / 3 }
-                )
-            },
-            popEnter = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(dur, easing = Emphasized),
-                    initialOffset = { it / 3 }
-                )
-            },
-            popExit = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(dur, easing = Emphasized)
-                )
-            }
-        )
     }
 }

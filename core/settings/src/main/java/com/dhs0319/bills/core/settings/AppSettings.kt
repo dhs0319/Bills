@@ -76,8 +76,7 @@ class AppSettings @Inject constructor(
                 ?: defaultThemeConfig.pullRefreshDistanceDp,
             animationSpeed = prefs[animationSpeedKey]?.let { AnimationSpeed.valueOf(it) }
                 ?: defaultThemeConfig.animationSpeed,
-            transitionStyle = prefs[transitionStyleKey]?.let { TransitionStyle.valueOf(it) }
-                ?: defaultThemeConfig.transitionStyle,
+            transitionStyle = prefs[transitionStyleKey].toTransitionStyleOrDefault(),
             preferredFrameRate = prefs[frameRateModeKey]?.let { FrameRateMode.valueOf(it) }
                 ?: defaultThemeConfig.preferredFrameRate,
             cornerStyle = prefs[cornerStyleKey]?.let { CornerStyle.valueOf(it) }
@@ -372,5 +371,11 @@ class AppSettings @Inject constructor(
         return PlayerBufferProfile.entries.getOrElse(this ?: defaultProfile.ordinal) {
             defaultProfile
         }
+    }
+
+    private fun String?.toTransitionStyleOrDefault(): TransitionStyle {
+        val value = this ?: return defaultThemeConfig.transitionStyle
+        return runCatching { TransitionStyle.valueOf(value) }
+            .getOrDefault(defaultThemeConfig.transitionStyle)
     }
 }

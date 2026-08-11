@@ -34,8 +34,8 @@ enum class TransitionStyle {
     SHARED_AXIS_X,
     SHARED_AXIS_Y,
     SHARED_AXIS_Z,
-    FADE_THROUGH,
-    SLIDE
+
+    FADE_THROUGH
 }
 
 enum class ThemeMode {
