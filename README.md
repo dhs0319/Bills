@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="images/banner.jpg" alt="BBSpace banner" width="920" />
-</p>
-
 <h2 align="center">Bills</h2>
 
 <p align="center">
