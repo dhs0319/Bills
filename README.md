@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="images/banner.jpg" alt="BBSpace banner" width="920" />
-</p>
-
 <h2 align="center">Bills</h2>
 
 <p align="center">
@@ -101,7 +97,7 @@
 - `Media3` 负责播放，`DanmakuFlameMaster` 负责弹幕渲染
 - `Room` 和 `DataStore` 管理本地数据
 - `OkHttp` `Retrofit` `Protobuf` 负责网络和协议层
-- 自行实现 B 站 gRPC over HTTP/1.1 请求封装
+- 实现 B 站 gRPC over HTTP/1.1 请求封装
 
 ## 下载与运行
 
@@ -111,7 +107,7 @@
 
 ## 说明
 
-Bills 与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
+Bills基于[bbspace](https://github.com/naaammme/bbspace)项目二次开发，与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
 
 如果这个项目帮你省下了找实现细节和踩坑的时间，欢迎点个 Star。
 
