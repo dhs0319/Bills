@@ -29,8 +29,6 @@
   <a href="https://github.com/dhs0319/Bills/releases"><strong>下载 APK</strong></a>
   ·
   <a href="https://github.com/dhs0319/Bills/issues"><strong>反馈问题</strong></a>
-  ·
-  <a href="https://t.me/ourbbspace"><strong>Telegram</strong></a>
 </p>
 
 
@@ -97,7 +95,7 @@
 - `Media3` 负责播放，`DanmakuFlameMaster` 负责弹幕渲染
 - `Room` 和 `DataStore` 管理本地数据
 - `OkHttp` `Retrofit` `Protobuf` 负责网络和协议层
-- 自行实现 B 站 gRPC over HTTP/1.1 请求封装
+- 实现 B 站 gRPC over HTTP/1.1 请求封装
 
 ## 下载与运行
 
