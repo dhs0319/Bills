@@ -83,10 +83,17 @@ jobs:
             -PversionName=${{ steps.ver.outputs.name }} \
             -PversionCode=${{ steps.ver.outputs.code }}
 
+      - name: Rename APKs
+        run: |
+          for apk in app/build/outputs/apk/release/app-*.apk; do
+            [ -e "$apk" ] || continue
+            mv "$apk" "${apk/app-/Bills-}"
+          done
+
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: bbspace-${{ steps.ver.outputs.name }}.apk
+          name: Bills-${{ steps.ver.outputs.name }}
           path: app/build/outputs/apk/release/*.apk
 
       - name: Create GitHub Release

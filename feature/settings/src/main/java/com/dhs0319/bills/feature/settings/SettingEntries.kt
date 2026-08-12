@@ -1,16 +1,17 @@
 package com.dhs0319.bills.feature.settings
 
 import com.dhs0319.bills.feature.settings.navigation.APPEARANCE_ROUTE
-import com.dhs0319.bills.feature.settings.navigation.FEED_SETTINGS_ROUTE
-import com.dhs0319.bills.feature.settings.navigation.PERFORMANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.AUDIO_VIDEO_ROUTE
+import com.dhs0319.bills.feature.settings.navigation.FEED_SETTINGS_ROUTE
+import com.dhs0319.bills.feature.settings.navigation.OTHER_SETTINGS_ROUTE
+import com.dhs0319.bills.feature.settings.navigation.PERFORMANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PRIVACY_ROUTE
 
 data class SettingEntry(val title: String, val subtitle: String, val route: String)
 
 val appearanceEntries = listOf(
     SettingEntry("主题模式", "浅色 深色 或跟随系统", APPEARANCE_ROUTE),
-    SettingEntry("动态取色", "Android 12 以上从壁纸提取颜色", APPEARANCE_ROUTE),
+    SettingEntry("动态取色", "Android 12 及以上从壁纸提取颜色", APPEARANCE_ROUTE),
     SettingEntry("主题色", "选择应用主题颜色", APPEARANCE_ROUTE),
     SettingEntry("字体大小", "调整应用字体大小", APPEARANCE_ROUTE),
     SettingEntry("动画速度", "调整界面动画速度", APPEARANCE_ROUTE),
@@ -19,8 +20,12 @@ val appearanceEntries = listOf(
 )
 
 val performanceEntries = listOf(
-    SettingEntry("使用系统 DNS", "重启后生效 关闭后使用 HTTPDNS", PERFORMANCE_ROUTE),
     SettingEntry("屏幕刷新率", "设置应用渲染帧率上限", PERFORMANCE_ROUTE),
+    SettingEntry("固定底栏", "主页底栏不再随滚动自动收起", PERFORMANCE_ROUTE),
+)
+
+val otherEntries = listOf(
+    SettingEntry("使用系统 DNS", "重启后生效，关闭后使用 HTTPDNS", OTHER_SETTINGS_ROUTE),
 )
 
 val audioVideoEntries = listOf(
@@ -41,4 +46,4 @@ val privacyEntries = listOf(
 )
 
 val allSettingEntries =
-    appearanceEntries + performanceEntries + audioVideoEntries + feedEntries + privacyEntries
+    appearanceEntries + performanceEntries + otherEntries + audioVideoEntries + feedEntries + privacyEntries

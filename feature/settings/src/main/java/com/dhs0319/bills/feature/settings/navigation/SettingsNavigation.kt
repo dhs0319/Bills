@@ -10,12 +10,14 @@ import com.dhs0319.bills.feature.settings.appearance.AppearanceSettingsScreen
 import com.dhs0319.bills.feature.settings.audioVideo.AudioVideoSettingsScreen
 import com.dhs0319.bills.feature.settings.errorlog.ErrorLogScreen
 import com.dhs0319.bills.feature.settings.feed.FeedSettingsScreen
+import com.dhs0319.bills.feature.settings.other.OtherSettingsScreen
 import com.dhs0319.bills.feature.settings.performance.PerformanceSettingsScreen
 import com.dhs0319.bills.feature.settings.privacy.PrivacySettingsScreen
 
 const val SETTINGS_ROUTE = "settings"
 const val APPEARANCE_ROUTE = "settings/appearance"
 const val PERFORMANCE_ROUTE = "settings/performance"
+const val OTHER_SETTINGS_ROUTE = "settings/other"
 const val PRIVACY_ROUTE = "settings/privacy"
 const val FEED_SETTINGS_ROUTE = "settings/feed"
 const val AUDIO_VIDEO_ROUTE = "settings/audio_video"
@@ -31,10 +33,10 @@ fun NavGraphBuilder.settingsScreen(
             onBack = { navController.popBackStack() },
             onNavigateToAppearance = { navController.navigate(APPEARANCE_ROUTE) },
             onNavigateToPerformance = { navController.navigate(PERFORMANCE_ROUTE) },
+            onNavigateToOther = { navController.navigate(OTHER_SETTINGS_ROUTE) },
             onNavigateToFeed = { navController.navigate(FEED_SETTINGS_ROUTE) },
             onNavigateToAudioVideo = { navController.navigate(AUDIO_VIDEO_ROUTE) },
             onNavigateToPrivacy = { navController.navigate(PRIVACY_ROUTE) },
-            onNavigateToErrorLog = { navController.navigate(ERROR_LOG_ROUTE) },
             onNavigateToAbout = { navController.navigate(ABOUT_ROUTE) }
         )
     }
@@ -45,6 +47,10 @@ fun NavGraphBuilder.settingsScreen(
 
     composable(PERFORMANCE_ROUTE) {
         PerformanceSettingsScreen(onBack = { navController.popBackStack() })
+    }
+
+    composable(OTHER_SETTINGS_ROUTE) {
+        OtherSettingsScreen(onBack = { navController.popBackStack() })
     }
 
     composable(AUDIO_VIDEO_ROUTE) {
@@ -75,6 +81,7 @@ fun NavGraphBuilder.settingsScreen(
             info.longVersionCode else info.versionCode.toLong()
         AboutScreen(
             onBack = { navController.popBackStack() },
+            onNavigateToErrorLog = { navController.navigate(ERROR_LOG_ROUTE) },
             versionName = info.versionName ?: "unknown",
             versionCode = versionCode
         )

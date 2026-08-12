@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +44,7 @@ import com.dhs0319.bills.feature.settings.components.SettingCategory
 import com.dhs0319.bills.feature.settings.navigation.APPEARANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.AUDIO_VIDEO_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.FEED_SETTINGS_ROUTE
+import com.dhs0319.bills.feature.settings.navigation.OTHER_SETTINGS_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PERFORMANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PRIVACY_ROUTE
 
@@ -51,10 +54,10 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToPerformance: () -> Unit,
+    onNavigateToOther: () -> Unit,
     onNavigateToFeed: () -> Unit,
     onNavigateToAudioVideo: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
-    onNavigateToErrorLog: () -> Unit,
     onNavigateToAbout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -65,6 +68,7 @@ fun SettingsScreen(
     val routeNav = mapOf(
         APPEARANCE_ROUTE to onNavigateToAppearance,
         PERFORMANCE_ROUTE to onNavigateToPerformance,
+        OTHER_SETTINGS_ROUTE to onNavigateToOther,
         FEED_SETTINGS_ROUTE to onNavigateToFeed,
         AUDIO_VIDEO_ROUTE to onNavigateToAudioVideo,
         PRIVACY_ROUTE to onNavigateToPrivacy,
@@ -87,22 +91,28 @@ fun SettingsScreen(
                 onClick = onNavigateToAppearance
             ),
             SettingsHomeItem(
-                icon = Icons.Default.Settings,
-                title = "性能设置",
+                icon = Icons.Default.Tv,
+                title = "显示设置",
                 subtitle = "刷新率和渲染策略",
                 onClick = onNavigateToPerformance
             ),
             SettingsHomeItem(
                 icon = Icons.Default.PlayArrow,
-                title = "音视频设置",
+                title = "播放器设置",
                 subtitle = "画质 音质 和编码格式",
                 onClick = onNavigateToAudioVideo
             ),
             SettingsHomeItem(
-                icon = Icons.Default.Settings,
-                title = "推荐设置",
+                icon = Icons.Default.AutoAwesome,
+                title = "内容推荐设置",
                 subtitle = "HD 推荐模式",
                 onClick = onNavigateToFeed
+            ),
+            SettingsHomeItem(
+                icon = Icons.Default.Tune,
+                title = "其他设置",
+                subtitle = "网络和其他选项",
+                onClick = onNavigateToOther
             ),
             SettingsHomeItem(
                 icon = Icons.Default.Lock,
@@ -116,12 +126,6 @@ fun SettingsScreen(
                 subtitle = "版本信息和开源许可",
                 onClick = onNavigateToAbout
             ),
-            SettingsHomeItem(
-                icon = Icons.Default.Warning,
-                title = "错误日志",
-                subtitle = "查看和导出应用错误记录",
-                onClick = onNavigateToErrorLog
-            )
         )
 
     CollapsingTopBarScaffold(

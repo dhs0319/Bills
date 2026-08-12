@@ -38,7 +38,6 @@ fun AppearanceSettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val config by viewModel.themeConfig.collectAsStateWithLifecycle()
-    val fixBottomBar by viewModel.fixBottomBar.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -116,15 +115,6 @@ fun AppearanceSettingsScreen(
                 PullRefreshDistanceSelector(
                     distanceDp = config.pullRefreshDistanceDp,
                     onDistanceChange = viewModel::updatePullRefreshDistance
-                )
-            }
-
-            item {
-                SettingSwitch(
-                    title = "固定底栏",
-                    subtitle = "主页底栏不再随滚动自动收起",
-                    checked = fixBottomBar,
-                    onCheckedChange = viewModel::updateFixBottomBar
                 )
             }
 

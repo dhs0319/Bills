@@ -53,7 +53,7 @@ fun AudioVideoSettingsScreen(
         topBar = { scrollBehavior ->
             TopAppBar(
                 title = {
-                    Text("音视频设置")
+                    Text("播放器设置")
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
