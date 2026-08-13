@@ -76,14 +76,10 @@ fun NavGraphBuilder.settingsScreen(
         val context = LocalContext.current
         val pm = context.packageManager
         val info = pm.getPackageInfo(context.packageName, 0)
-        @Suppress("DEPRECATION")
-        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P)
-            info.longVersionCode else info.versionCode.toLong()
         AboutScreen(
             onBack = { navController.popBackStack() },
             onNavigateToErrorLog = { navController.navigate(ERROR_LOG_ROUTE) },
-            versionName = info.versionName ?: "unknown",
-            versionCode = versionCode
+            versionName = info.versionName ?: "unknown"
         )
     }
 }

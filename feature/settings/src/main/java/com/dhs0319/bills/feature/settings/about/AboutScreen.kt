@@ -5,10 +5,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -41,7 +41,6 @@ fun AboutScreen(
     onBack: () -> Unit,
     onNavigateToErrorLog: () -> Unit,
     versionName: String,
-    versionCode: Long,
     vm: AboutViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -75,20 +74,18 @@ fun AboutScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.about_banner),
                             contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth(0.56f)
-                                .aspectRatio(1f),
+                            modifier = Modifier.size(104.dp),
                             contentScale = ContentScale.Fit
                         )
                         Text(
-                            text = "v$versionName - $versionCode",
+                            text = "v$versionName",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

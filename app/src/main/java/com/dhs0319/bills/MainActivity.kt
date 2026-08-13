@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
     private fun autoCheckUpdate() {
         lifecycleScope.launch {
             if (!appSettings.autoCheckUpdate.first()) return@launch
+            if (!appSettings.tryBeginAutomaticUpdateCheck()) return@launch
             val result = updateChecker.check().getOrNull() ?: return@launch
             if (result is AppUpdateCheckResult.HasUpdate) {
                 updateDialog = result.toDialogState()

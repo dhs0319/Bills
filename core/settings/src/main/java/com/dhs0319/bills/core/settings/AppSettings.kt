@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.dhs0319.bills.core.designsystem.theme.AnimationSpeed
 import com.dhs0319.bills.core.designsystem.theme.CornerStyle
@@ -57,6 +58,7 @@ class AppSettings @Inject constructor(
     private val teenagersModeKey = booleanPreferencesKey("teenagers_mode")
     private val teenagersAgeKey = intPreferencesKey("teenagers_age")
     private val autoCheckUpdateKey = booleanPreferencesKey("auto_check_update")
+    private val lastAutoUpdateCheckAtKey = longPreferencesKey("last_auto_update_check_at")
     private val useSystemDnsKey = booleanPreferencesKey("use_system_dns")
     private val fixBottomBarKey = booleanPreferencesKey("fix_bottom_bar")
 
@@ -173,6 +175,19 @@ class AppSettings @Inject constructor(
 
     suspend fun updateAutoCheckEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[autoCheckUpdateKey] = enabled }
+    }
+
+    suspend fun tryBeginAutomaticUpdateCheck(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        var shouldCheck = false
+        context.appSettingsDataStore.edit { preferences ->
+            val lastCheckAt = preferences[lastAutoUpdateCheckAtKey] ?: 0L
+            val elapsed = nowMillis - lastCheckAt
+            if (lastCheckAt == 0L || elapsed < 0L || elapsed >= AUTO_UPDATE_CHECK_INTERVAL_MS) {
+                preferences[lastAutoUpdateCheckAtKey] = nowMillis
+                shouldCheck = true
+            }
+        }
+        return shouldCheck
     }
 
     suspend fun updateUseSystemDns(enabled: Boolean) {
@@ -362,6 +377,7 @@ class AppSettings @Inject constructor(
     }
 
     private companion object {
+        const val AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
         const val DEFAULT_TEENAGERS_AGE = 16
         const val MIN_TEENAGERS_AGE = 1
         const val MAX_TEENAGERS_AGE = 17
