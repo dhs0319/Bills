@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
 data class ThemeConfig(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val seedColor: Color = Color(0xFFFB7299),
-    val useDynamicColor: Boolean = true,
+    val useDynamicColor: Boolean = false,
     val paletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT,
     val fontScale: Float = 1.0f,
     val uiScale: Float = 1.0f,

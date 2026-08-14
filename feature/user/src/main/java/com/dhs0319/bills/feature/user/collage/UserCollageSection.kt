@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ShoppingCart
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -52,7 +51,6 @@ private object UserCollageFrames {
     val history = UserCollageFrame("history", 0.31f, 0.31f, Alignment.BottomCenter, -0.02f, -0.48f, 13f)
     val favorite = UserCollageFrame("favorite", 0.31f, 0.31f, Alignment.BottomEnd, -0.03f, -0.47f, -10f)
     val watchLater = UserCollageFrame("watchLater", 0.35f, 0.35f, Alignment.BottomStart, 0.11f, -0.34f, 6f)
-    val bbSpace = UserCollageFrame("bbSpace", 0.46f, 0.20f, Alignment.BottomEnd, -0.04f, -0.34f, -6f)
 }
 
 private data class UserCollageFrame(
@@ -71,7 +69,6 @@ internal fun UserCollageSection(
     collageOffsets: Map<String, Offset>,
     onCollageOffsetChange: (String, Offset) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
-    onNavigateToBbSpace: () -> Unit,
     onNavigate: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
     palette: UserCollagePalette,
@@ -203,18 +200,6 @@ internal fun UserCollageSection(
                 title = "稍后再看",
                 subtitle = "待看清单",
                 centered = true
-            )
-        }
-        CollageItem(
-            frame = UserCollageFrames.bbSpace,
-            shape = extraLarge,
-            color = palette.tileSurfaceStrong,
-            onClick = onNavigateToBbSpace
-        ) {
-            UserEntryTileContent(
-                icon = Icons.Default.ShoppingCart,
-                title = "bb空间",
-                subtitle = "扩展入口"
             )
         }
     }

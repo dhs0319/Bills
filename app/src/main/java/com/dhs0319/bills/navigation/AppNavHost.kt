@@ -72,8 +72,6 @@ import com.dhs0319.bills.feature.auth.navigation.SMS_LOGIN_ROUTE
 import com.dhs0319.bills.feature.auth.navigation.accountScreen
 import com.dhs0319.bills.feature.auth.navigation.loginScreen
 import com.dhs0319.bills.feature.auth.navigation.smsLoginScreen
-import com.dhs0319.bills.feature.bbspace.navigation.bbSpaceScreen
-import com.dhs0319.bills.feature.bbspace.navigation.navigateToBbSpace
 import com.dhs0319.bills.feature.download.navigation.downloadScreen
 import com.dhs0319.bills.feature.download.navigation.navigateToDownload
 import com.dhs0319.bills.feature.favorite.navigation.favoriteScreen
@@ -258,7 +256,6 @@ fun AppNavHost(
                     onNavigateToSearch = { rootNavController.navigateToSearch() },
                     onNavigateToSettings = { rootNavController.navigate(SETTINGS_ROUTE) },
                     onNavigateToAccount = { rootNavController.navigate(ACCOUNT_ROUTE) },
-                    onNavigateToBbSpace = { rootNavController.navigateToBbSpace() },
                     onNavigateFromUser = { dest ->
                         when (dest) {
                             UserDest.History -> rootNavController.navigateToHistory()
@@ -306,13 +303,6 @@ fun AppNavHost(
                 onSwitched = { rootNavController.popBackStack() }
             )
 
-            bbSpaceScreen(
-                navController = rootNavController,
-                onOpenSpace = rootNavController::navigateToSpace,
-                onOpenVideoDetail = openVideo,
-                onOpenDynamicDetail = rootNavController::navigateToDynamicDetail,
-                onOpenLiveDetail = openLive
-            )
             settingsScreen(rootNavController)
             searchScreen(
                 onBack = { rootNavController.popBackStack() },
@@ -441,7 +431,6 @@ private fun MainTabsScaffold(
     onNavigateToSearch: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToAccount: () -> Unit,
-    onNavigateToBbSpace: () -> Unit,
     onNavigateFromUser: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
     onNavigateToVideo: (VideoTarget) -> Unit,
@@ -496,7 +485,6 @@ private fun MainTabsScaffold(
                         TopLevelRoute.PROFILE -> UserScreen(
                             onNavigateToAccount = onNavigateToAccount,
                             onNavigateToSettings = onNavigateToSettings,
-                            onNavigateToBbSpace = onNavigateToBbSpace,
                             onNavigate = onNavigateFromUser,
                             onNavigateToDownload = onNavigateToDownload,
                             onOpenSpace = onNavigateToSpace

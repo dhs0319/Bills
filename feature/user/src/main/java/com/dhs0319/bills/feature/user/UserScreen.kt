@@ -39,7 +39,6 @@ enum class UserDest {
 fun UserScreen(
     onNavigateToAccount: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToBbSpace: () -> Unit,
     onNavigate: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit = {},
@@ -88,7 +87,6 @@ fun UserScreen(
             collageOffsets = collageState.offsets,
             onCollageOffsetChange = collageState::updateOffset,
             onOpenSpace = onOpenSpace,
-            onNavigateToBbSpace = onNavigateToBbSpace,
             onNavigate = onNavigate,
             onNavigateToDownload = onNavigateToDownload,
             palette = palette,

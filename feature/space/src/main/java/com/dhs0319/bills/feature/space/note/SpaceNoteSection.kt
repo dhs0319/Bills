@@ -112,7 +112,7 @@ internal fun SpaceNoteTitleButton(
                 )
             },
             onExport = {
-                exportLauncher.launch("bbspace_space_notes.json")
+                exportLauncher.launch("bills_space_notes.json")
             },
             onImport = {
                 importLauncher.launch(arrayOf("application/json", "text/*"))
