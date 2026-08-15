@@ -3,6 +3,7 @@ package com.dhs0319.bills.feature.settings.appearance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.FlowRow
@@ -24,9 +25,9 @@ import com.dhs0319.bills.core.designsystem.theme.AnimationSpeed
 import com.dhs0319.bills.core.designsystem.theme.CornerStyle
 import com.dhs0319.bills.core.designsystem.theme.DEFAULT_PULL_REFRESH_DISTANCE_DP
 import com.dhs0319.bills.core.designsystem.theme.PresetColors
-import com.dhs0319.bills.core.designsystem.theme.PaletteStyle
 import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
+import com.dhs0319.bills.core.designsystem.theme.previewThemePrimaryColor
 import com.dhs0319.bills.feature.settings.components.SettingDropdown
 import com.dhs0319.bills.feature.settings.components.SettingSwitch
 import kotlin.math.roundToInt
@@ -38,6 +39,12 @@ fun AppearanceSettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val config by viewModel.themeConfig.collectAsStateWithLifecycle()
+    val systemIsDark = isSystemInDarkTheme()
+    val previewIsDark = when (config.themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> systemIsDark
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -69,25 +76,21 @@ fun AppearanceSettingsScreen(
 
             item {
                 SettingSwitch(
-                    title = "动态取色",
-                    subtitle = "Android 12+ 使用系统动态配色",
+                    title = "使用系统动态取色",
+                    subtitle = "开启后由壁纸决定应用配色",
                     checked = config.useDynamicColor,
                     onCheckedChange = viewModel::updateUseDynamicColor
                 )
             }
 
-            item {
-                PaletteStyleSelector(
-                    selected = config.paletteStyle,
-                    onSelect = viewModel::updatePaletteStyle
-                )
-            }
-
-            item {
-                ColorPaletteSelector(
-                    selected = config.seedColor,
-                    onSelect = viewModel::updateSeedColor
-                )
+            if (!config.useDynamicColor) {
+                item {
+                    ColorPaletteSelector(
+                        selected = config.seedColor,
+                        isDark = previewIsDark,
+                        onSelect = viewModel::updateSeedColor
+                    )
+                }
             }
 
             item {
@@ -165,6 +168,7 @@ private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
 @Composable
 private fun ColorPaletteSelector(
     selected: Color,
+    isDark: Boolean,
     onSelect: (Color) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -178,7 +182,7 @@ private fun ColorPaletteSelector(
             ) {
                 PresetColors.forEach { (color, _) ->
                     ColorItem(
-                        color = color,
+                        color = previewThemePrimaryColor(color, isDark),
                         selected = color == selected,
                         onClick = { onSelect(color) }
                     )
@@ -200,7 +204,7 @@ private fun ColorItem(
             .clip(CircleShape)
             .background(color)
             .then(
-                if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                 else Modifier
             )
             .clickable(onClick = onClick),
@@ -213,46 +217,6 @@ private fun ColorItem(
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun PaletteStyleSelector(
-    selected: PaletteStyle,
-    onSelect: (PaletteStyle) -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("调色盘风格", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            PaletteStyle.entries.forEach { style ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = { onSelect(style) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = paletteStyleLabel(style),
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    if (style == selected) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    } else {
-                        Spacer(Modifier.size(24.dp))
-                    }
-                }
-            }
         }
     }
 }
@@ -486,14 +450,6 @@ private fun transitionStyleLabel(style: TransitionStyle): String = when (style) 
     TransitionStyle.SHARED_AXIS_Y -> "垂直滑动"
     TransitionStyle.SHARED_AXIS_Z -> "缩放"
     TransitionStyle.FADE_THROUGH -> "淡入淡出"
-}
-
-private fun paletteStyleLabel(style: PaletteStyle): String = when (style) {
-    PaletteStyle.TONAL_SPOT -> "特调"
-    PaletteStyle.EXPRESSIVE -> "表现力"
-    PaletteStyle.NEUTRAL -> "中性"
-    PaletteStyle.VIBRANT -> "鲜艳"
-    PaletteStyle.MONOCHROME -> "黑白"
 }
 
 @Composable

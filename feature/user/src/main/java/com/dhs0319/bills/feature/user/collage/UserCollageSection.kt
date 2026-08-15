@@ -42,7 +42,7 @@ private object UserCollageShapes {
 }
 
 private object UserCollageFrames {
-    val avatar = UserCollageFrame("avatar", 0.29f, 0.34f, Alignment.TopStart, 0.04f, 0.05f, -8f)
+    val avatar = UserCollageFrame("avatar", 0.29f, 0.29f, Alignment.TopStart, 0.04f, 0.05f, -8f)
     val name = UserCollageFrame("name", 0.41f, 0.41f, Alignment.TopEnd, -0.03f, 0.05f, 7f)
     val dynamic = UserCollageFrame("dynamic", 0.29f, 0.29f, Alignment.CenterEnd, -0.05f, -0.25f, -9f)
     val following = UserCollageFrame("following", 0.31f, 0.20f, Alignment.CenterStart, 0.06f, -0.13f, -12f)

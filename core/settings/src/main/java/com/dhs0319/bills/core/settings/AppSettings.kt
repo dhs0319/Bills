@@ -13,7 +13,6 @@ import com.dhs0319.bills.core.designsystem.theme.AnimationSpeed
 import com.dhs0319.bills.core.designsystem.theme.CornerStyle
 import com.dhs0319.bills.core.designsystem.theme.DEFAULT_PULL_REFRESH_DISTANCE_DP
 import com.dhs0319.bills.core.designsystem.theme.FrameRateMode
-import com.dhs0319.bills.core.designsystem.theme.PaletteStyle
 import com.dhs0319.bills.core.designsystem.theme.ThemeConfig
 import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
@@ -43,7 +42,6 @@ class AppSettings @Inject constructor(
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val seedColorKey = intPreferencesKey("seed_color")
     private val useDynamicColorKey = booleanPreferencesKey("use_dynamic_color")
-    private val paletteStyleKey = stringPreferencesKey("palette_style")
     private val fontScaleKey = floatPreferencesKey("font_scale")
     private val uiScaleKey = floatPreferencesKey("ui_scale")
     private val roundScreenSafePaddingScaleKey = floatPreferencesKey("round_screen_safe_padding_scale")
@@ -68,8 +66,6 @@ class AppSettings @Inject constructor(
                 ?: defaultThemeConfig.themeMode,
             seedColor = Color(prefs[seedColorKey] ?: defaultThemeConfig.seedColor.toArgb()),
             useDynamicColor = prefs[useDynamicColorKey] ?: defaultThemeConfig.useDynamicColor,
-            paletteStyle = prefs[paletteStyleKey]?.let { PaletteStyle.valueOf(it) }
-                ?: defaultThemeConfig.paletteStyle,
             fontScale = prefs[fontScaleKey] ?: defaultThemeConfig.fontScale,
             uiScale = prefs[uiScaleKey] ?: defaultThemeConfig.uiScale,
             roundScreenSafePaddingScale = prefs[roundScreenSafePaddingScaleKey]
@@ -96,10 +92,6 @@ class AppSettings @Inject constructor(
 
     suspend fun updateUseDynamicColor(use: Boolean) {
         context.appSettingsDataStore.edit { it[useDynamicColorKey] = use }
-    }
-
-    suspend fun updatePaletteStyle(style: PaletteStyle) {
-        context.appSettingsDataStore.edit { it[paletteStyleKey] = style.name }
     }
 
     suspend fun updateFontScale(scale: Float) {

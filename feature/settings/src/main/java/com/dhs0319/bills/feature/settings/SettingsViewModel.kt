@@ -7,7 +7,6 @@ import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.designsystem.theme.AnimationSpeed
 import com.dhs0319.bills.core.designsystem.theme.CornerStyle
 import com.dhs0319.bills.core.designsystem.theme.FrameRateMode
-import com.dhs0319.bills.core.designsystem.theme.PaletteStyle
 import com.dhs0319.bills.core.designsystem.theme.ThemeConfig
 import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
@@ -132,12 +131,6 @@ class SettingsViewModel @Inject constructor(
     fun updateUseDynamicColor(use: Boolean) {
         viewModelScope.launch {
             appSettings.updateUseDynamicColor(use)
-        }
-    }
-
-    fun updatePaletteStyle(style: PaletteStyle) {
-        viewModelScope.launch {
-            appSettings.updatePaletteStyle(style)
         }
     }
 

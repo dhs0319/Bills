@@ -6,9 +6,8 @@ import androidx.compose.ui.graphics.Color
 @Immutable
 data class ThemeConfig(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val seedColor: Color = Color(0xFFFB7299),
+    val seedColor: Color = Color(0xFF00A1D6),
     val useDynamicColor: Boolean = false,
-    val paletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT,
     val fontScale: Float = 1.0f,
     val uiScale: Float = 1.0f,
     val roundScreenSafePaddingScale: Float = DEFAULT_ROUND_SCREEN_SAFE_PADDING_SCALE,
@@ -42,14 +41,6 @@ enum class ThemeMode {
     LIGHT, DARK, SYSTEM
 }
 
-enum class PaletteStyle {
-    TONAL_SPOT,
-    EXPRESSIVE,
-    NEUTRAL,
-    VIBRANT,
-    MONOCHROME
-}
-
 enum class AnimationSpeed(val multiplier: Float) {
     OFF(0f),
     FAST(0.5f),
@@ -66,8 +57,9 @@ enum class FrameRateMode(val value: Float) {
 }
 
 val PresetColors = listOf(
-    Color(0xFFFB7299) to "哔哩粉",
+    Color(0xFFD5D8EE) to "应用图标",
     Color(0xFF00A1D6) to "哔哩蓝",
+    Color(0xFFFB7299) to "哔哩粉",
     Color(0xFFF44336) to "红色",
     Color(0xFFFF9800) to "橙色",
     Color(0xFFFFC107) to "琥珀",
@@ -77,7 +69,6 @@ val PresetColors = listOf(
     Color(0xFF4CAF50) to "绿色",
     Color(0xFF009688) to "青色",
     Color(0xFF00BCD4) to "蓝绿",
-    Color(0xFF03A9F4) to "浅蓝",
     Color(0xFF2196F3) to "蓝色",
     Color(0xFF3F51B5) to "靛蓝",
     Color(0xFF9C27B0) to "紫色",

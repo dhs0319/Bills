@@ -3,6 +3,7 @@ package com.dhs0319.bills.navigation
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -547,6 +548,7 @@ private fun TopLevelFloatingNavigation(
     val searchFab: @Composable () -> Unit = {
         FloatingActionButton(
             onClick = onNavigateToSearch,
+            shape = CircleShape,
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
