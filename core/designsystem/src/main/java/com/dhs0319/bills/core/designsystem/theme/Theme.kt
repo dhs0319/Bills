@@ -1,6 +1,5 @@
 package com.dhs0319.bills.core.designsystem.theme
 
-import android.graphics.Color as AndroidColor
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
@@ -17,6 +16,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import com.google.android.material.color.utilities.DynamicColor
+import com.google.android.material.color.utilities.Hct
+import com.google.android.material.color.utilities.MaterialDynamicColors
+import com.google.android.material.color.utilities.SchemeTonalSpot
 
 @Composable
 fun BiliTheme(
@@ -73,212 +76,91 @@ fun previewThemePrimaryColor(seedColor: Color, isDark: Boolean): Color {
 }
 
 private fun createSeedColorScheme(seedColor: Color, isDark: Boolean): ColorScheme {
-    val sourceHsv = FloatArray(3)
-    AndroidColor.colorToHSV(seedColor.toArgb(), sourceHsv)
-    val isNeutralSeed = sourceHsv[1] < 0.05f
-    val isSoftSeed = sourceHsv[1] < 0.20f
-    val neutralValue = sourceHsv[2]
-    val seed = seedColor.tone(
-        saturationScale = if (isSoftSeed) 1f else 0.82f,
-        value = if (isNeutralSeed) neutralValue else 0.92f
+    val scheme = SchemeTonalSpot(
+        Hct.fromInt(seedColor.toArgb()),
+        isDark,
+        0.0
     )
-    val containerSaturationScale = if (isSoftSeed) {
-        1f
-    } else if (isDark) {
-        0.45f
-    } else {
-        0.24f
-    }
-    val accentSaturationScale = if (isSoftSeed) {
-        1f
-    } else if (isDark) {
-        0.48f
-    } else {
-        0.20f
-    }
-    val accentContainerSaturationScale = if (isSoftSeed) {
-        1f
-    } else if (isDark) {
-        0.24f
-    } else {
-        0.20f
-    }
-    val primaryValue = if (isNeutralSeed) {
-        if (isDark) {
-            (0.90f - neutralValue * 0.35f).coerceIn(0.50f, 0.90f)
-        } else {
-            (0.18f + neutralValue * 0.55f).coerceIn(0.18f, 0.75f)
-        }
-    } else if (isDark) {
-        0.82f
-    } else {
-        0.64f
-    }
-    val primaryContainerValue = if (isNeutralSeed) {
-        if (isDark) 0.26f + neutralValue * 0.16f else 0.86f + neutralValue * 0.10f
-    } else if (isDark) {
-        0.26f
-    } else {
-        0.92f
-    }
-    val accentValue = if (isNeutralSeed) {
-        if (isDark) 0.84f - neutralValue * 0.28f else 0.30f + neutralValue * 0.32f
-    } else if (isDark) {
-        0.78f
-    } else {
-        0.50f
-    }
-    val accentContainerValue = if (isNeutralSeed) {
-        if (isDark) 0.28f + neutralValue * 0.12f else 0.88f + neutralValue * 0.08f
-    } else if (isDark) {
-        0.22f
-    } else {
-        0.94f
-    }
-    val primary = seed.tone(value = primaryValue)
-    val primaryContainer = seed.tone(
-        saturationScale = containerSaturationScale,
-        value = primaryContainerValue
-    )
-    val inversePrimary = seed.tone(value = 0.42f)
-    val secondary = seed.tone(
-        saturationScale = accentSaturationScale,
-        value = accentValue
-    )
-    val secondaryContainer = seed.tone(
-        saturationScale = accentContainerSaturationScale,
-        value = accentContainerValue
-    )
-    val tertiary = seed.tone(
-        saturationScale = accentSaturationScale,
-        value = accentValue
-    )
-    val tertiaryContainer = seed.tone(
-        saturationScale = accentContainerSaturationScale,
-        value = accentContainerValue
-    )
-    val background = seed.tone(
-        saturationScale = if (isDark) 0.06f else 0.08f,
-        value = if (isDark) 0.08f else 0.97f
-    )
-    val surface = seed.tone(
-        saturationScale = if (isDark) 0.06f else 0.08f,
-        value = if (isDark) 0.10f else 0.98f
-    )
-    val surfaceTint = primary
-    val surfaceVariant = if (isDark) Color(0xFF1C1C1C) else Color(0xFFF0F0F0)
-    val onSurfaceVariant = if (isDark) Color(0xFFD0D0D0) else Color(0xFF505050)
-    val scrim = seed.tone(saturationScale = 0.04f, value = if (isDark) 0.04f else 0.10f)
-    val surfaceBright = if (isDark) seed.tone(saturationScale = 0.06f, value = 0.16f) else Color.White
-    val surfaceContainer = seed.tone(
-        saturationScale = 0.06f,
-        value = if (isDark) 0.12f else 0.96f
-    )
-    val surfaceContainerHigh = seed.tone(
-        saturationScale = 0.06f,
-        value = if (isDark) 0.16f else 0.94f
-    )
-    val surfaceContainerHighest = seed.tone(
-        saturationScale = 0.06f,
-        value = if (isDark) 0.20f else 0.92f
-    )
-    val surfaceContainerLow = seed.tone(
-        saturationScale = 0.06f,
-        value = if (isDark) 0.08f else 0.98f
-    )
-    val surfaceContainerLowest = if (isDark) seed.tone(saturationScale = 0.04f, value = 0.05f) else Color.White
-    val surfaceDim = seed.tone(
-        saturationScale = 0.05f,
-        value = if (isDark) 0.06f else 0.94f
-    )
+    val materialColors = MaterialDynamicColors()
+    fun colorOf(dynamicColor: DynamicColor): Color = Color(dynamicColor.getArgb(scheme))
+
     return if (isDark) {
         darkColorScheme(
-            primary = primary,
-            onPrimary = Color.Black,
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = Color.White,
-            inversePrimary = inversePrimary,
-            secondary = secondary,
-            onSecondary = Color.Black,
-            secondaryContainer = secondaryContainer,
-            onSecondaryContainer = Color.White,
-            tertiary = tertiary,
-            onTertiary = Color.Black,
-            tertiaryContainer = tertiaryContainer,
-            onTertiaryContainer = Color.White,
-            background = background,
-            onBackground = Color.White,
-            surface = surface,
-            onSurface = Color.White,
-            surfaceVariant = surfaceVariant,
-            onSurfaceVariant = onSurfaceVariant,
-            surfaceTint = surfaceTint,
-            inverseSurface = Color.White,
-            inverseOnSurface = Color.Black,
-            outline = Color(0xFF808080),
-            outlineVariant = Color(0xFF404040),
-            scrim = scrim,
-            surfaceBright = surfaceBright,
-            surfaceContainer = surfaceContainer,
-            surfaceContainerHigh = surfaceContainerHigh,
-            surfaceContainerHighest = surfaceContainerHighest,
-            surfaceContainerLow = surfaceContainerLow,
-            surfaceContainerLowest = surfaceContainerLowest,
-            surfaceDim = surfaceDim,
-            error = Color(0xFFE0E0E0),
-            onError = Color.Black,
-            errorContainer = Color(0xFF2A2A2A),
-            onErrorContainer = Color.White
+            primary = colorOf(materialColors.primary()),
+            onPrimary = colorOf(materialColors.onPrimary()),
+            primaryContainer = colorOf(materialColors.primaryContainer()),
+            onPrimaryContainer = colorOf(materialColors.onPrimaryContainer()),
+            inversePrimary = colorOf(materialColors.inversePrimary()),
+            secondary = colorOf(materialColors.secondary()),
+            onSecondary = colorOf(materialColors.onSecondary()),
+            secondaryContainer = colorOf(materialColors.secondaryContainer()),
+            onSecondaryContainer = colorOf(materialColors.onSecondaryContainer()),
+            tertiary = colorOf(materialColors.tertiary()),
+            onTertiary = colorOf(materialColors.onTertiary()),
+            tertiaryContainer = colorOf(materialColors.tertiaryContainer()),
+            onTertiaryContainer = colorOf(materialColors.onTertiaryContainer()),
+            background = colorOf(materialColors.background()),
+            onBackground = colorOf(materialColors.onBackground()),
+            surface = colorOf(materialColors.surface()),
+            onSurface = colorOf(materialColors.onSurface()),
+            surfaceVariant = colorOf(materialColors.surfaceVariant()),
+            onSurfaceVariant = colorOf(materialColors.onSurfaceVariant()),
+            surfaceTint = colorOf(materialColors.surfaceTint()),
+            inverseSurface = colorOf(materialColors.inverseSurface()),
+            inverseOnSurface = colorOf(materialColors.inverseOnSurface()),
+            outline = colorOf(materialColors.outline()),
+            outlineVariant = colorOf(materialColors.outlineVariant()),
+            scrim = colorOf(materialColors.scrim()),
+            surfaceBright = colorOf(materialColors.surfaceBright()),
+            surfaceContainer = colorOf(materialColors.surfaceContainer()),
+            surfaceContainerHigh = colorOf(materialColors.surfaceContainerHigh()),
+            surfaceContainerHighest = colorOf(materialColors.surfaceContainerHighest()),
+            surfaceContainerLow = colorOf(materialColors.surfaceContainerLow()),
+            surfaceContainerLowest = colorOf(materialColors.surfaceContainerLowest()),
+            surfaceDim = colorOf(materialColors.surfaceDim()),
+            error = colorOf(materialColors.error()),
+            onError = colorOf(materialColors.onError()),
+            errorContainer = colorOf(materialColors.errorContainer()),
+            onErrorContainer = colorOf(materialColors.onErrorContainer())
         )
     } else {
         lightColorScheme(
-            primary = primary,
-            onPrimary = Color.White,
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = Color.Black,
-            inversePrimary = inversePrimary,
-            secondary = secondary,
-            onSecondary = Color.White,
-            secondaryContainer = secondaryContainer,
-            onSecondaryContainer = Color.Black,
-            tertiary = tertiary,
-            onTertiary = Color.White,
-            tertiaryContainer = tertiaryContainer,
-            onTertiaryContainer = Color.Black,
-            background = background,
-            onBackground = Color.Black,
-            surface = surface,
-            onSurface = Color.Black,
-            surfaceVariant = surfaceVariant,
-            onSurfaceVariant = onSurfaceVariant,
-            surfaceTint = surfaceTint,
-            inverseSurface = Color(0xFF1A1A1A),
-            inverseOnSurface = Color.White,
-            outline = Color(0xFF707070),
-            outlineVariant = Color(0xFFC8C8C8),
-            scrim = scrim,
-            surfaceBright = Color.White,
-            surfaceContainer = surfaceContainer,
-            surfaceContainerHigh = surfaceContainerHigh,
-            surfaceContainerHighest = surfaceContainerHighest,
-            surfaceContainerLow = surfaceContainerLow,
-            surfaceContainerLowest = surfaceContainerLowest,
-            surfaceDim = surfaceDim,
-            error = Color(0xFF2E2E2E),
-            onError = Color.White,
-            errorContainer = Color(0xFFE2E2E2),
-            onErrorContainer = Color.Black
+            primary = colorOf(materialColors.primary()),
+            onPrimary = colorOf(materialColors.onPrimary()),
+            primaryContainer = colorOf(materialColors.primaryContainer()),
+            onPrimaryContainer = colorOf(materialColors.onPrimaryContainer()),
+            inversePrimary = colorOf(materialColors.inversePrimary()),
+            secondary = colorOf(materialColors.secondary()),
+            onSecondary = colorOf(materialColors.onSecondary()),
+            secondaryContainer = colorOf(materialColors.secondaryContainer()),
+            onSecondaryContainer = colorOf(materialColors.onSecondaryContainer()),
+            tertiary = colorOf(materialColors.tertiary()),
+            onTertiary = colorOf(materialColors.onTertiary()),
+            tertiaryContainer = colorOf(materialColors.tertiaryContainer()),
+            onTertiaryContainer = colorOf(materialColors.onTertiaryContainer()),
+            background = colorOf(materialColors.background()),
+            onBackground = colorOf(materialColors.onBackground()),
+            surface = colorOf(materialColors.surface()),
+            onSurface = colorOf(materialColors.onSurface()),
+            surfaceVariant = colorOf(materialColors.surfaceVariant()),
+            onSurfaceVariant = colorOf(materialColors.onSurfaceVariant()),
+            surfaceTint = colorOf(materialColors.surfaceTint()),
+            inverseSurface = colorOf(materialColors.inverseSurface()),
+            inverseOnSurface = colorOf(materialColors.inverseOnSurface()),
+            outline = colorOf(materialColors.outline()),
+            outlineVariant = colorOf(materialColors.outlineVariant()),
+            scrim = colorOf(materialColors.scrim()),
+            surfaceBright = colorOf(materialColors.surfaceBright()),
+            surfaceContainer = colorOf(materialColors.surfaceContainer()),
+            surfaceContainerHigh = colorOf(materialColors.surfaceContainerHigh()),
+            surfaceContainerHighest = colorOf(materialColors.surfaceContainerHighest()),
+            surfaceContainerLow = colorOf(materialColors.surfaceContainerLow()),
+            surfaceContainerLowest = colorOf(materialColors.surfaceContainerLowest()),
+            surfaceDim = colorOf(materialColors.surfaceDim()),
+            error = colorOf(materialColors.error()),
+            onError = colorOf(materialColors.onError()),
+            errorContainer = colorOf(materialColors.errorContainer()),
+            onErrorContainer = colorOf(materialColors.onErrorContainer())
         )
     }
-}
-
-private fun Color.tone(
-    saturationScale: Float = 1f,
-    value: Float
-): Color {
-    val hsv = FloatArray(3)
-    AndroidColor.colorToHSV(toArgb(), hsv)
-    hsv[1] = (hsv[1] * saturationScale).coerceIn(0f, 1f)
-    hsv[2] = value.coerceIn(0f, 1f)
-    return Color(AndroidColor.HSVToColor(hsv))
 }

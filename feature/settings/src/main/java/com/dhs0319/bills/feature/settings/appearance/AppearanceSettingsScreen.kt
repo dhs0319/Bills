@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ fun AppearanceSettingsScreen(
 ) {
     val config by viewModel.themeConfig.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
+    var colorPickerVisible by rememberSaveable { mutableStateOf(false) }
     val previewIsDark = when (config.themeMode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
@@ -85,10 +87,10 @@ fun AppearanceSettingsScreen(
 
             if (!config.useDynamicColor) {
                 item {
-                    ColorPaletteSelector(
+                    ThemeColorSetting(
                         selected = config.seedColor,
                         isDark = previewIsDark,
-                        onSelect = viewModel::updateSeedColor
+                        onClick = { colorPickerVisible = true }
                     )
                 }
             }
@@ -143,6 +145,24 @@ fun AppearanceSettingsScreen(
             }
         }
     }
+
+    if (colorPickerVisible && !config.useDynamicColor) {
+        AlertDialog(
+            onDismissRequest = { colorPickerVisible = false },
+            title = { Text("主题色") },
+            text = {
+                ColorPaletteGrid(
+                    selected = config.seedColor,
+                    isDark = previewIsDark,
+                    onSelect = { color ->
+                        viewModel.updateSeedColor(color)
+                        colorPickerVisible = false
+                    }
+                )
+            },
+            confirmButton = {}
+        )
+    }
 }
 
 @Composable
@@ -166,28 +186,48 @@ private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
 }
 
 @Composable
-private fun ColorPaletteSelector(
+private fun ThemeColorSetting(
+    selected: Color,
+    isDark: Boolean,
+    onClick: () -> Unit
+) {
+    val previewColor = previewThemePrimaryColor(selected, isDark)
+
+    Card {
+        ListItem(
+            modifier = Modifier.clickable(onClick = onClick),
+            headlineContent = { Text("主题色", style = MaterialTheme.typography.titleMedium) },
+            supportingContent = { Text("点击切换") },
+            trailingContent = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(previewColor)
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+    }
+}
+
+@Composable
+private fun ColorPaletteGrid(
     selected: Color,
     isDark: Boolean,
     onSelect: (Color) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("主题色", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                PresetColors.forEach { (color, _) ->
-                    ColorItem(
-                        color = previewThemePrimaryColor(color, isDark),
-                        selected = color == selected,
-                        onClick = { onSelect(color) }
-                    )
-                }
-            }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PresetColors.forEach { (color, _) ->
+            ColorItem(
+                color = previewThemePrimaryColor(color, isDark),
+                selected = color == selected,
+                onClick = { onSelect(color) }
+            )
         }
     }
 }
@@ -200,11 +240,11 @@ private fun ColorItem(
 ) {
     Box(
         modifier = Modifier
-            .size(48.dp)
+            .size(46.dp)
             .clip(CircleShape)
             .background(color)
             .then(
-                if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                 else Modifier
             )
             .clickable(onClick = onClick),
