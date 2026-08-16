@@ -87,7 +87,7 @@ jobs:
         run: |
           for apk in app/build/outputs/apk/release/app-*.apk; do
             [ -e "$apk" ] || continue
-            mv "$apk" "${apk/app-/Bills-}"
+            mv "$apk" "${apk/app-/Bills-${{ steps.ver.outputs.name }}-}"
           done
 
       - name: Upload APK
