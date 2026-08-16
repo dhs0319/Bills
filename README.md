@@ -40,9 +40,6 @@
   <img src="images/shot.png" alt="BBSpace screenshot home" width="240" />
   <img src="images/shot2.png" alt="BBSpace screenshot player" width="240" />
 </p>
-<p align="center">
-  <img src="images/shot3.png" alt="BBSpace screenshot tablet" width="640" />
-</p>
 
 ## 当前功能
 
