@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
@@ -443,7 +444,7 @@ private fun OwnerCapsule(
                     modifier = Modifier
                         .width(72.dp)
                         .aspectRatio(1f)
-                        .clip(MaterialTheme.shapes.large),
+                        .clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
             }
@@ -655,9 +656,9 @@ private fun ToggleChip(
     onClick: () -> Unit
 ) {
     Surface(
+        onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        modifier = Modifier.clickable(onClick = onClick)
+        color = MaterialTheme.colorScheme.tertiaryContainer
     ) {
         Text(
             text = text,

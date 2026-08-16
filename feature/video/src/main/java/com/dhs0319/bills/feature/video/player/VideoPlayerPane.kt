@@ -305,10 +305,11 @@ internal fun VideoPlayerPane(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (danmakuOn) "弹幕" else "弹幕关",
+                            text = if (danmakuOn) "弹幕关" else "弹幕",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White,
                             modifier = Modifier
+                                .clip(MaterialTheme.shapes.extraLarge)
                                 .clickable {
                                     showCtrl = true
                                     viewModel.updateDanmaku(

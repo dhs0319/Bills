@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 
 @Immutable
 data class DanmakuConfig(
-    val enabled: Boolean = false,
+    val enabled: Boolean = true,
     val areaPercent: Int = 100,
     val opacity: Float = 1f,
     val textScale: Float = 1f,

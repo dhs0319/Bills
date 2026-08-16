@@ -260,7 +260,7 @@ fun VideoDetailInfoSkeleton(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .width(72.dp)
                     .aspectRatio(1f),
-                shape = MaterialTheme.shapes.large
+                shape = CircleShape
             )
             Column(
                 modifier = Modifier.weight(1f),

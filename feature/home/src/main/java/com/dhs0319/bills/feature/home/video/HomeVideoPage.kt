@@ -179,6 +179,9 @@ private fun FeedCard(
                 }
             }
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                val threePoint = item.threePointV2
+                val hasMoreMenu = !isDisliked && !threePoint.isNullOrEmpty()
+                val recommendationReason = item.rcmdReason?.takeIf { it.text.isNotEmpty() }
                 val spaceRoute = remember(item.args, item.target) {
                     item.args?.let { args ->
                         if (args.upId <= 0L && args.upName.isNullOrBlank()) {
@@ -224,31 +227,43 @@ private fun FeedCard(
                         }
                     }
 
-                    val threePoint = item.threePointV2
-                    if (!isDisliked && !threePoint.isNullOrEmpty()) {
+                    if (hasMoreMenu && recommendationReason == null) {
                         MoreMenu(
                             item = item,
-                            items = threePoint,
+                            items = threePoint.orEmpty(),
                             onDislike = onDislike
                         )
                     }
                 }
 
-                item.rcmdReason?.let { reason ->
-                    if (reason.text.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        val rcmdBgColor = MaterialTheme.colorScheme.secondaryContainer
-                        val rcmdBgShape = MaterialTheme.shapes.extraSmall
-                        Text(
-                            text = reason.text,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier
-                                .background(rcmdBgColor, rcmdBgShape)
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                recommendationReason?.let { reason ->
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = reason.text,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        MaterialTheme.shapes.extraSmall
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (hasMoreMenu) {
+                            MoreMenu(
+                                item = item,
+                                items = threePoint.orEmpty(),
+                                onDislike = onDislike
+                            )
+                        }
                     }
                 }
             }
