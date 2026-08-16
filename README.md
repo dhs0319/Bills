@@ -29,8 +29,6 @@
   <a href="https://github.com/dhs0319/Bills/releases"><strong>下载 APK</strong></a>
   ·
   <a href="https://github.com/dhs0319/Bills/issues"><strong>反馈问题</strong></a>
-  ·
-  <a href="https://t.me/ourbbspace"><strong>Telegram</strong></a>
 </p>
 
 
