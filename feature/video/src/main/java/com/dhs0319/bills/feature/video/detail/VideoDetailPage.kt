@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
+import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
 import com.dhs0319.bills.core.designsystem.component.VideoRelateCardSkeleton
@@ -445,7 +446,8 @@ private fun OwnerCapsule(
                         .width(72.dp)
                         .aspectRatio(1f)
                         .clip(CircleShape),
-                    contentScale = ContentScale.Crop
+                    variant = BiliImageVariant.Avatar,
+                    contentScale = ContentScale.Fit
                 )
             }
 

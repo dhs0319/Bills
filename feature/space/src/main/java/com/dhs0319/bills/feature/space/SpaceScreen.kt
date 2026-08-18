@@ -28,7 +28,6 @@ import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.space.archive.spaceArchiveSection
 import com.dhs0319.bills.feature.space.header.spaceHeaderSection
-import com.dhs0319.bills.feature.space.note.SpaceNoteTitleButton
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -84,17 +83,7 @@ fun SpaceScreen(
         topBar = { scrollBehavior ->
             val header = state.header
             TopAppBar(
-                title = {
-                    if (header != null && header.profile.mid > 0L) {
-                        SpaceNoteTitleButton(
-                            uid = header.profile.mid,
-                            name = header.profile.name,
-                            face = header.profile.face
-                        )
-                    } else {
-                        Text(text = state.title)
-                    }
-                },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
