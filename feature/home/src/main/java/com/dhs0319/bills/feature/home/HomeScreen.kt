@@ -69,11 +69,17 @@ fun HomeScreen(
     onOpenDynamic: (String) -> Unit = {},
     onOpenArticle: (String, Int) -> Unit = { _, _ -> },
     onOpenListenItem: (Long, Int, Long, String, String, String) -> Unit = { _, _, _, _, _, _ -> },
+    refreshRequest: Int = 0,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
     LaunchedEffect(Unit) {
         viewModel.refreshPageAction()
+    }
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest > 0) {
+            viewModel.refresh()
+        }
     }
     val pagerState = rememberPagerState(initialPage = homeDefaultPage, pageCount = { homeTabs.size })
     val scope = rememberCoroutineScope()

@@ -25,6 +25,7 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -421,6 +422,27 @@ private fun MainTabsScaffold(
     onNavigateToImConversation: (ImSessionItem) -> Unit
 ) {
     val saveableStateHolder = rememberSaveableStateHolder()
+    var homeRefreshRequest by remember { mutableIntStateOf(0) }
+    var dynamicRefreshRequest by remember { mutableIntStateOf(0) }
+    var messageRefreshRequest by remember { mutableIntStateOf(0) }
+    val selectTab: (TopLevelRoute) -> Unit = { tab ->
+        if (tab != currentTab) {
+            when (currentTab) {
+                TopLevelRoute.HOME -> homeRefreshRequest = 0
+                TopLevelRoute.DYNAMIC -> dynamicRefreshRequest = 0
+                TopLevelRoute.MESSAGE -> messageRefreshRequest = 0
+                TopLevelRoute.PROFILE -> Unit
+            }
+            onTabChange(tab)
+        } else {
+            when (tab) {
+                TopLevelRoute.HOME -> homeRefreshRequest++
+                TopLevelRoute.DYNAMIC -> dynamicRefreshRequest++
+                TopLevelRoute.MESSAGE -> messageRefreshRequest++
+                TopLevelRoute.PROFILE -> Unit
+            }
+        }
+    }
     val userViewModel: UserViewModel = hiltViewModel()
     val userState by userViewModel.uiState.collectAsStateWithLifecycle()
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
@@ -441,24 +463,27 @@ private fun MainTabsScaffold(
                     when (tab) {
                         TopLevelRoute.HOME -> HomeScreen(
                             onNavigateToSearch = onNavigateToSearch,
-                            onNavigateToProfile = { onTabChange(TopLevelRoute.PROFILE) },
+                            onNavigateToProfile = { selectTab(TopLevelRoute.PROFILE) },
                             profileAvatar = userState.user?.avatar,
                             onOpenVideo = onNavigateToVideo,
                             onOpenSpace = onNavigateToSpace,
                             onOpenLive = onNavigateToLive,
                             onOpenDynamic = onNavigateToDynamicDetail,
                             onOpenArticle = onNavigateToArticle,
-                            onOpenListenItem = onNavigateToListenDetail
+                            onOpenListenItem = onNavigateToListenDetail,
+                            refreshRequest = homeRefreshRequest
                         )
                         TopLevelRoute.DYNAMIC -> DynamicScreen(
                             onOpenVideo = onNavigateToVideo,
                             onOpenSpace = onNavigateToSpace,
                             onOpenLive = onNavigateToLive,
-                            onOpenDynamic = onNavigateToDynamicDetail
+                            onOpenDynamic = onNavigateToDynamicDetail,
+                            refreshRequest = dynamicRefreshRequest
                         )
                         TopLevelRoute.MESSAGE -> ImScreen(
                             onOpenConversation = onNavigateToImConversation,
-                            onOpenMsgFeed = onNavigateToMsgFeed
+                            onOpenMsgFeed = onNavigateToMsgFeed,
+                            refreshRequest = messageRefreshRequest
                         )
                         TopLevelRoute.PROFILE -> UserScreen(
                             onNavigateToAccount = onNavigateToAccount,
@@ -484,7 +509,7 @@ private fun MainTabsScaffold(
                 .zIndex(1f),
             currentTab = currentTab,
             visibilityController = navVisibilityController,
-            onTabChange = onTabChange,
+            onTabChange = selectTab,
             onNavigateToSearch = onNavigateToSearch
         )
     }

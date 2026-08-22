@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -278,47 +277,6 @@ private fun PlaybackSettingsSection(
         onSelect = { videoResizeModeState.value = PlayerVideoResizeMode.entries[it] }
     )
 
-    SheetSwitchCard(
-        title = "后台播放",
-        subtitle = "退出页面或切到后台后继续播放，并显示系统通知",
-        checked = settingsState.playback.backgroundPlayback,
-        onCheckedChange = viewModel::updateBackgroundPlayback
-    )
-
-    SheetSwitchCard(
-        title = "应用内小窗",
-        subtitle = "允许把视频和直播缩成应用内小窗继续播放",
-        checked = settingsState.playback.inAppMiniPlayer,
-        onCheckedChange = viewModel::updateInAppMiniPlayer
-    )
-
-    SheetSwitchCard(
-        title = "播放行为上报",
-        subtitle = "向服务端上报播放心跳和历史，关闭影响个性化推荐和历史记录",
-        checked = settingsState.playback.reportPlayback,
-        onCheckedChange = viewModel::updateReportPlayback
-    )
-
-    SheetSwitchCard(
-        title = "软解优先",
-        subtitle = "优先使用软件解码",
-        checked = settingsState.playback.preferSoftwareDecode,
-        onCheckedChange = viewModel::updatePreferSoftwareDecode
-    )
-
-    SheetSwitchCard(
-        title = "解码失败自动回退",
-        subtitle = "允许切换到低优先级解码器",
-        checked = settingsState.playback.decoderFallback,
-        onCheckedChange = viewModel::updateDecoderFallback
-    )
-
-    SheetSwitchCard(
-        title = "全屏自动横屏",
-        subtitle = "点击全屏按钮时自动强制横屏",
-        checked = settingsState.playback.autoRotateFullscreen,
-        onCheckedChange = viewModel::updateAutoRotateFullscreen
-    )
 }
 
 @Composable
@@ -409,37 +367,6 @@ private fun SheetSectionTitle(title: String) {
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary
     )
-}
-
-@Composable
-private fun SheetSwitchCard(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Card {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
-        }
-    }
 }
 
 @Composable

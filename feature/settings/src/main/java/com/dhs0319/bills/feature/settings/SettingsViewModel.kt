@@ -10,6 +10,7 @@ import com.dhs0319.bills.core.designsystem.theme.FrameRateMode
 import com.dhs0319.bills.core.designsystem.theme.ThemeConfig
 import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
+import com.dhs0319.bills.core.model.PlayerSettingsState
 import androidx.compose.ui.graphics.Color
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,6 +103,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         false
+    )
+
+    val playerSettings = appSettings.state.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        PlayerSettingsState()
     )
 
     val useSystemDns = appSettings.useSystemDns.stateIn(
@@ -257,6 +264,30 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             appSettings.updateEnableWebPlayback(enabled)
         }
+    }
+
+    fun updateBackgroundPlayback(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setBackgroundPlayback(enabled) }
+    }
+
+    fun updateInAppMiniPlayer(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setInAppMiniPlayer(enabled) }
+    }
+
+    fun updateReportPlayback(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setReportPlayback(enabled) }
+    }
+
+    fun updatePreferSoftwareDecode(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setPreferSoftwareDecode(enabled) }
+    }
+
+    fun updateDecoderFallback(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setDecoderFallback(enabled) }
+    }
+
+    fun updateAutoRotateFullscreen(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setAutoRotateFullscreen(enabled) }
     }
 
     fun updateUseSystemDns(enabled: Boolean) {

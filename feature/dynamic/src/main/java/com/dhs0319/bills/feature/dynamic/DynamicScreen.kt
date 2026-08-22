@@ -34,6 +34,7 @@ fun DynamicScreen(
     onOpenSpace: (SpaceRoute) -> Unit,
     onOpenLive: (LiveRoute) -> Unit,
     onOpenDynamic: (String) -> Unit,
+    refreshRequest: Int = 0,
     viewModel: DynamicViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -57,6 +58,11 @@ fun DynamicScreen(
 
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore) viewModel.loadMore()
+    }
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest > 0) {
+            viewModel.refresh()
+        }
     }
 
     Scaffold(

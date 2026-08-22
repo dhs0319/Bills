@@ -3,6 +3,7 @@ package com.dhs0319.bills.feature.settings.audioVideo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +38,7 @@ fun AudioVideoSettingsScreen(
     val needTrial by viewModel.needTrial.collectAsStateWithLifecycle()
     val preferredCodec by viewModel.preferredCodec.collectAsStateWithLifecycle()
     val enableWebPlayback by viewModel.enableWebPlayback.collectAsStateWithLifecycle()
+    val playerSettings by viewModel.playerSettings.collectAsStateWithLifecycle()
 
     CollapsingTopBarScaffold(
         topBar = { scrollBehavior ->
@@ -56,8 +58,9 @@ fun AudioVideoSettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(padding)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -99,6 +102,20 @@ fun AudioVideoSettingsScreen(
             )
 
             SettingSwitch(
+                title = "软解优先",
+                subtitle = "优先使用软件解码",
+                checked = playerSettings.playback.preferSoftwareDecode,
+                onCheckedChange = viewModel::updatePreferSoftwareDecode
+            )
+
+            SettingSwitch(
+                title = "解码失败自动回退",
+                subtitle = "允许切换到低优先级解码器",
+                checked = playerSettings.playback.decoderFallback,
+                onCheckedChange = viewModel::updateDecoderFallback
+            )
+
+            SettingSwitch(
                 title = "使用https播放",
                 checked = forceHost > 0,
                 onCheckedChange = { viewModel.updateForceHost(if (it) 1 else 0) }
@@ -115,6 +132,36 @@ fun AudioVideoSettingsScreen(
                 subtitle = "打开就算不登录也能看1080p喵",
                 checked = enableWebPlayback,
                 onCheckedChange = viewModel::updateEnableWebPlayback
+            )
+
+            SettingCategory(title = "播放行为")
+
+            SettingSwitch(
+                title = "后台播放",
+                subtitle = "退出页面或切到后台后继续播放，并显示系统通知",
+                checked = playerSettings.playback.backgroundPlayback,
+                onCheckedChange = viewModel::updateBackgroundPlayback
+            )
+
+            SettingSwitch(
+                title = "应用内小窗",
+                subtitle = "允许把视频和直播缩成应用内小窗继续播放",
+                checked = playerSettings.playback.inAppMiniPlayer,
+                onCheckedChange = viewModel::updateInAppMiniPlayer
+            )
+
+            SettingSwitch(
+                title = "播放行为上报",
+                subtitle = "向服务端上报播放心跳和历史，关闭影响个性化推荐和历史记录",
+                checked = playerSettings.playback.reportPlayback,
+                onCheckedChange = viewModel::updateReportPlayback
+            )
+
+            SettingSwitch(
+                title = "全屏自动横屏",
+                subtitle = "点击全屏按钮时自动强制横屏",
+                checked = playerSettings.playback.autoRotateFullscreen,
+                onCheckedChange = viewModel::updateAutoRotateFullscreen
             )
         }
 

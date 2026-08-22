@@ -41,9 +41,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun ImScreen(
     onOpenConversation: (ImSessionItem) -> Unit,
     onOpenMsgFeed: () -> Unit = {},
+    refreshRequest: Int = 0,
     vm: ImViewModel = hiltViewModel()
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest > 0) {
+            vm.refresh()
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
