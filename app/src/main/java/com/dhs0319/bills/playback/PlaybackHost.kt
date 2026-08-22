@@ -22,13 +22,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.util.UnstableApi
-import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.StreamPlaybackTarget
-import com.dhs0319.bills.core.model.VideoDownloadRequest
 import com.dhs0319.bills.feature.live.LiveScreen
 import com.dhs0319.bills.feature.live.LiveViewModel
-import com.dhs0319.bills.feature.video.VideoScreen
-import com.dhs0319.bills.feature.video.VideoViewModel
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -39,11 +35,6 @@ fun PlaybackHost(
     onTogglePlay: () -> Unit,
     onClose: () -> Unit,
     onDismissExpanded: () -> Unit,
-    onGoHome: () -> Unit,
-    onOpenSpace: (SpaceRoute) -> Unit,
-    onOpenDownloadCache: () -> Unit,
-    onStartDownload: (VideoDownloadRequest) -> Unit,
-    videoViewModel: VideoViewModel,
     liveViewModel: LiveViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -78,22 +69,6 @@ fun PlaybackHost(
     ) { fullWidth -> fullWidth }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(
-            visible = target is StreamPlaybackTarget.Video && mode == PlaybackHostMode.Expanded,
-            enter = enterSpec,
-            exit = ExitNone
-        ) {
-            VideoScreen(
-                onBack = onDismissExpanded,
-                onGoHome = onGoHome,
-                onOpenSpace = onOpenSpace,
-                onOpenDownloadCache = onOpenDownloadCache,
-                onStartDownload = onStartDownload,
-                viewModel = videoViewModel,
-                hostExpanded = true
-            )
-        }
-
         AnimatedVisibility(
             visible = target is StreamPlaybackTarget.Live && mode == PlaybackHostMode.Expanded,
             enter = enterSpec,

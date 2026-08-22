@@ -77,6 +77,10 @@ class PlaybackHostViewModel @Inject constructor(
         _hostMode.value = PlaybackHostMode.Mini
     }
 
+    fun hide() {
+        _hostMode.value = PlaybackHostMode.Hidden
+    }
+
     fun openLive(route: LiveRoute) {
         viewModelScope.launch {
             livePlaybackController.openLive(route)

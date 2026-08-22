@@ -80,6 +80,18 @@ class VideoViewModel @Inject constructor(
         }
     }
 
+    fun pause(): Boolean {
+        val wasPlaying = videoState.value.isPlaying
+        if (wasPlaying) {
+            playbackController.pause()
+        }
+        return wasPlaying
+    }
+
+    fun resume() {
+        playbackController.play()
+    }
+
     fun switchQuality(quality: Int) {
         playbackController.switchVideoQuality(quality)
     }

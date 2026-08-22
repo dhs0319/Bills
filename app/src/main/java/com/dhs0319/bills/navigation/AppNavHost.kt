@@ -110,7 +110,6 @@ import com.dhs0319.bills.feature.user.UserDest
 import com.dhs0319.bills.feature.user.UserViewModel
 import com.dhs0319.bills.feature.video.VideoViewModel
 import com.dhs0319.bills.playback.PlaybackHost
-import com.dhs0319.bills.playback.PlaybackHostMode
 import com.dhs0319.bills.playback.PlaybackHostViewModel
 
 private const val MAIN_ROUTE = "main"
@@ -132,12 +131,6 @@ fun AppNavHost(
     val videoViewModel: VideoViewModel = hiltViewModel()
     val liveViewModel: LiveViewModel = hiltViewModel()
     val hostMode = playbackHostViewModel.hostMode
-    var forcedDismissMode by remember { mutableStateOf<PlaybackHostMode?>(null) }
-    val playbackMode = when {
-        hostMode != PlaybackHostMode.Expanded -> hostMode
-        forcedDismissMode != null -> forcedDismissMode!!
-        else -> hostMode
-    }
     val closeVideoHost: () -> Unit = {
         playbackHostViewModel.close()
     }
@@ -151,37 +144,14 @@ fun AppNavHost(
             }
         }
     }
-    val collapseExpandedPlayback = {
-        if (hostMode == PlaybackHostMode.Expanded) {
-            forcedDismissMode = if (
-                playbackHostViewModel.miniPlayerAvailable.value &&
-                playbackHostViewModel.currentTarget.value != null
-            ) {
-                PlaybackHostMode.Mini
-            } else {
-                PlaybackHostMode.Hidden
-            }
-        }
-    }
-    val openSpaceFromVideo: (SpaceRoute) -> Unit = { route ->
-        collapseExpandedPlayback()
-        dismissPlaybackHost()
-        rootNavController.navigateToSpace(route)
-    }
-    val openDownloadFromVideo: () -> Unit = {
-        collapseExpandedPlayback()
-        dismissPlaybackHost()
-        rootNavController.navigateToDownload()
-    }
     val goHomeFromVideo: () -> Unit = {
-        collapseExpandedPlayback()
         dismissPlaybackHost()
         rootNavController.popBackStack(MAIN_ROUTE, false)
         currentTab = TopLevelRoute.HOME
     }
     val openVideo: (VideoTarget) -> Unit = { target ->
-        playbackHostViewModel.expand()
-        videoViewModel.openRoot(target)
+        playbackHostViewModel.hide()
+        rootNavController.navigateToVideo(target)
     }
     val openLive: (LiveRoute) -> Unit = { route ->
         liveViewModel.openRoute(route)
@@ -215,12 +185,6 @@ fun AppNavHost(
             themeConfig.transitionStyle,
             themeConfig.animationSpeed
         )
-    }
-
-    LaunchedEffect(hostMode, forcedDismissMode) {
-        if (forcedDismissMode != null && hostMode != PlaybackHostMode.Expanded) {
-            forcedDismissMode = null
-        }
     }
 
     LaunchedEffect(appLink) {
@@ -277,6 +241,20 @@ fun AppNavHost(
                     }
                 )
             }
+
+            videoScreen(
+                videoViewModel = videoViewModel,
+                playbackHostViewModel = playbackHostViewModel,
+                onBack = {
+                    if (rootNavController.popBackStack()) {
+                        dismissPlaybackHost()
+                    }
+                },
+                onGoHome = goHomeFromVideo,
+                onOpenSpace = rootNavController::navigateToSpace,
+                onOpenDownloadCache = rootNavController::navigateToDownload,
+                onStartDownload = downloadViewModel::enqueueDownload,
+            )
 
             loginScreen(
                 onLoginSuccess = { rootNavController.popBackStack() },
@@ -401,10 +379,14 @@ fun AppNavHost(
         }
 
         PlaybackHost(
-            mode = playbackMode,
+            mode = hostMode,
             playbackHostViewModel = playbackHostViewModel,
             onExpand = {
-                playbackHostViewModel.expand()
+                when (val target = playbackHostViewModel.currentTarget.value) {
+                    is StreamPlaybackTarget.Video -> openVideo(target.target)
+                    is StreamPlaybackTarget.Live -> playbackHostViewModel.expand()
+                    null -> Unit
+                }
             },
             onTogglePlay = playbackHostViewModel::togglePlayPause,
             onClose = {
@@ -415,11 +397,6 @@ fun AppNavHost(
                 }
             },
             onDismissExpanded = dismissPlaybackHost,
-            onGoHome = goHomeFromVideo,
-            onOpenSpace = openSpaceFromVideo,
-            onOpenDownloadCache = openDownloadFromVideo,
-            onStartDownload = downloadViewModel::enqueueDownload,
-            videoViewModel = videoViewModel,
             liveViewModel = liveViewModel
         )
     }

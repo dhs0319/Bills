@@ -1,34 +1,27 @@
 package com.dhs0319.bills.feature.settings.audioVideo
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.feature.settings.SettingsViewModel
+import com.dhs0319.bills.feature.settings.components.SettingDropdown
 import com.dhs0319.bills.feature.settings.components.SettingSwitch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,10 +37,6 @@ fun AudioVideoSettingsScreen(
     val needTrial by viewModel.needTrial.collectAsStateWithLifecycle()
     val preferredCodec by viewModel.preferredCodec.collectAsStateWithLifecycle()
     val enableWebPlayback by viewModel.enableWebPlayback.collectAsStateWithLifecycle()
-
-    var showVideoQualityDialog by remember { mutableStateOf(false) }
-    var showAudioQualityDialog by remember { mutableStateOf(false) }
-    var showCodecDialog by remember { mutableStateOf(false) }
 
     CollapsingTopBarScaffold(
         topBar = { scrollBehavior ->
@@ -83,25 +72,30 @@ fun AudioVideoSettingsScreen(
 
             SettingCategory(title = "本地选择")
 
-            QualityItem(
+            SettingDropdown(
                 title = "默认视频画质",
-                quality = defaultVideoQuality,
-                onClick = { showVideoQualityDialog = true }
+                selected = defaultVideoQuality,
+                options = VIDEO_QUALITIES,
+                optionLabel = ::getVideoQualityName,
+                onSelect = viewModel::updateDefaultVideoQuality
             )
 
-            QualityItem(
+            SettingDropdown(
                 title = "默认音频质量",
-                quality = defaultAudioQuality,
-                onClick = { showAudioQualityDialog = true }
+                selected = defaultAudioQuality,
+                options = AUDIO_QUALITIES,
+                optionLabel = ::getAudioQualityName,
+                onSelect = viewModel::updateDefaultAudioQuality
             )
 
             SettingCategory(title = "其他")
 
-            QualityItem(
+            SettingDropdown(
                 title = "优先编码格式",
-                quality = preferredCodec,
-                label = getCodecName(preferredCodec),
-                onClick = { showCodecDialog = true }
+                selected = preferredCodec,
+                options = CODECS,
+                optionLabel = ::getCodecName,
+                onSelect = viewModel::updatePreferredCodec
             )
 
             SettingSwitch(
@@ -124,134 +118,16 @@ fun AudioVideoSettingsScreen(
             )
         }
 
-        if (showVideoQualityDialog) {
-            VideoQualityDialog(
-                currentQuality = defaultVideoQuality,
-                onSelect = viewModel::updateDefaultVideoQuality,
-                onDismiss = { showVideoQualityDialog = false }
-            )
-        }
-
-        if (showAudioQualityDialog) {
-            AudioQualityDialog(
-                currentQuality = defaultAudioQuality,
-                onSelect = viewModel::updateDefaultAudioQuality,
-                onDismiss = { showAudioQualityDialog = false }
-            )
-        }
-
-        if (showCodecDialog) {
-            CodecDialog(
-                currentCodec = preferredCodec,
-                onSelect = viewModel::updatePreferredCodec,
-                onDismiss = { showCodecDialog = false }
-            )
-        }
     }
 }
 
 @Composable
-fun SettingCategory(title: String) {
+private fun SettingCategory(title: String) {
     Text(
         text = title,
         style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
         color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-}
-
-@Composable
-fun QualityItem(
-    title: String,
-    quality: Int,
-    onClick: () -> Unit,
-    label: String? = null
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(title)
-            Text(
-                text = label ?: when {
-                    quality == 0 -> "自动"
-                    quality < 100 -> getVideoQualityName(quality)
-                    else -> getAudioQualityName(quality)
-                },
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-            )
-        }
-    }
-}
-
-@Composable
-fun VideoQualityDialog(
-    currentQuality: Int,
-    onSelect: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val qualities = listOf(16, 32, 64, 80, 112, 116, 120, 125, 126, 127)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("选择默认视频画质") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                qualities.forEach { quality ->
-                    Text(
-                        text = if (quality == currentQuality) "✓ ${getVideoQualityName(quality)}" else getVideoQualityName(quality),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(quality); onDismiss() }
-                            .padding(vertical = 8.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
-}
-
-@Composable
-fun AudioQualityDialog(
-    currentQuality: Int,
-    onSelect: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val qualities = listOf(0, 30216, 30232, 30280, 30250, 30251)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("选择默认音频质量") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                qualities.forEach { quality ->
-                    Text(
-                        text = if (quality == currentQuality) "✓ ${getAudioQualityName(quality)}" else getAudioQualityName(quality),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(quality); onDismiss() }
-                            .padding(vertical = 8.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
@@ -283,35 +159,6 @@ private fun getAudioQualityName(quality: Int): String {
     }
 }
 
-@Composable
-fun CodecDialog(
-    currentCodec: Int,
-    onSelect: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val codecs = listOf(1, 2, 3)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("选择优先编码格式") },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                codecs.forEach { codec ->
-                    Text(
-                        text = if (codec == currentCodec) "✓ ${getCodecName(codec)}" else getCodecName(codec),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(codec); onDismiss() }
-                            .padding(vertical = 8.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
-        }
-    )
-}
-
 private fun getCodecName(codec: Int): String {
     return when (codec) {
         1 -> "AVC/H.264"
@@ -320,3 +167,7 @@ private fun getCodecName(codec: Int): String {
         else -> "未知"
     }
 }
+
+private val VIDEO_QUALITIES = listOf(16, 32, 64, 80, 112, 116, 120, 125, 126, 127)
+private val AUDIO_QUALITIES = listOf(0, 30216, 30232, 30280, 30250, 30251)
+private val CODECS = listOf(1, 2, 3)
