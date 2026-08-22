@@ -3,6 +3,7 @@ package com.dhs0319.bills.feature.video.player
 import android.media.AudioManager
 import android.os.BatteryManager
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,8 +47,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -117,9 +123,9 @@ internal fun VideoPlayerPane(
     var showPlaybackSheet by remember { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
     val videoResizeMode = rememberSaveable { mutableStateOf(PlayerVideoResizeMode.Fit) }
-    val topMetaText = remember(showCtrl, isFull) {
+    val topStatus = remember(showCtrl, isFull) {
         if (showCtrl && isFull) {
-            readPlayerTopMetaText(context, timeFmt)
+            readPlayerTopStatus(context, timeFmt)
         } else {
             null
         }
@@ -242,7 +248,7 @@ internal fun VideoPlayerPane(
             )
 
             if (showCtrl) {
-                Row(
+                Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
@@ -254,81 +260,123 @@ internal fun VideoPlayerPane(
                                 )
                             )
                         )
-                        .padding(horizontal = 10.dp, vertical = 1.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (isFull) {
+                        topStatus?.let { status ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 20.dp)
+                                    .padding(horizontal = 32.dp)
+                            ) {
+                                Text(
+                                    text = status.time,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                                status.batteryPercent?.let { batteryPercent ->
+                                    Row(
+                                        modifier = Modifier.align(Alignment.CenterEnd),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "$batteryPercent%",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White.copy(alpha = 0.9f)
+                                        )
+                                        BatteryLevelIcon(batteryPercent = batteryPercent)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = 10.dp,
+                                end = if (isFull) 28.dp else 10.dp
+                            ),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回",
-                                tint = Color.White
-                            )
-                        }
-                        if (!isFull) {
-                            IconButton(onClick = onGoHome) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = onBackClick,
+                                modifier = if (isFull) Modifier.size(40.dp) else Modifier
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.Home,
-                                    contentDescription = "首页",
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "返回",
                                     tint = Color.White
                                 )
                             }
-                        }
-                        if (isFull) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            if (!isFull) {
+                                IconButton(
+                                    onClick = onGoHome,
+                                    modifier = if (isFull) Modifier.size(40.dp) else Modifier
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Home,
+                                        contentDescription = "首页",
+                                        tint = Color.White
+                                    )
+                                }
+                            } else {
                                 videoTitle?.takeIf(String::isNotBlank)?.let {
                                     Text(
                                         text = it,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = Color.White,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                topMetaText?.let {
-                                    Text(
-                                        text = it,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = Color.White.copy(alpha = 0.8f),
-                                        maxLines = 1
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
                                     )
                                 }
                             }
                         }
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (danmakuOn) "弹幕关" else "弹幕",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White,
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.extraLarge)
-                                .clickable {
-                                    showCtrl = true
-                                    viewModel.updateDanmaku(
-                                        settingsState.danmaku.copy(enabled = !settingsState.danmaku.enabled)
-                                    )
-                                }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        )
-                        IconButton(
-                            onClick = {
-                                showCtrl = true
-                                showPlaybackSheet = true
-                            }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(
+                                if (isFull) 0.dp else 8.dp
+                            ),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "更多信息",
-                                tint = Color.White
+                            Text(
+                                text = if (danmakuOn) "弹幕关" else "弹幕",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .clip(MaterialTheme.shapes.extraLarge)
+                                    .clickable {
+                                        showCtrl = true
+                                        viewModel.updateDanmaku(
+                                            settingsState.danmaku.copy(enabled = !settingsState.danmaku.enabled)
+                                        )
+                                    }
+                                    .padding(
+                                        horizontal = if (isFull) 8.dp else 12.dp,
+                                        vertical = if (isFull) 6.dp else 8.dp
+                                    )
                             )
+                            IconButton(
+                                onClick = {
+                                    showCtrl = true
+                                    showPlaybackSheet = true
+                                },
+                                modifier = if (isFull) Modifier.size(40.dp) else Modifier
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "更多信息",
+                                    tint = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -891,14 +939,59 @@ private fun SpeedSelectionDialog(
     )
 }
 
-private fun readPlayerTopMetaText(
+private data class PlayerTopStatus(
+    val time: String,
+    val batteryPercent: Int?
+)
+
+@Composable
+private fun BatteryLevelIcon(
+    batteryPercent: Int,
+    modifier: Modifier = Modifier
+) {
+    val level = batteryPercent.coerceIn(0, 100) / 100f
+    val color = Color.White.copy(alpha = 0.9f)
+
+    Canvas(modifier = modifier.size(width = 22.dp, height = 11.dp)) {
+        val strokeWidth = 1.dp.toPx()
+        val terminalGap = 1.dp.toPx()
+        val terminalWidth = 2.dp.toPx()
+        val bodyWidth = size.width - terminalGap - terminalWidth
+        val innerInset = strokeWidth * 2f
+        val innerWidth = (bodyWidth - innerInset * 2f).coerceAtLeast(0f)
+
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f),
+            size = Size(bodyWidth - strokeWidth, size.height - strokeWidth),
+            cornerRadius = CornerRadius(2.dp.toPx()),
+            style = Stroke(width = strokeWidth)
+        )
+        if (level > 0f) {
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(innerInset, innerInset),
+                size = Size(innerWidth * level, size.height - innerInset * 2f),
+                cornerRadius = CornerRadius(1.dp.toPx())
+            )
+        }
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(bodyWidth + terminalGap, size.height * 0.3f),
+            size = Size(terminalWidth, size.height * 0.4f),
+            cornerRadius = CornerRadius(terminalWidth / 2f)
+        )
+    }
+}
+
+private fun readPlayerTopStatus(
     context: android.content.Context,
     timeFmt: java.text.DateFormat
-): String {
+): PlayerTopStatus {
     val time = timeFmt.format(System.currentTimeMillis())
     val battery = context.getSystemService(BatteryManager::class.java)
         ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
         ?.takeIf { it in 0..100 }
-    return if (battery != null) "$time  ${battery}%" else time
+    return PlayerTopStatus(time = time, batteryPercent = battery)
 }
 
