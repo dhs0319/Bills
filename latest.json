@@ -1,10 +1,10 @@
 {
-  "version": "1.0",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases",
+  "version": "1.0.4",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.4/Bills-1.0.4-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.4/Bills-1.0.4-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.4/Bills-1.0.4-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases",
-  "releaseNotes": "## 更新内容\n\n- 优化全屏播放页面的UI\n- 设置页面避免底部安全区遮挡\n- 设置页增加播放行为等控制开关\n"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.4",
+  "releaseNotes": "## 更新内容\n\n- 优化app版本的更新检测逻辑\n- 支持底部导航栏选中后再次点击触发页面刷新\n"
 }
