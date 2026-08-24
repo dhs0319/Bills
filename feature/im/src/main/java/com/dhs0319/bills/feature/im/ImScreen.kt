@@ -45,9 +45,13 @@ fun ImScreen(
     vm: ImViewModel = hiltViewModel()
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(refreshRequest) {
         if (refreshRequest > 0) {
+            if (state.sessions.isNotEmpty()) {
+                listState.scrollToItem(0)
+            }
             vm.refresh()
         }
     }
@@ -118,7 +122,6 @@ fun ImScreen(
                 return@BiliPullToRefreshBox
             }
 
-            val listState = rememberLazyListState()
             LaunchedEffect(
                 listState,
                 state.sessions.size,

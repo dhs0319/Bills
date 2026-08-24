@@ -61,6 +61,9 @@ fun DynamicScreen(
     }
     LaunchedEffect(refreshRequest) {
         if (refreshRequest > 0) {
+            if (state.items.isNotEmpty()) {
+                listState.scrollToItem(0)
+            }
             viewModel.refresh()
         }
     }

@@ -58,6 +58,7 @@ fun HomeVideoPage(
     errorMessage: String?,
     toastMessage: String,
     dislikedReasons: Map<String, String>,
+    refreshRequest: Int,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
@@ -82,6 +83,11 @@ fun HomeVideoPage(
             gridState.scrollToItem(0)
         }
         wasRefreshing = isRefreshing
+    }
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest > 0 && items.isNotEmpty()) {
+            gridState.scrollToItem(0)
+        }
     }
     AdaptiveMediaGrid(
         items = items,

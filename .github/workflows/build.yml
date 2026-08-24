@@ -112,3 +112,42 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: app/build/outputs/apk/release/*.apk
           body_path: .github/release-notes.md
+
+      - name: Generate latest metadata
+        id: latest
+        env:
+          VERSION: ${{ steps.ver.outputs.name }}
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -maxdepth 1 -type f \
+            -name "Bills-${VERSION}-arm64-v8a-*.apk" -print -quit)
+          if [ -z "$APK_PATH" ]; then
+            echo "arm64-v8a APK not found" >&2
+            exit 1
+          fi
+
+          APK_NAME=$(basename "$APK_PATH")
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${APK_NAME}"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg downloadUrl "$DOWNLOAD_URL" \
+            --rawfile releaseNotes .github/release-notes.md \
+            '{version: $version, downloadUrl: $downloadUrl, releaseNotes: $releaseNotes}' \
+            > "$RUNNER_TEMP/latest.json"
+          echo "path=$RUNNER_TEMP/latest.json" >> "$GITHUB_OUTPUT"
+
+      - name: Publish latest metadata
+        env:
+          LATEST_JSON: ${{ steps.latest.outputs.path }}
+          VERSION: ${{ steps.ver.outputs.name }}
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git checkout -B main origin/main
+          cp "$LATEST_JSON" latest.json
+          git add latest.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update latest metadata for v${VERSION}"
+          git push origin main

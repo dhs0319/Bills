@@ -95,6 +95,12 @@ fun HomeScreen(
     CollapsingTopBarScaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = { scrollBehavior ->
+            LaunchedEffect(refreshRequest) {
+                if (refreshRequest > 0) {
+                    scrollBehavior.state.heightOffset = 0f
+                    scrollBehavior.state.contentOffset = 0f
+                }
+            }
             HomeTopBar(
                 scrollBehavior = scrollBehavior,
                 selectedIndex = pagerState.currentPage,
@@ -135,6 +141,7 @@ fun HomeScreen(
                     errorMessage = state.errorMessage,
                     toastMessage = state.toastMessage,
                     dislikedReasons = state.dislikedReasons,
+                    refreshRequest = refreshRequest,
                     onRefresh = viewModel::refresh,
                     onLoadMore = viewModel::loadMore,
                     onOpenVideo = onOpenVideo,

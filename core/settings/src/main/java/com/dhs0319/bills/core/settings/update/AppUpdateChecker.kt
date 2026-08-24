@@ -56,12 +56,13 @@ class AppUpdateChecker @Inject constructor(
 ) {
     companion object {
         private const val TAG = "AppUpdateChecker"
-        private const val RELEASES_API = "https://api.github.com/repos/dhs0319/Bills/releases/latest"
+        private const val LATEST_METADATA_URL =
+            "https://raw.githubusercontent.com/dhs0319/Bills/main/latest.json"
     }
 
     suspend fun check(): Result<AppUpdateCheckResult> = withContext(Dispatchers.IO) {
         runCatching {
-            val release = fetchLatestRelease()
+            val release = fetchLatestReleaseInfo()
             if (release.version == currentVersionName()) {
                 AppUpdateCheckResult.UpToDate(release)
             } else {
@@ -72,10 +73,10 @@ class AppUpdateChecker @Inject constructor(
         }
     }
 
-    private fun fetchLatestRelease(): AppReleaseInfo {
+    private fun fetchLatestReleaseInfo(): AppReleaseInfo {
         val request = Request.Builder()
-            .url(RELEASES_API)
-            .header("Accept", "application/vnd.github+json")
+            .url(LATEST_METADATA_URL)
+            .header("Accept", "application/json")
             .header("User-Agent", "Bills")
             .build()
         okHttpClient.newCall(request).execute().use { response ->
@@ -85,9 +86,9 @@ class AppUpdateChecker @Inject constructor(
             val body = response.body?.string() ?: error("响应为空")
             val json = JSONObject(body)
             return AppReleaseInfo(
-                version = json.getString("tag_name").trimStart('v', 'V'),
-                url = json.getString("html_url"),
-                desc = json.optString("body")
+                version = json.requireNonBlankString("version").trimStart('v', 'V'),
+                url = json.requireNonBlankString("downloadUrl"),
+                desc = json.optString("releaseNotes")
                     .replace("\r\n", "\n")
                     .trim()
                     .takeIf(String::isNotBlank)
@@ -101,4 +102,11 @@ class AppUpdateChecker @Inject constructor(
         return (info.versionName ?: "")
             .trimStart('v', 'V')
     }
+}
+
+private fun JSONObject.requireNonBlankString(name: String): String {
+    return optString(name)
+        .trim()
+        .takeIf(String::isNotBlank)
+        ?: error("缺少有效字段: $name")
 }
