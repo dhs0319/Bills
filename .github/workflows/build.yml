@@ -118,20 +118,28 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.name }}
         run: |
-          APK_PATH=$(find app/build/outputs/apk/release -maxdepth 1 -type f \
+          ARM64_APK=$(find app/build/outputs/apk/release -maxdepth 1 -type f \
             -name "Bills-${VERSION}-arm64-v8a-*.apk" -print -quit)
-          if [ -z "$APK_PATH" ]; then
-            echo "arm64-v8a APK not found" >&2
+          V7A_APK=$(find app/build/outputs/apk/release -maxdepth 1 -type f \
+            -name "Bills-${VERSION}-armeabi-v7a-*.apk" -print -quit)
+          if [ -z "$ARM64_APK" ] || [ -z "$V7A_APK" ]; then
+            echo "Both arm64-v8a and armeabi-v7a APKs are required" >&2
             exit 1
           fi
 
-          APK_NAME=$(basename "$APK_PATH")
-          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${APK_NAME}"
+          ARM64_NAME=$(basename "$ARM64_APK")
+          V7A_NAME=$(basename "$V7A_APK")
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
+          ARM64_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${ARM64_NAME}"
+          V7A_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${V7A_NAME}"
           jq -n \
             --arg version "$VERSION" \
-            --arg downloadUrl "$DOWNLOAD_URL" \
+            --arg downloadUrl "$ARM64_URL" \
+            --arg releaseUrl "$RELEASE_URL" \
+            --arg arm64Url "$ARM64_URL" \
+            --arg v7aUrl "$V7A_URL" \
             --rawfile releaseNotes .github/release-notes.md \
-            '{version: $version, downloadUrl: $downloadUrl, releaseNotes: $releaseNotes}' \
+            '{version: $version, downloadUrl: $downloadUrl, downloadUrls: {"arm64-v8a": $arm64Url, "armeabi-v7a": $v7aUrl}, releaseUrl: $releaseUrl, releaseNotes: $releaseNotes}' \
             > "$RUNNER_TEMP/latest.json"
           echo "path=$RUNNER_TEMP/latest.json" >> "$GITHUB_OUTPUT"
 

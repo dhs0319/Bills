@@ -1,6 +1,7 @@
 package com.dhs0319.bills.core.settings.update
 
 import android.content.Context
+import android.os.Build
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.designsystem.component.AppUpdateDialogState
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -87,7 +88,7 @@ class AppUpdateChecker @Inject constructor(
             val json = JSONObject(body)
             return AppReleaseInfo(
                 version = json.requireNonBlankString("version").trimStart('v', 'V'),
-                url = json.requireNonBlankString("downloadUrl"),
+                url = json.selectDownloadUrl(),
                 desc = json.optString("releaseNotes")
                     .replace("\r\n", "\n")
                     .trim()
@@ -109,4 +110,20 @@ private fun JSONObject.requireNonBlankString(name: String): String {
         .trim()
         .takeIf(String::isNotBlank)
         ?: error("缺少有效字段: $name")
+}
+
+private fun JSONObject.selectDownloadUrl(): String {
+    val urls = optJSONObject("downloadUrls")
+    if (urls != null) {
+        Build.SUPPORTED_ABIS
+            .asSequence()
+            .mapNotNull { abi -> urls.optString(abi).trim().takeIf(String::isNotBlank) }
+            .firstOrNull()
+            ?.let { return it }
+    }
+
+    return optString("releaseUrl")
+        .trim()
+        .takeIf(String::isNotBlank)
+        ?: requireNonBlankString("downloadUrl")
 }
