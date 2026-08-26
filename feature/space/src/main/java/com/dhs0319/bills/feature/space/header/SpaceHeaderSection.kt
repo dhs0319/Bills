@@ -1,12 +1,15 @@
 package com.dhs0319.bills.feature.space.header
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +28,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -32,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
+import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.PreviewImage
 import com.dhs0319.bills.core.designsystem.component.PreviewImageDialog
 import com.dhs0319.bills.core.designsystem.component.SelectableText
@@ -44,45 +50,57 @@ internal fun LazyListScope.spaceHeaderSection(
     onToggleFollow: () -> Unit,
     onToggleBlock: () -> Unit
 ) {
-    state.bannerUrl?.let { banner ->
-        item(
-            key = "header_banner",
-            contentType = "banner"
-        ) {
-            BannerCard(imageUrl = banner)
-        }
-    }
-
     item(
-        key = "header_profile",
-        contentType = "profile"
+        key = "space_header",
+        contentType = "header"
     ) {
-        ProfileCard(
-            state = state,
-            onOpenFollowings = onOpenFollowings,
-            onOpenFollowers = onOpenFollowers,
-            onToggleFollow = onToggleFollow,
-            onToggleBlock = onToggleBlock
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            state.bannerUrl?.let { banner ->
+                BannerCard(imageUrl = banner)
+            }
+            ProfileCard(
+                state = state,
+                onOpenFollowings = onOpenFollowings,
+                onOpenFollowers = onOpenFollowers,
+                onToggleFollow = onToggleFollow,
+                onToggleBlock = onToggleBlock
+            )
+        }
     }
 }
 
 @Composable
 private fun BannerCard(imageUrl: String) {
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        BiliAsyncImage(
-            url = imageUrl,
-            contentDescription = null,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 6f),
-            contentScale = ContentScale.Crop
-        )
+                .aspectRatio(16f / 6f)
+        ) {
+            BiliAsyncImage(
+                url = imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                variant = BiliImageVariant.Banner,
+                contentScale = ContentScale.Crop
+            )
+            if (isDarkTheme) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.14f))
+                )
+            }
+        }
     }
 }
 
