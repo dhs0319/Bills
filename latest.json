@@ -1,10 +1,10 @@
 {
-  "version": "1.0.4",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.4/Bills-1.0.4-arm64-v8a-release.apk",
+  "version": "1.0.5",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.5/Bills-1.0.5-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.4/Bills-1.0.4-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.4/Bills-1.0.4-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.5/Bills-1.0.5-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.5/Bills-1.0.5-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.4",
-  "releaseNotes": "## 更新内容\n\n- 优化app版本的更新检测逻辑\n- 支持底部导航栏选中后再次点击触发页面刷新\n"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.5",
+  "releaseNotes": "## 更新内容\n\n- 修复最近访问的名称错位问题\n- 修复进入空间页定位错误的问题\n- 增加了空间页头图在深色模式下的暗化效果\n"
 }
