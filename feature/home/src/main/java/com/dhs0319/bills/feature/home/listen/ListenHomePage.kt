@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -29,13 +30,21 @@ import com.dhs0319.bills.core.model.listen.ListenItem
 @Composable
 fun ListenHomePage(
     isActive: Boolean,
+    refreshRequest: Int,
     onItemClick: (ListenItem) -> Unit,
     viewModel: ListenHomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val gridState = rememberLazyStaggeredGridState()
 
     androidx.compose.runtime.LaunchedEffect(isActive) {
         if (isActive) viewModel.ensureLoaded()
+    }
+    androidx.compose.runtime.LaunchedEffect(refreshRequest) {
+        if (refreshRequest > 0) {
+            gridState.scrollToItem(0)
+            viewModel.refresh()
+        }
     }
 
     AdaptiveMediaGrid(
@@ -45,6 +54,7 @@ fun ListenHomePage(
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
         modifier = Modifier.fillMaxSize(),
+        state = gridState,
         errorMessage = state.errorMessage,
         loadMoreEnabled = state.hasMore,
         key = { _, item -> item.actionKey() },

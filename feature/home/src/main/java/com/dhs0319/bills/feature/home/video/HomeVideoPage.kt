@@ -85,8 +85,11 @@ fun HomeVideoPage(
         wasRefreshing = isRefreshing
     }
     LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0 && items.isNotEmpty()) {
-            gridState.scrollToItem(0)
+        if (refreshRequest > 0) {
+            if (items.isNotEmpty()) {
+                gridState.scrollToItem(0)
+            }
+            onRefresh()
         }
     }
     AdaptiveMediaGrid(

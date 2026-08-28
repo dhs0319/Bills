@@ -28,7 +28,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,15 +77,29 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
+    val pagerState = rememberPagerState(initialPage = homeDefaultPage, pageCount = { homeTabs.size })
+    var listenRefreshRequest by remember { mutableIntStateOf(0) }
+    var videoRefreshRequest by remember { mutableIntStateOf(0) }
+    var liveRefreshRequest by remember { mutableIntStateOf(0) }
+    var articleRefreshRequest by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         viewModel.refreshPageAction()
     }
     LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0) {
-            viewModel.refresh()
+        if (refreshRequest == 0) {
+            listenRefreshRequest = 0
+            videoRefreshRequest = 0
+            liveRefreshRequest = 0
+            articleRefreshRequest = 0
+        } else {
+            when (pagerState.currentPage) {
+                0 -> listenRefreshRequest++
+                1 -> videoRefreshRequest++
+                2 -> liveRefreshRequest++
+                else -> articleRefreshRequest++
+            }
         }
     }
-    val pagerState = rememberPagerState(initialPage = homeDefaultPage, pageCount = { homeTabs.size })
     val scope = rememberCoroutineScope()
 
     state.interestChoose?.let { interestChoose ->
@@ -122,6 +140,7 @@ fun HomeScreen(
             when (page) {
                 0 -> ListenHomePage(
                     isActive = pagerState.currentPage == page,
+                    refreshRequest = listenRefreshRequest,
                     onItemClick = { item ->
                         onOpenListenItem(
                             item.oid,
@@ -141,7 +160,7 @@ fun HomeScreen(
                     errorMessage = state.errorMessage,
                     toastMessage = state.toastMessage,
                     dislikedReasons = state.dislikedReasons,
-                    refreshRequest = refreshRequest,
+                    refreshRequest = videoRefreshRequest,
                     onRefresh = viewModel::refresh,
                     onLoadMore = viewModel::loadMore,
                     onOpenVideo = onOpenVideo,
@@ -155,12 +174,14 @@ fun HomeScreen(
 
                 2 -> HomeLivePage(
                     isActive = pagerState.currentPage == page,
+                    refreshRequest = liveRefreshRequest,
                     onOpenLive = onOpenLive,
                     onOpenSpace = onOpenSpace
                 )
 
                 else -> HomeArticlePage(
                     isActive = pagerState.currentPage == page,
+                    refreshRequest = articleRefreshRequest,
                     onOpenArticle = onOpenArticle,
                     onOpenSpace = onOpenSpace
                 )

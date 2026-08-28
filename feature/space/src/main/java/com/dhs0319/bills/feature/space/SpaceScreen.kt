@@ -43,12 +43,7 @@ fun SpaceScreen(
     viewModel: SpaceViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val videoListState = rememberLazyListState()
-    val dynamicListState = rememberLazyListState()
-    val listState = when (state.selectedSection) {
-        SpaceSection.VIDEO -> videoListState
-        SpaceSection.DYNAMIC -> dynamicListState
-    }
+    val listState = rememberLazyListState()
     val archiveState = rememberUpdatedState(state.archive)
     val dynamicsState = rememberUpdatedState(state.dynamics)
     val selectedSectionState = rememberUpdatedState(state.selectedSection)
@@ -72,10 +67,10 @@ fun SpaceScreen(
     }
 
     LaunchedEffect(state.archive.selectedOrder) {
-        val needScrollTop = videoListState.firstVisibleItemIndex > 0 ||
-                videoListState.firstVisibleItemScrollOffset > 0
+        val needScrollTop = listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > 0
         if (needScrollTop) {
-            videoListState.scrollToItem(0)
+            listState.scrollToItem(0)
         }
     }
 

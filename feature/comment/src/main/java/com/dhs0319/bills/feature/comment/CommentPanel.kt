@@ -11,7 +11,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -28,9 +30,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -44,12 +46,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.designsystem.component.CommentCardSkeleton
-import com.dhs0319.bills.core.designsystem.component.CommentHeaderSkeleton
 import com.dhs0319.bills.core.designsystem.component.PreviewImage
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.model.PublishedRecord
@@ -247,21 +249,10 @@ fun CommentPanel(
                     key = "comment_header",
                     contentType = "header"
                 ) {
-                    if (isInitLoading) {
-                        CommentHeaderSkeleton()
-                    } else {
-                        CommentHeader(
-                            state = uiState,
-                            onToggleSort = {
-                                val next = if (uiState.sort == CommentSort.HOT) {
-                                    CommentSort.TIME
-                                } else {
-                                    CommentSort.HOT
-                                }
-                                viewModel.selectSort(next)
-                            }
-                        )
-                    }
+                    CommentHeader(
+                        state = uiState,
+                        onSelectSort = viewModel::selectSort
+                    )
                 }
 
                 when {
@@ -447,12 +438,12 @@ private fun BoxScope.CommentEditorLayer(
 @Composable
 private fun CommentHeader(
     state: CommentUiState,
-    onToggleSort: () -> Unit
+    onSelectSort: (CommentSort) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -462,9 +453,9 @@ private fun CommentHeader(
             color = MaterialTheme.colorScheme.onSurface
         )
         if (state.canSwitchSort) {
-            SortSwitch(
+            CommentSortSelector(
                 sort = state.sort,
-                onClick = onToggleSort
+                onSelectSort = onSelectSort
             )
         } else {
             Text(
@@ -477,28 +468,45 @@ private fun CommentHeader(
 }
 
 @Composable
-private fun SortSwitch(
+private fun CommentSortSelector(
     sort: CommentSort,
-    onClick: () -> Unit
+    onSelectSort: (CommentSort) -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.extraLarge,
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Text(
-            text = sortText(sort),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-        )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CommentSort.entries.forEachIndexed { index, option ->
+            if (index > 0) {
+                VerticalDivider(
+                    modifier = Modifier.height(16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+            val selected = option == sort
+            Text(
+                text = sortText(option),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                },
+                modifier = Modifier
+                    .selectable(
+                        selected = selected,
+                        onClick = { onSelectSort(option) },
+                        role = Role.RadioButton,
+                        interactionSource = remember(option) { MutableInteractionSource() },
+                        indication = null
+                    )
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            )
+        }
     }
 }
 
 private fun sortText(sort: CommentSort): String {
     return when (sort) {
-        CommentSort.HOT -> "热门"
-        CommentSort.TIME -> "时间"
+        CommentSort.HOT -> "按热度"
+        CommentSort.TIME -> "按时间"
     }
 }
 

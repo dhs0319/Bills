@@ -1,11 +1,14 @@
 package com.dhs0319.bills.feature.space.archive
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -13,12 +16,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.CoverImage
@@ -90,13 +94,6 @@ private fun LazyListScope.videoSection(
         key = "archive_toolbar",
         contentType = "toolbar"
     ) {
-        val orderIndex = state.orders.indexOfFirst { it.value == state.selectedOrder }
-            .takeIf { it >= 0 }
-            ?: 0
-        val order = state.orders.getOrNull(orderIndex)
-        val nextOrder = state.orders
-            .takeIf { it.size > 1 }
-            ?.get((orderIndex + 1) % state.orders.size)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -106,15 +103,11 @@ private fun LazyListScope.videoSection(
                 text = "${videoCount.coerceAtLeast(state.videos.size)} 个视频",
                 style = MaterialTheme.typography.titleSmall
             )
-            TextButton(
-                onClick = { nextOrder?.let { onSelectOrder(it.value) } },
-                enabled = nextOrder != null
-            ) {
-                Text(
-                    text = order?.title ?: "排序",
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
+            ArchiveOrderSelector(
+                orders = state.orders,
+                selectedOrder = state.selectedOrder,
+                onSelectOrder = onSelectOrder
+            )
         }
     }
 
@@ -159,6 +152,43 @@ private fun LazyListScope.videoSection(
             item(key = "archive_end", contentType = "state") {
                 StateMessageCard(text = "没有更多视频了")
             }
+        }
+    }
+}
+
+@Composable
+private fun ArchiveOrderSelector(
+    orders: List<com.dhs0319.bills.core.model.SpaceOrderOption>,
+    selectedOrder: String,
+    onSelectOrder: (String) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        orders.forEachIndexed { index, order ->
+            if (index > 0) {
+                VerticalDivider(
+                    modifier = Modifier.height(16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+            val selected = order.value == selectedOrder
+            Text(
+                text = order.title,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                },
+                modifier = Modifier
+                    .selectable(
+                        selected = selected,
+                        onClick = { onSelectOrder(order.value) },
+                        role = Role.RadioButton,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    )
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            )
         }
     }
 }

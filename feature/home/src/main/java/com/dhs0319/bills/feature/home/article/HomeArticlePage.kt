@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -36,14 +37,22 @@ import com.dhs0319.bills.core.model.article.ArticleRecommendItem
 @Composable
 fun HomeArticlePage(
     isActive: Boolean,
+    refreshRequest: Int,
     onOpenArticle: (String, Int) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     viewModel: HomeArticleViewModel = hiltViewModel()
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
+    val gridState = rememberLazyStaggeredGridState()
 
     LaunchedEffect(isActive) {
         if (isActive) viewModel.ensureLoaded()
+    }
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest > 0) {
+            gridState.scrollToItem(0)
+            viewModel.refresh()
+        }
     }
     AdaptiveMediaGrid(
         items = state.items,
@@ -52,6 +61,7 @@ fun HomeArticlePage(
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
         modifier = Modifier.fillMaxSize(),
+        state = gridState,
         errorMessage = state.errorMessage,
         loadMoreEnabled = isActive,
         key = { _, item -> item.id },
