@@ -1,7 +1,9 @@
 package com.dhs0319.bills.feature.history.watchlater
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,8 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -31,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -95,9 +99,10 @@ fun WatchLaterScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = viewModel::toggleSort) {
-                        Text(if (state.asc) "最早添加" else "最新添加")
-                    }
+                    WatchLaterSortSelector(
+                        asc = state.asc,
+                        onSelect = viewModel::selectSort
+                    )
                 },
                 scrollBehavior = scrollBehavior
             )
@@ -196,6 +201,42 @@ fun WatchLaterScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WatchLaterSortSelector(
+    asc: Boolean,
+    onSelect: (Boolean) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        listOf(false to "最新添加", true to "最早添加").forEachIndexed { index, (option, label) ->
+            if (index > 0) {
+                VerticalDivider(
+                    modifier = Modifier.height(16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+            val selected = option == asc
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                },
+                modifier = Modifier
+                    .selectable(
+                        selected = selected,
+                        onClick = { onSelect(option) },
+                        role = Role.RadioButton,
+                        interactionSource = remember(option) { MutableInteractionSource() },
+                        indication = null
+                    )
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            )
         }
     }
 }

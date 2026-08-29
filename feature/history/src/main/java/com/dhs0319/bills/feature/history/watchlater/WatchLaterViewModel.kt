@@ -84,10 +84,9 @@ class WatchLaterViewModel @Inject constructor(
         }
     }
 
-    fun toggleSort() {
+    fun selectSort(asc: Boolean) {
         val state = _uiState.value
-        if (state.isLoading || state.isRefreshing || state.isLoadingMore) return
-        val asc = !state.asc
+        if (state.asc == asc || state.isLoading || state.isRefreshing || state.isLoadingMore) return
         val key = WatchLaterCacheKey(state.tab, asc)
         val cached = cache[key]
         if (cached != null) {

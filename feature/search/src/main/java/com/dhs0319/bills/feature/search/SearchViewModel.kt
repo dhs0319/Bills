@@ -108,11 +108,8 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun toggleHistoryOrder() {
-        historyOrder.value = when (historyOrder.value) {
-            SearchHistoryOrder.TIME -> SearchHistoryOrder.HOT
-            SearchHistoryOrder.HOT -> SearchHistoryOrder.TIME
-        }
+    fun selectHistoryOrder(order: SearchHistoryOrder) {
+        historyOrder.value = order
     }
 
     fun deleteHistory(keyword: String) {

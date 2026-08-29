@@ -247,20 +247,15 @@ class CommentViewModel @Inject constructor(
         )
     }
 
-    fun toggleReplyThreadSort() {
+    fun selectReplyThreadSort(sort: CommentSort) {
         val state = _uiState.value
         val subject = state.subject ?: return
         val thread = state.threadPane ?: return
-        if (!thread.canSwitchSort) return
-        val nextSort = if (thread.sort == CommentSort.HOT) {
-            CommentSort.TIME
-        } else {
-            CommentSort.HOT
-        }
+        if (!thread.canSwitchSort || thread.sort == sort) return
         _uiState.update {
             it.copy(
                 threadPane = thread.copy(
-                    sort = nextSort,
+                    sort = sort,
                     loading = true,
                     loadingMore = false,
                     error = null,
@@ -274,7 +269,7 @@ class CommentViewModel @Inject constructor(
             subject = subject,
             rootRpid = thread.rootRpid,
             rpid = thread.root.rpid,
-            sort = nextSort,
+            sort = sort,
             offset = "",
             append = false
         )

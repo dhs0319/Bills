@@ -2,6 +2,7 @@ package com.dhs0319.bills.feature.search.history
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -9,13 +10,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.model.SearchHistoryOrder
@@ -32,7 +36,7 @@ import com.dhs0319.bills.core.model.SearchHistoryOrder
 fun SearchHistoryPanel(
     histories: List<String>,
     order: SearchHistoryOrder,
-    onToggleOrder: () -> Unit,
+    onSelectOrder: (SearchHistoryOrder) -> Unit,
     onSearch: (String) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -60,14 +64,7 @@ fun SearchHistoryPanel(
                     text = "搜索历史",
                     style = MaterialTheme.typography.titleMedium
                 )
-                TextButton(onClick = onToggleOrder) {
-                    Text(
-                        text = when (order) {
-                            SearchHistoryOrder.TIME -> "最热"
-                            SearchHistoryOrder.HOT -> "最新"
-                        }
-                    )
-                }
+                SearchHistoryOrderSelector(order = order, onSelect = onSelectOrder)
             }
         }
 
@@ -105,6 +102,45 @@ fun SearchHistoryPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistoryOrderSelector(
+    order: SearchHistoryOrder,
+    onSelect: (SearchHistoryOrder) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        listOf(
+            SearchHistoryOrder.TIME to "按时间",
+            SearchHistoryOrder.HOT to "按热度"
+        ).forEachIndexed { index, (option, label) ->
+            if (index > 0) {
+                VerticalDivider(
+                    modifier = Modifier.height(16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+            val selected = option == order
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                },
+                modifier = Modifier
+                    .selectable(
+                        selected = selected,
+                        onClick = { onSelect(option) },
+                        role = Role.RadioButton,
+                        interactionSource = remember(option) { MutableInteractionSource() },
+                        indication = null
+                    )
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            )
         }
     }
 }

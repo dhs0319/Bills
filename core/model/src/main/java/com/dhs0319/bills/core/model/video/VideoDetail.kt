@@ -14,7 +14,10 @@ data class VideoDetail(
     val staffs: List<VideoStaff> = emptyList(),
     val season: VideoSeason? = null,
     val pages: List<VideoPagePart> = emptyList(),
-    val relates: List<VideoRelate> = emptyList()
+    val relates: List<VideoRelate> = emptyList(),
+    val isLiked: Boolean = false,
+    val isFavorited: Boolean = false,
+    val userCoinCount: Int = 0
 )
 
 @Immutable

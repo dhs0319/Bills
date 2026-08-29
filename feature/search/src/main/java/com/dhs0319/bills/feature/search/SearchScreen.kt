@@ -182,7 +182,7 @@ fun SearchScreen(
                         SearchHistoryPanel(
                             histories = histories,
                             order = historyOrder,
-                            onToggleOrder = viewModel::toggleHistoryOrder,
+                            onSelectOrder = viewModel::selectHistoryOrder,
                             onSearch = { keyword ->
                                 keyboard?.hide()
                                 viewModel.submitSearch(keyword)
