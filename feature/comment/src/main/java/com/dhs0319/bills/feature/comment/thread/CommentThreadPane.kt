@@ -1,5 +1,6 @@
 package com.dhs0319.bills.feature.comment.thread
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,10 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -30,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
@@ -45,7 +50,7 @@ internal fun CommentThreadPane(
     busyReplyIds: Set<Long>,
     onReplyAction: (CommentReplyAction) -> Unit,
     onDismiss: () -> Unit,
-    onToggleSort: () -> Unit,
+    onSelectSort: (CommentSort) -> Unit,
     onLoadMore: () -> Unit,
     bottomPadding: Dp,
     modifier: Modifier = Modifier,
@@ -62,7 +67,7 @@ internal fun CommentThreadPane(
             busyReplyIds = busyReplyIds,
             onReplyAction = onReplyAction,
             onDismiss = onDismiss,
-            onToggleSort = onToggleSort,
+            onSelectSort = onSelectSort,
             onLoadMore = onLoadMore,
             bottomPadding = bottomPadding,
             modifier = Modifier.fillMaxSize(),
@@ -80,7 +85,7 @@ private fun CommentThreadContent(
     busyReplyIds: Set<Long>,
     onReplyAction: (CommentReplyAction) -> Unit,
     onDismiss: () -> Unit,
-    onToggleSort: () -> Unit,
+    onSelectSort: (CommentSort) -> Unit,
     onLoadMore: () -> Unit,
     bottomPadding: Dp,
     modifier: Modifier = Modifier,
@@ -183,7 +188,7 @@ private fun CommentThreadContent(
                     count = state.count,
                     sort = state.sort,
                     canSwitchSort = state.canSwitchSort,
-                    onToggleSort = onToggleSort
+                    onSelectSort = onSelectSort
                 )
             }
 
@@ -239,7 +244,7 @@ private fun ThreadInfoBar(
     count: Long,
     sort: CommentSort,
     canSwitchSort: Boolean,
-    onToggleSort: () -> Unit
+    onSelectSort: (CommentSort) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -256,17 +261,34 @@ private fun ThreadInfoBar(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (canSwitchSort) {
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.extraLarge,
-                onClick = onToggleSort
-            ) {
-                Text(
-                    text = "按${threadSortText(sort)}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CommentSort.entries.forEachIndexed { index, option ->
+                    if (index > 0) {
+                        VerticalDivider(
+                            modifier = Modifier.height(16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+                    val selected = option == sort
+                    Text(
+                        text = threadSortText(option),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        },
+                        modifier = Modifier
+                            .selectable(
+                                selected = selected,
+                                onClick = { onSelectSort(option) },
+                                role = Role.RadioButton,
+                                interactionSource = remember(option) { MutableInteractionSource() },
+                                indication = null
+                            )
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    )
+                }
             }
         } else {
             Text(
@@ -280,7 +302,7 @@ private fun ThreadInfoBar(
 
 private fun threadSortText(sort: CommentSort): String {
     return when (sort) {
-        CommentSort.HOT -> "热门"
-        CommentSort.TIME -> "时间"
+        CommentSort.HOT -> "按热度"
+        CommentSort.TIME -> "按时间"
     }
 }

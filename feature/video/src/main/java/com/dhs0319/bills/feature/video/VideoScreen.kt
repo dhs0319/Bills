@@ -1,6 +1,7 @@
 package com.dhs0319.bills.feature.video
 
 import android.content.pm.ActivityInfo
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -77,8 +79,10 @@ fun VideoScreen(
     hostExpanded: Boolean = true
 ) {
     val videoState by viewModel.videoState.collectAsStateWithLifecycle()
+    val actionUiState by viewModel.actionUiState.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val act = LocalActivity.current
+    val context = LocalContext.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isExpandedWidth = windowSizeClass.isWidthAtLeastBreakpoint(840)
     val themeUsesDarkSystemBarIcons = MaterialTheme.colorScheme.background.luminance() > 0.5f
@@ -106,6 +110,13 @@ fun VideoScreen(
             onBack()
         } else {
             Unit
+        }
+    }
+
+    LaunchedEffect(actionUiState.message, context) {
+        actionUiState.message?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeActionMessage()
         }
     }
 
@@ -217,11 +228,21 @@ fun VideoScreen(
                         ids = videoState.ids,
                         detailLoading = videoState.detailLoading,
                         detailError = videoState.detailError,
+                        actionState = actionUiState,
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 0.dp,
                         onOpenVideo = openTarget,
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
+                        onToggleLike = viewModel::toggleLike,
+                        onOpenCoinPicker = viewModel::openCoinPicker,
+                        onSelectCoinAmount = viewModel::selectCoinAmount,
+                        onDismissCoinPicker = viewModel::dismissCoinPicker,
+                        onSubmitCoins = viewModel::submitCoins,
+                        onOpenFavoritePicker = viewModel::openFavoritePicker,
+                        onSelectFavoriteFolder = viewModel::selectFavoriteFolder,
+                        onDismissFavoritePicker = viewModel::dismissFavoritePicker,
+                        onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
                         onOpenEpisode = switchEpisode,
                         onSwitchPage = switchPage
                     )
@@ -257,11 +278,21 @@ fun VideoScreen(
                         ids = videoState.ids,
                         detailLoading = videoState.detailLoading,
                         detailError = videoState.detailError,
+                        actionState = actionUiState,
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 16.dp,
                         onOpenVideo = openTarget,
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
+                        onToggleLike = viewModel::toggleLike,
+                        onOpenCoinPicker = viewModel::openCoinPicker,
+                        onSelectCoinAmount = viewModel::selectCoinAmount,
+                        onDismissCoinPicker = viewModel::dismissCoinPicker,
+                        onSubmitCoins = viewModel::submitCoins,
+                        onOpenFavoritePicker = viewModel::openFavoritePicker,
+                        onSelectFavoriteFolder = viewModel::selectFavoriteFolder,
+                        onDismissFavoritePicker = viewModel::dismissFavoritePicker,
+                        onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
                         onOpenEpisode = switchEpisode,
                         onSwitchPage = switchPage
                     )

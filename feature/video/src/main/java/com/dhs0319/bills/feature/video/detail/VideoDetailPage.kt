@@ -1,8 +1,12 @@
 package com.dhs0319.bills.feature.video.detail
 
 import android.text.format.DateFormat
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +19,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +35,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -49,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -74,6 +84,7 @@ import com.dhs0319.bills.core.model.VideoSeasonEpisode
 import com.dhs0319.bills.core.model.VideoStat
 import com.dhs0319.bills.feature.comment.CommentPanel
 import com.dhs0319.bills.feature.video.formatDuration
+import com.dhs0319.bills.feature.video.VideoActionUiState
 import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -83,11 +94,21 @@ internal fun VideoDetailPage(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    actionState: VideoActionUiState,
     commentSubject: CommentSubject?,
     contentHorizontalPad: Dp,
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
+    onToggleLike: () -> Unit,
+    onOpenCoinPicker: () -> Unit,
+    onSelectCoinAmount: (Int) -> Unit,
+    onDismissCoinPicker: () -> Unit,
+    onSubmitCoins: () -> Unit,
+    onOpenFavoritePicker: () -> Unit,
+    onSelectFavoriteFolder: (Long, Boolean) -> Unit,
+    onDismissFavoritePicker: () -> Unit,
+    onSaveFavoriteFolders: () -> Unit,
     onOpenEpisode: (VideoTarget) -> Unit,
     onSwitchPage: (Long) -> Unit
 ) {
@@ -129,6 +150,7 @@ internal fun VideoDetailPage(
                 ids = ids,
                 detailLoading = detailLoading,
                 detailError = detailError,
+                actionState = actionState,
                 horizontalPad = contentHorizontalPad,
                 infoListState = detailListState,
                 descOn = descOn,
@@ -148,7 +170,10 @@ internal fun VideoDetailPage(
                 },
                 onOpenVideo = onOpenVideo,
                 onOpenSpace = onOpenSpace,
-                onDownloadClick = onDownloadClick
+                onDownloadClick = onDownloadClick,
+                onToggleLike = onToggleLike,
+                onOpenCoinPicker = onOpenCoinPicker,
+                onOpenFavoritePicker = onOpenFavoritePicker
             )
 
             else -> {
@@ -202,6 +227,24 @@ internal fun VideoDetailPage(
             }
         }
     }
+
+    if (actionState.favoriteDialogVisible) {
+        FavoriteFolderSheet(
+            state = actionState,
+            onSelectFolder = onSelectFavoriteFolder,
+            onDismiss = onDismissFavoritePicker,
+            onConfirm = onSaveFavoriteFolders
+        )
+    }
+
+    if (actionState.coinSheetVisible) {
+        CoinSheet(
+            state = actionState,
+            onSelectAmount = onSelectCoinAmount,
+            onDismiss = onDismissCoinPicker,
+            onConfirm = onSubmitCoins
+        )
+    }
 }
 
 @Composable
@@ -211,6 +254,7 @@ private fun DetailPageContent(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    actionState: VideoActionUiState,
     horizontalPad: Dp,
     infoListState: LazyListState,
     descOn: Boolean,
@@ -222,7 +266,10 @@ private fun DetailPageContent(
     onOpenComments: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
-    onDownloadClick: () -> Unit
+    onDownloadClick: () -> Unit,
+    onToggleLike: () -> Unit,
+    onOpenCoinPicker: () -> Unit,
+    onOpenFavoritePicker: () -> Unit
 ) {
     val itemMod = remember(horizontalPad) {
         if (horizontalPad > 0.dp) Modifier.padding(horizontal = horizontalPad) else Modifier
@@ -242,6 +289,7 @@ private fun DetailPageContent(
             ids = ids,
             detailLoading = detailLoading,
             detailError = detailError,
+            actionState = actionState,
             itemMod = itemMod,
             descOn = descOn,
             tagOn = tagOn,
@@ -252,6 +300,9 @@ private fun DetailPageContent(
             onOpenVideo = onOpenVideo,
             onOpenSpace = onOpenSpace,
             onDownloadClick = onDownloadClick,
+            onToggleLike = onToggleLike,
+            onOpenCoinPicker = onOpenCoinPicker,
+            onOpenFavoritePicker = onOpenFavoritePicker,
             onOpenComments = onOpenComments
         )
     }
@@ -262,6 +313,7 @@ private fun LazyListScope.detailItems(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    actionState: VideoActionUiState,
     itemMod: Modifier,
     descOn: Boolean,
     tagOn: Boolean,
@@ -272,6 +324,9 @@ private fun LazyListScope.detailItems(
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
+    onToggleLike: () -> Unit,
+    onOpenCoinPicker: () -> Unit,
+    onOpenFavoritePicker: () -> Unit,
     onOpenComments: () -> Unit
 ) {
     val curCid = ids.cid.takeIf { it > 0L }
@@ -319,6 +374,10 @@ private fun LazyListScope.detailItems(
                     onToggleTag = onToggleTag,
                     onOpenSpace = onOpenSpace,
                     onDownloadClick = onDownloadClick,
+                    actionState = actionState,
+                    onToggleLike = onToggleLike,
+                    onOpenCoinPicker = onOpenCoinPicker,
+                    onOpenFavoritePicker = onOpenFavoritePicker,
                     onOpenComments = onOpenComments,
                     modifier = itemMod
                 )
@@ -393,6 +452,10 @@ private fun VideoSummarySection(
     onToggleTag: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
+    actionState: VideoActionUiState,
+    onToggleLike: () -> Unit,
+    onOpenCoinPicker: () -> Unit,
+    onOpenFavoritePicker: () -> Unit,
     onOpenComments: () -> Unit
 ) {
     val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
@@ -419,6 +482,10 @@ private fun VideoSummarySection(
         )
         ActionCapsule(
             stat = detail.stat,
+            state = actionState,
+            onToggleLike = onToggleLike,
+            onOpenCoinPicker = onOpenCoinPicker,
+            onOpenFavoritePicker = onOpenFavoritePicker,
             onDownloadClick = onDownloadClick
         )
     }
@@ -525,13 +592,15 @@ private fun InfoCapsule(
         ) {
             if (detail.desc.isNotBlank()) {
                 ToggleChip(
-                    text = if (descOn) "收起简介" else "展开简介",
+                    text = "简介",
+                    expanded = descOn,
                     onClick = onToggleDesc
                 )
             }
             if (detail.tags.isNotEmpty()) {
                 ToggleChip(
-                    text = if (tagOn) "收起标签" else "展开标签",
+                    text = "标签",
+                    expanded = tagOn,
                     onClick = onToggleTag
                 )
             }
@@ -567,7 +636,11 @@ private fun InfoCapsule(
 @Composable
 private fun ActionCapsule(
     stat: VideoStat?,
+    state: VideoActionUiState,
     modifier: Modifier = Modifier,
+    onToggleLike: () -> Unit,
+    onOpenCoinPicker: () -> Unit,
+    onOpenFavoritePicker: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
     CapsuleCard(modifier = modifier) {
@@ -577,9 +650,27 @@ private fun ActionCapsule(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             stat?.let {
-                ActionChip("点赞", it.like)
-                ActionChip("投币", it.coin)
-                ActionChip("收藏", it.fav)
+                ActionChip(
+                    label = "点赞",
+                    value = adjustedCount(it.like, state.likeCountDelta),
+                    selected = state.liked,
+                    enabled = state.initialized && !state.likeBusy,
+                    onClick = onToggleLike
+                )
+                ActionChip(
+                    label = "投币",
+                    value = adjustedCount(it.coin, state.coinCountDelta),
+                    selected = state.userCoinCount > 0,
+                    enabled = state.initialized && !state.coinBusy,
+                    onClick = onOpenCoinPicker
+                )
+                ActionChip(
+                    label = "收藏",
+                    value = adjustedCount(it.fav, state.favoriteCountDelta),
+                    selected = state.favorited,
+                    enabled = state.initialized && !state.favoriteLoading && !state.favoriteSaving,
+                    onClick = onOpenFavoritePicker
+                )
                 ActionChip("分享", it.share)
             }
             ActionChip(
@@ -655,6 +746,7 @@ private fun SoftChip(
 @Composable
 private fun ToggleChip(
     text: String,
+    expanded: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
@@ -662,12 +754,27 @@ private fun ToggleChip(
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.tertiaryContainer
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Icon(
+                imageVector = if (expanded) {
+                    Icons.Default.KeyboardArrowUp
+                } else {
+                    Icons.Default.KeyboardArrowDown
+                },
+                contentDescription = if (expanded) "收起" else "展开",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+        }
     }
 }
 
@@ -675,15 +782,43 @@ private fun ToggleChip(
 private fun ActionChip(
     label: String,
     value: String? = null,
+    selected: Boolean = false,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "actionChipContainer"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "actionChipContent"
+    )
     Surface(
         modifier = if (onClick != null) {
-            Modifier.clickable(onClick = onClick)
+            Modifier
+                .alpha(if (enabled) 1f else 0.55f)
+                .clickable(
+                    enabled = enabled,
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
         } else {
             Modifier
         },
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = containerColor,
         shape = MaterialTheme.shapes.extraLarge
     ) {
         Row(
@@ -700,17 +835,287 @@ private fun ActionChip(
                 } else {
                     MaterialTheme.typography.labelMedium
                 },
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = contentColor
             )
             value?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = contentColor
                 )
             }
         }
     }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun CoinSheet(
+    state: VideoActionUiState,
+    onSelectAmount: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = {
+            if (!state.coinBusy) onDismiss()
+        },
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+        ) {
+            Text(
+                text = "投币支持一下",
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                for (amount in 1..2) {
+                    CoinAmountOption(
+                        amount = amount,
+                        selected = state.selectedCoinAmount == amount,
+                        enabled = !state.coinBusy,
+                        onClick = { onSelectAmount(amount) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+
+            val confirmInteractionSource = remember { MutableInteractionSource() }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        enabled = !state.coinBusy,
+                        interactionSource = confirmInteractionSource,
+                        indication = null,
+                        onClick = onConfirm
+                    )
+                    .padding(vertical = 20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "确认投币",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (state.coinBusy) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoinAmountOption(
+    amount: Int,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        modifier = modifier
+            .height(84.dp)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        shape = MaterialTheme.shapes.small,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        border = if (selected) {
+            androidx.compose.foundation.BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            null
+        }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = amount.toString(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+            )
+            Text(
+                text = "枚硬币",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun FavoriteFolderSheet(
+    state: VideoActionUiState,
+    onSelectFolder: (Long, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = {
+            if (!state.favoriteSaving) onDismiss()
+        },
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+        ) {
+            Text(
+                text = "选择收藏夹",
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 88.dp, max = 420.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                items(
+                    items = state.favoriteFolders,
+                    key = { it.id }
+                ) { folder ->
+                    val selected = folder.id in state.selectedFolderIds
+                    val interactionSource = remember { MutableInteractionSource() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                enabled = !state.favoriteSaving,
+                                interactionSource = interactionSource,
+                                indication = null
+                            ) { onSelectFolder(folder.id, !selected) }
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = folder.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${folder.mediaCount} 个内容",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        FavoriteSelectionIndicator(selected = selected)
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            val confirmInteractionSource = remember { MutableInteractionSource() }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        enabled = !state.favoriteSaving,
+                        interactionSource = confirmInteractionSource,
+                        indication = null,
+                        onClick = onConfirm
+                    )
+                    .padding(vertical = 20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "完成",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (state.favoriteSaving) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteSelectionIndicator(selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(26.dp)
+            .then(
+                if (selected) {
+                    Modifier.background(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape
+                    )
+                } else {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = CircleShape
+                    )
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+}
+
+private fun adjustedCount(value: String, delta: Int): String {
+    if (delta == 0) return value
+    return value.toLongOrNull()
+        ?.let { (it + delta).coerceAtLeast(0L).toString() }
+        ?: value
 }
 
 @Composable

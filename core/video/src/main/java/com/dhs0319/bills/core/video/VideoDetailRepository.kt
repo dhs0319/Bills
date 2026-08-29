@@ -175,7 +175,10 @@ class VideoDetailRepository @Inject constructor(
                 staffs = staffs,
                 season = season,
                 pages = parsePages(reply),
-                relates = relates
+                relates = relates,
+                isLiked = reply.reqUser.like > 0,
+                isFavorited = reply.reqUser.favorite > 0,
+                userCoinCount = reply.reqUser.coin.coerceIn(0, 2)
             ),
             ids = ids,
             biz = biz

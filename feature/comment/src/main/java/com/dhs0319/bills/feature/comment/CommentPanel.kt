@@ -226,7 +226,7 @@ fun CommentPanel(
                     busyReplyIds = uiState.busyReplyIds,
                     onReplyAction = onReplyAction,
                     onDismiss = onDismissDetail,
-                    onToggleSort = viewModel::toggleReplyThreadSort,
+                    onSelectSort = viewModel::selectReplyThreadSort,
                     onLoadMore = viewModel::loadMoreReplyThread,
                     bottomPadding = COMMENT_FAB_SPACE,
                     modifier = Modifier.fillMaxSize()
@@ -357,7 +357,7 @@ fun CommentPanel(
                         busyReplyIds = uiState.busyReplyIds,
                         onReplyAction = onReplyAction,
                         onDismiss = viewModel::closeReplyThread,
-                        onToggleSort = viewModel::toggleReplyThreadSort,
+                        onSelectSort = viewModel::selectReplyThreadSort,
                         onLoadMore = viewModel::loadMoreReplyThread,
                         bottomPadding = COMMENT_FAB_SPACE,
                         modifier = Modifier.fillMaxSize(),
