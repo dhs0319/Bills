@@ -166,7 +166,11 @@ class AuthRepository @Inject constructor(
         _currentMidFlow.value = mid
         return result
     }
-    fun removeAccount(mid: Long) = authStore.removeAccount(mid)
+    fun removeAccount(mid: Long) {
+        authStore.removeAccount(mid)
+        // Keep the shared session state in sync when the active account is removed.
+        _currentMidFlow.value = authStore.mid
+    }
     fun getUserInfo(): User? = authStore.getUserInfo()
     fun getAllUserInfos(): Map<Long, User> = authStore.getAllUserInfos()
 

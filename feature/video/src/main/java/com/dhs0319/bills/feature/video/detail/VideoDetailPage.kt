@@ -1,6 +1,13 @@
 package com.dhs0319.bills.feature.video.detail
 
+import android.content.ComponentName
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.text.format.DateFormat
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -37,12 +44,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -84,7 +93,8 @@ import com.dhs0319.bills.core.model.VideoSeasonEpisode
 import com.dhs0319.bills.core.model.VideoStat
 import com.dhs0319.bills.feature.comment.CommentPanel
 import com.dhs0319.bills.feature.video.formatDuration
-import com.dhs0319.bills.feature.video.VideoActionUiState
+import com.dhs0319.bills.core.video.VideoFavoriteFolder
+import com.dhs0319.bills.feature.video.action.VideoActionUiState
 import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -101,14 +111,9 @@ internal fun VideoDetailPage(
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
-    onOpenCoinPicker: () -> Unit,
-    onSelectCoinAmount: (Int) -> Unit,
-    onDismissCoinPicker: () -> Unit,
-    onSubmitCoins: () -> Unit,
-    onOpenFavoritePicker: () -> Unit,
-    onSelectFavoriteFolder: (Long, Boolean) -> Unit,
-    onDismissFavoritePicker: () -> Unit,
-    onSaveFavoriteFolders: () -> Unit,
+    onSubmitCoins: (Int, () -> Unit) -> Unit,
+    onLoadFavoriteFolders: ((List<VideoFavoriteFolder>) -> Unit) -> Unit,
+    onSaveFavoriteFolders: (Set<Long>, Set<Long>, () -> Unit) -> Unit,
     onOpenEpisode: (VideoTarget) -> Unit,
     onSwitchPage: (Long) -> Unit
 ) {
@@ -123,6 +128,18 @@ internal fun VideoDetailPage(
     val commentThreadListState = remember(aidKey) { LazyListState() }
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    var coinSheetVisible by remember(aidKey) { mutableStateOf(false) }
+    var selectedCoinAmount by remember(aidKey) { mutableStateOf(1) }
+    var favoriteSheetVisible by remember(aidKey) { mutableStateOf(false) }
+    var favoriteFolders by remember(aidKey) { mutableStateOf(emptyList<VideoFavoriteFolder>()) }
+    var originalFavoriteFolderIds by remember(aidKey) { mutableStateOf(emptySet<Long>()) }
+    var selectedFavoriteFolderIds by remember(aidKey) { mutableStateOf(emptySet<Long>()) }
+    var shareSheetVisible by remember(aidKey) { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboardManager = remember(context) {
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
+    val shareUrl = remember(detail, ids) { detail?.let { buildVideoShareUrl(ids) } }
 
     LaunchedEffect(aidKey) {
         pagerState.scrollToPage(0)
@@ -172,8 +189,36 @@ internal fun VideoDetailPage(
                 onOpenSpace = onOpenSpace,
                 onDownloadClick = onDownloadClick,
                 onToggleLike = onToggleLike,
-                onOpenCoinPicker = onOpenCoinPicker,
-                onOpenFavoritePicker = onOpenFavoritePicker
+                onOpenCoinPicker = {
+                    if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
+                        selectedCoinAmount = 1
+                        coinSheetVisible = true
+                    }
+                },
+                onOpenFavoritePicker = {
+                    if (
+                        actionState.initialized &&
+                        actionState.aid > 0L &&
+                        !actionState.favoriteLoading &&
+                        !actionState.favoriteSaving
+                    ) {
+                        onLoadFavoriteFolders { folders ->
+                            val selectedIds = folders.filter(VideoFavoriteFolder::selected)
+                                .mapTo(linkedSetOf(), VideoFavoriteFolder::id)
+                            favoriteFolders = folders
+                            originalFavoriteFolderIds = selectedIds
+                            selectedFavoriteFolderIds = selectedIds
+                            favoriteSheetVisible = true
+                        }
+                    }
+                },
+                onOpenShare = {
+                    if (shareUrl == null) {
+                        Toast.makeText(context, "视频链接无效", Toast.LENGTH_SHORT).show()
+                    } else {
+                        shareSheetVisible = true
+                    }
+                }
             )
 
             else -> {
@@ -228,21 +273,63 @@ internal fun VideoDetailPage(
         }
     }
 
-    if (actionState.favoriteDialogVisible) {
+    if (favoriteSheetVisible) {
         FavoriteFolderSheet(
-            state = actionState,
-            onSelectFolder = onSelectFavoriteFolder,
-            onDismiss = onDismissFavoritePicker,
-            onConfirm = onSaveFavoriteFolders
+            folders = favoriteFolders,
+            selectedFolderIds = selectedFavoriteFolderIds,
+            saving = actionState.favoriteSaving,
+            onSelectFolder = { folderId, selected ->
+                selectedFavoriteFolderIds = if (selected) {
+                    selectedFavoriteFolderIds + folderId
+                } else {
+                    selectedFavoriteFolderIds - folderId
+                }
+            },
+            onDismiss = { favoriteSheetVisible = false },
+            onConfirm = {
+                onSaveFavoriteFolders(
+                    originalFavoriteFolderIds,
+                    selectedFavoriteFolderIds
+                ) {
+                    favoriteSheetVisible = false
+                }
+            }
         )
     }
 
-    if (actionState.coinSheetVisible) {
+    if (coinSheetVisible) {
         CoinSheet(
-            state = actionState,
-            onSelectAmount = onSelectCoinAmount,
-            onDismiss = onDismissCoinPicker,
-            onConfirm = onSubmitCoins
+            selectedAmount = selectedCoinAmount,
+            busy = actionState.coinBusy,
+            onSelectAmount = { selectedCoinAmount = it },
+            onDismiss = { coinSheetVisible = false },
+            onConfirm = {
+                onSubmitCoins(selectedCoinAmount) {
+                    coinSheetVisible = false
+                }
+            }
+        )
+    }
+
+    if (shareSheetVisible && detail != null && shareUrl != null) {
+        ShareSheet(
+            title = formatShareTitle(detail.title),
+            url = shareUrl,
+            onDismiss = { shareSheetVisible = false },
+            onShare = { channel ->
+                if (channel == ShareChannel.COPY_LINK) {
+                    clipboardManager.setPrimaryClip(ClipData.newPlainText("video_link", shareUrl))
+                    Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                    shareSheetVisible = false
+                } else {
+                    val launched = launchShareTarget(context, channel, formatShareTitle(detail.title), shareUrl)
+                    if (!launched) {
+                        Toast.makeText(context, "未安装对应应用", Toast.LENGTH_SHORT).show()
+                    } else {
+                        shareSheetVisible = false
+                    }
+                }
+            }
         )
     }
 }
@@ -269,7 +356,8 @@ private fun DetailPageContent(
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
     onOpenCoinPicker: () -> Unit,
-    onOpenFavoritePicker: () -> Unit
+    onOpenFavoritePicker: () -> Unit,
+    onOpenShare: () -> Unit
 ) {
     val itemMod = remember(horizontalPad) {
         if (horizontalPad > 0.dp) Modifier.padding(horizontal = horizontalPad) else Modifier
@@ -303,6 +391,7 @@ private fun DetailPageContent(
             onToggleLike = onToggleLike,
             onOpenCoinPicker = onOpenCoinPicker,
             onOpenFavoritePicker = onOpenFavoritePicker,
+            onOpenShare = onOpenShare,
             onOpenComments = onOpenComments
         )
     }
@@ -327,6 +416,7 @@ private fun LazyListScope.detailItems(
     onToggleLike: () -> Unit,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
+    onOpenShare: () -> Unit,
     onOpenComments: () -> Unit
 ) {
     val curCid = ids.cid.takeIf { it > 0L }
@@ -378,6 +468,7 @@ private fun LazyListScope.detailItems(
                     onToggleLike = onToggleLike,
                     onOpenCoinPicker = onOpenCoinPicker,
                     onOpenFavoritePicker = onOpenFavoritePicker,
+                    onOpenShare = onOpenShare,
                     onOpenComments = onOpenComments,
                     modifier = itemMod
                 )
@@ -456,6 +547,7 @@ private fun VideoSummarySection(
     onToggleLike: () -> Unit,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
+    onOpenShare: () -> Unit,
     onOpenComments: () -> Unit
 ) {
     val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
@@ -486,6 +578,7 @@ private fun VideoSummarySection(
             onToggleLike = onToggleLike,
             onOpenCoinPicker = onOpenCoinPicker,
             onOpenFavoritePicker = onOpenFavoritePicker,
+            onOpenShare = onOpenShare,
             onDownloadClick = onDownloadClick
         )
     }
@@ -641,6 +734,7 @@ private fun ActionCapsule(
     onToggleLike: () -> Unit,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
+    onOpenShare: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
     CapsuleCard(modifier = modifier) {
@@ -671,7 +765,10 @@ private fun ActionCapsule(
                     enabled = state.initialized && !state.favoriteLoading && !state.favoriteSaving,
                     onClick = onOpenFavoritePicker
                 )
-                ActionChip("分享", it.share)
+                ActionChip(
+                    label = "分享",
+                    onClick = onOpenShare
+                )
             }
             ActionChip(
                 label = "下载",
@@ -851,7 +948,8 @@ private fun ActionChip(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun CoinSheet(
-    state: VideoActionUiState,
+    selectedAmount: Int,
+    busy: Boolean,
     onSelectAmount: (Int) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
@@ -860,7 +958,7 @@ private fun CoinSheet(
 
     ModalBottomSheet(
         onDismissRequest = {
-            if (!state.coinBusy) onDismiss()
+            if (!busy) onDismiss()
         },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -885,41 +983,34 @@ private fun CoinSheet(
                 for (amount in 1..2) {
                     CoinAmountOption(
                         amount = amount,
-                        selected = state.selectedCoinAmount == amount,
-                        enabled = !state.coinBusy,
+                        selected = selectedAmount == amount,
+                        enabled = !busy,
                         onClick = { onSelectAmount(amount) },
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-
-            val confirmInteractionSource = remember { MutableInteractionSource() }
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                        enabled = !state.coinBusy,
-                        interactionSource = confirmInteractionSource,
-                        indication = null,
-                        onClick = onConfirm
-                    )
-                    .padding(vertical = 20.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "确认投币",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = if (state.coinBusy) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    }
-                )
+                OutlinedButton(
+                    onClick = onDismiss,
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = onConfirm,
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("确认投币")
+                }
             }
         }
     }
@@ -984,7 +1075,9 @@ private fun CoinAmountOption(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun FavoriteFolderSheet(
-    state: VideoActionUiState,
+    folders: List<VideoFavoriteFolder>,
+    selectedFolderIds: Set<Long>,
+    saving: Boolean,
     onSelectFolder: (Long, Boolean) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
@@ -993,7 +1086,7 @@ private fun FavoriteFolderSheet(
 
     ModalBottomSheet(
         onDismissRequest = {
-            if (!state.favoriteSaving) onDismiss()
+            if (!saving) onDismiss()
         },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -1016,16 +1109,16 @@ private fun FavoriteFolderSheet(
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
                 items(
-                    items = state.favoriteFolders,
+                    items = folders,
                     key = { it.id }
                 ) { folder ->
-                    val selected = folder.id in state.selectedFolderIds
+                    val selected = folder.id in selectedFolderIds
                     val interactionSource = remember { MutableInteractionSource() }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable(
-                                enabled = !state.favoriteSaving,
+                                enabled = !saving,
                                 interactionSource = interactionSource,
                                 indication = null
                             ) { onSelectFolder(folder.id, !selected) }
@@ -1050,30 +1143,26 @@ private fun FavoriteFolderSheet(
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            val confirmInteractionSource = remember { MutableInteractionSource() }
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                        enabled = !state.favoriteSaving,
-                        interactionSource = confirmInteractionSource,
-                        indication = null,
-                        onClick = onConfirm
-                    )
-                    .padding(vertical = 20.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "完成",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = if (state.favoriteSaving) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    }
-                )
+                OutlinedButton(
+                    onClick = onDismiss,
+                    enabled = !saving,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = onConfirm,
+                    enabled = !saving,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("完成")
+                }
             }
         }
     }
@@ -1109,6 +1198,171 @@ private fun FavoriteSelectionIndicator(selected: Boolean) {
             )
         }
     }
+}
+
+private enum class ShareChannel(
+    val label: String,
+    val glyph: String,
+    val color: androidx.compose.ui.graphics.Color,
+    val packageName: String? = null,
+    val componentClassName: String? = null
+) {
+    WECHAT("微信", "微", androidx.compose.ui.graphics.Color(0xFF07C160), "com.tencent.mm"),
+    WECHAT_MOMENTS(
+        "朋友圈",
+        "圈",
+        androidx.compose.ui.graphics.Color(0xFF34BFA3),
+        "com.tencent.mm",
+        "com.tencent.mm.ui.tools.ShareToTimeLineUI"
+    ),
+    QQ("QQ", "Q", androidx.compose.ui.graphics.Color(0xFF12B7F5), "com.tencent.mobileqq"),
+    WEIBO("微博", "微", androidx.compose.ui.graphics.Color(0xFFE6162D), "com.sina.weibo"),
+    COPY_LINK("复制链接", "链", androidx.compose.ui.graphics.Color(0xFFE9E9EE))
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ShareSheet(
+    title: String,
+    url: String,
+    onDismiss: () -> Unit,
+    onShare: (ShareChannel) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = "分享",
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleLarge
+            )
+            Text(
+                text = title,
+                modifier = Modifier.padding(horizontal = 12.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ShareChannel.entries.forEach { channel ->
+                    ShareChannelItem(
+                        channel = channel,
+                        onClick = { onShare(channel) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareChannelItem(
+    channel: ShareChannel,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Column(
+        modifier = modifier
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Surface(
+            modifier = Modifier.size(52.dp),
+            shape = CircleShape,
+            color = channel.color
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = channel.glyph,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (channel == ShareChannel.COPY_LINK) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        androidx.compose.ui.graphics.Color.White
+                    }
+                )
+            }
+        }
+        Text(
+            text = channel.label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun buildVideoShareUrl(ids: ResolvedVideoIds): String? {
+    ids.bvid?.takeIf(String::isNotBlank)?.let { return "https://www.bilibili.com/video/$it" }
+    return ids.aid.takeIf { it > 0L }?.let { "https://www.bilibili.com/video/av$it" }
+}
+
+private fun formatShareTitle(title: String): String {
+    return if (title.startsWith("【") && title.endsWith("】")) {
+        title
+    } else {
+        "【$title】"
+    }
+}
+
+private fun launchShareTarget(
+    context: Context,
+    channel: ShareChannel,
+    title: String,
+    url: String
+): Boolean {
+    val packageName = channel.packageName ?: return false
+
+    fun buildIntent(action: String, componentClassName: String? = null): Intent {
+        return Intent(action).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_TEXT, "$title\n$url")
+            if (componentClassName != null) {
+                component = ComponentName(packageName, componentClassName)
+            } else {
+                setPackage(packageName)
+            }
+        }
+    }
+
+    val intents = listOf(buildIntent(Intent.ACTION_SEND, channel.componentClassName))
+
+    for (intent in intents) {
+        try {
+            context.startActivity(intent)
+            return true
+        } catch (_: ActivityNotFoundException) {
+            // No compatible share target is installed.
+        } catch (_: SecurityException) {
+            // The target does not expose its share entry point.
+        }
+    }
+    return false
 }
 
 private fun adjustedCount(value: String, delta: Int): String {

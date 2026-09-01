@@ -201,7 +201,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
-                                    text = "一键重置外观 音视频 推荐和隐私等设置",
+                                    text = "一键重置外观 播放器 推荐和隐私等设置",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
