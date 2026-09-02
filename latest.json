@@ -1,10 +1,10 @@
 {
-  "version": "1.0.7",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.7/Bills-1.0.7-arm64-v8a-release.apk",
+  "version": "1.0.8",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.8/Bills-1.0.8-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.7/Bills-1.0.7-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.7/Bills-1.0.7-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.8/Bills-1.0.8-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.8/Bills-1.0.8-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.7",
-  "releaseNotes": "## 更新内容\n\n- 支持点赞、收藏和投币功能\n- 优化其余排序切换按钮的UI交互\n- 优化展开和收起标签的UI"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.8",
+  "releaseNotes": "## 更新内容\n\n- 支持视频分享功能\n- 优化投币和收藏的面板底部按钮UI\n- 修复私信页面会话输入框被遮挡的问题\n- 修复账号登录成功后未刷新账号列表\n- 修复删除账号后仍显示旧账号信息"
 }
