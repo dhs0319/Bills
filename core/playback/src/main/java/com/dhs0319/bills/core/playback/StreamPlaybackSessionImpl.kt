@@ -90,6 +90,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
     private val _videoState = MutableStateFlow(VideoPlaybackState(biz = PlayBiz.UGC))
     override val videoState: StateFlow<VideoPlaybackState> = _videoState.asStateFlow()
     override val playbackProgress: StateFlow<PlaybackProgress> = playerEngine.playbackProgress
+    override val downloadSpeedBytesPerSecond: StateFlow<Long> = playerEngine.downloadSpeedBytesPerSecond
     private val prepMu = Mutex()
     private val openId = AtomicLong(0L)
     private var lastDiscontinuitySeq = 0L

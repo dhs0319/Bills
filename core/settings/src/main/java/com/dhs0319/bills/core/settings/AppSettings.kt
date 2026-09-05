@@ -19,6 +19,7 @@ import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
 import com.dhs0319.bills.core.model.DanmakuConfig
 import com.dhs0319.bills.core.model.PlayerBufferProfile
 import com.dhs0319.bills.core.model.PlayerBufferSettings
+import com.dhs0319.bills.core.model.PlayerOverlayPrefs
 import com.dhs0319.bills.core.model.PlayerPlaybackPrefs
 import com.dhs0319.bills.core.model.PlayerSettingsState
 import com.dhs0319.bills.core.model.VideoCdnMode
@@ -37,6 +38,7 @@ class AppSettings @Inject constructor(
     private val defaultPlayerSettings = PlayerSettingsState()
     private val defaultBufferSettings = defaultPlayerSettings.buffer
     private val defaultPlaybackPrefs = defaultPlayerSettings.playback
+    private val defaultOverlayPrefs = defaultPlayerSettings.overlay
     private val defaultDanmakuConfig = defaultPlayerSettings.danmaku
 
     private val themeModeKey = stringPreferencesKey("theme_mode")
@@ -217,6 +219,9 @@ class AppSettings @Inject constructor(
     private val gestureSpeedKey = floatPreferencesKey("gesture_speed")
     private val videoCdnModeKey = stringPreferencesKey("video_cdn_mode")
     private val reportPlaybackKey = booleanPreferencesKey("report_playback")
+    private val playerOverlayShowTimeKey = booleanPreferencesKey("player_overlay_show_time")
+    private val playerOverlayShowNetworkSpeedKey = booleanPreferencesKey("player_overlay_show_network_speed")
+    private val playerOverlayShowBatteryKey = booleanPreferencesKey("player_overlay_show_battery")
     private val danmakuEnabledKey = booleanPreferencesKey("danmaku_enabled")
     private val danmakuAreaPercentKey = intPreferencesKey("danmaku_area_percent")
     private val danmakuOpacityKey = floatPreferencesKey("danmaku_opacity")
@@ -258,6 +263,12 @@ class AppSettings @Inject constructor(
                 videoCdnMode = prefs[videoCdnModeKey]
                     ?.let(VideoCdnMode::valueOf)
                     ?: defaultPlaybackPrefs.videoCdnMode
+            ),
+            overlay = PlayerOverlayPrefs(
+                showTime = prefs[playerOverlayShowTimeKey] ?: defaultOverlayPrefs.showTime,
+                showNetworkSpeed = prefs[playerOverlayShowNetworkSpeedKey]
+                    ?: defaultOverlayPrefs.showNetworkSpeed,
+                showBattery = prefs[playerOverlayShowBatteryKey] ?: defaultOverlayPrefs.showBattery
             ),
             danmaku = DanmakuConfig(
                 enabled = prefs[danmakuEnabledKey] ?: defaultDanmakuConfig.enabled,
@@ -320,6 +331,18 @@ class AppSettings @Inject constructor(
 
     suspend fun setReportPlayback(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[reportPlaybackKey] = enabled }
+    }
+
+    suspend fun setPlayerOverlayShowTime(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[playerOverlayShowTimeKey] = enabled }
+    }
+
+    suspend fun setPlayerOverlayShowNetworkSpeed(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[playerOverlayShowNetworkSpeedKey] = enabled }
+    }
+
+    suspend fun setPlayerOverlayShowBattery(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[playerOverlayShowBatteryKey] = enabled }
     }
 
     suspend fun setPreferSoftwareDecode(enabled: Boolean) {

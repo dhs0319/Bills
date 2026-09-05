@@ -37,7 +37,8 @@ import okhttp3.Request
 @UnstableApi
 internal class SingleFileDashMediaSourceFactory(
     private val appContext: Context,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val networkTransferListener: TransferListener
 ) {
 
     suspend fun create(
@@ -153,6 +154,7 @@ internal class SingleFileDashMediaSourceFactory(
         val requestSpec = source.toPlaybackRequestSpec()
         val upstreamFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent(requestSpec.userAgent)
+            .setTransferListener(networkTransferListener)
         if (requestSpec.headers.isNotEmpty()) {
             upstreamFactory.setDefaultRequestProperties(requestSpec.headers)
         }

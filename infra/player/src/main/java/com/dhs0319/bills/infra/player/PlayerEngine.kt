@@ -25,6 +25,7 @@ interface PlayerEngine {
     val currentSource: StateFlow<EngineSource?>
     val playbackState: StateFlow<PlayerPlaybackState>
     val playbackProgress: StateFlow<PlaybackProgress>
+    val downloadSpeedBytesPerSecond: StateFlow<Long>
 
     fun updateConfig(config: PlayerConfig)
     suspend fun setSource(

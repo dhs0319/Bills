@@ -106,8 +106,16 @@ data class PlayerPlaybackPrefs(
 )
 
 @Immutable
+data class PlayerOverlayPrefs(
+    val showTime: Boolean = true,
+    val showNetworkSpeed: Boolean = true,
+    val showBattery: Boolean = true
+)
+
+@Immutable
 data class PlayerSettingsState(
     val buffer: PlayerBufferSettings = PlayerBufferSettings(),
     val playback: PlayerPlaybackPrefs = PlayerPlaybackPrefs(),
+    val overlay: PlayerOverlayPrefs = PlayerOverlayPrefs(),
     val danmaku: DanmakuConfig = DanmakuConfig()
 )

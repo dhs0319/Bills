@@ -82,6 +82,7 @@ import com.dhs0319.bills.feature.video.getAudioName
 import com.dhs0319.bills.feature.video.getQualityName
 import com.dhs0319.bills.feature.video.speedOps
 import kotlinx.coroutines.delay
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -118,14 +119,22 @@ internal fun VideoPlayerPane(
     val timeFmt = remember { android.text.format.DateFormat.getTimeFormat(context) }
     val state by viewModel.videoState.collectAsStateWithLifecycle()
     val player by viewModel.player.collectAsStateWithLifecycle()
+    val downloadSpeedBytesPerSecond by viewModel.downloadSpeedBytesPerSecond.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     var activeDialog by remember { mutableStateOf<PlayerDialog?>(null) }
     var showPlaybackSheet by remember { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
     val videoResizeMode = rememberSaveable { mutableStateOf(PlayerVideoResizeMode.Fit) }
-    val topStatus = remember(showCtrl, isFull) {
+    val topStatus = remember(showCtrl, isFull, downloadSpeedBytesPerSecond, settingsState.overlay) {
         if (showCtrl && isFull) {
-            readPlayerTopStatus(context, timeFmt)
+            readPlayerTopStatus(
+                context = context,
+                timeFmt = timeFmt,
+                downloadSpeedBytesPerSecond = downloadSpeedBytesPerSecond,
+                showTime = settingsState.overlay.showTime,
+                showNetworkSpeed = settingsState.overlay.showNetworkSpeed,
+                showBattery = settingsState.overlay.showBattery
+            )
         } else {
             null
         }
@@ -269,24 +278,38 @@ internal fun VideoPlayerPane(
                                     .heightIn(min = 20.dp)
                                     .padding(horizontal = 32.dp)
                             ) {
-                                Text(
-                                    text = status.time,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-                                status.batteryPercent?.let { batteryPercent ->
-                                    Row(
-                                        modifier = Modifier.align(Alignment.CenterEnd),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+                                status.time?.let { time ->
+                                    Text(
+                                        text = time,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.align(Alignment.CenterEnd),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    status.downloadSpeedText?.let { speedText ->
                                         Text(
-                                            text = "$batteryPercent%",
+                                            text = speedText,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color.White.copy(alpha = 0.9f)
                                         )
-                                        BatteryLevelIcon(batteryPercent = batteryPercent)
+                                    }
+                                    status.batteryPercent?.let { batteryPercent ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "$batteryPercent%",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White.copy(alpha = 0.9f)
+                                            )
+                                            BatteryLevelIcon(batteryPercent = batteryPercent)
+                                        }
                                     }
                                 }
                             }
@@ -940,8 +963,9 @@ private fun SpeedSelectionDialog(
 }
 
 private data class PlayerTopStatus(
-    val time: String,
-    val batteryPercent: Int?
+    val time: String?,
+    val batteryPercent: Int?,
+    val downloadSpeedText: String?
 )
 
 @Composable
@@ -986,12 +1010,33 @@ private fun BatteryLevelIcon(
 
 private fun readPlayerTopStatus(
     context: android.content.Context,
-    timeFmt: java.text.DateFormat
+    timeFmt: java.text.DateFormat,
+    downloadSpeedBytesPerSecond: Long,
+    showTime: Boolean,
+    showNetworkSpeed: Boolean,
+    showBattery: Boolean
 ): PlayerTopStatus {
-    val time = timeFmt.format(System.currentTimeMillis())
-    val battery = context.getSystemService(BatteryManager::class.java)
-        ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        ?.takeIf { it in 0..100 }
-    return PlayerTopStatus(time = time, batteryPercent = battery)
+    val time = timeFmt.format(System.currentTimeMillis()).takeIf { showTime }
+    val battery = if (showBattery) {
+        context.getSystemService(BatteryManager::class.java)
+            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            ?.takeIf { it in 0..100 }
+    } else {
+        null
+    }
+    return PlayerTopStatus(
+        time = time,
+        batteryPercent = battery,
+        downloadSpeedText = formatDownloadSpeed(downloadSpeedBytesPerSecond).takeIf { showNetworkSpeed }
+    )
+}
+
+private fun formatDownloadSpeed(bytesPerSecond: Long): String {
+    val kilobytesPerSecond = bytesPerSecond / 1024.0
+    return if (kilobytesPerSecond >= 1024.0) {
+        String.format(Locale.US, "%.1f MB/s", kilobytesPerSecond / 1024.0)
+    } else {
+        "${kilobytesPerSecond.coerceAtLeast(0.0).toInt()} KB/s"
+    }
 }
 

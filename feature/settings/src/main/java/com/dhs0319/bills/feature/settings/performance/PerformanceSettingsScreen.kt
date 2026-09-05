@@ -39,6 +39,7 @@ fun PerformanceSettingsScreen(
 ) {
     val config by viewModel.themeConfig.collectAsStateWithLifecycle()
     val fixBottomBar by viewModel.fixBottomBar.collectAsStateWithLifecycle()
+    val playerSettings by viewModel.playerSettings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val frameRateOptions = remember(context) { context.availableFrameRateModes() }
 
@@ -76,6 +77,30 @@ fun PerformanceSettingsScreen(
                     subtitle = "主页底栏不再随滚动自动收起",
                     checked = fixBottomBar,
                     onCheckedChange = viewModel::updateFixBottomBar
+                )
+            }
+            item {
+                SettingSwitch(
+                    title = "状态栏显示时间",
+                    subtitle = "在全屏播放器顶部显示当前时间",
+                    checked = playerSettings.overlay.showTime,
+                    onCheckedChange = viewModel::updatePlayerOverlayShowTime
+                )
+            }
+            item {
+                SettingSwitch(
+                    title = "状态栏显示网速",
+                    subtitle = "在全屏播放器顶部显示视频缓冲速度",
+                    checked = playerSettings.overlay.showNetworkSpeed,
+                    onCheckedChange = viewModel::updatePlayerOverlayShowNetworkSpeed
+                )
+            }
+            item {
+                SettingSwitch(
+                    title = "状态栏显示电量",
+                    subtitle = "在全屏播放器顶部显示设备电量",
+                    checked = playerSettings.overlay.showBattery,
+                    onCheckedChange = viewModel::updatePlayerOverlayShowBattery
                 )
             }
         }
