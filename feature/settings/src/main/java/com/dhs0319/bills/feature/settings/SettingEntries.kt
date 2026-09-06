@@ -22,6 +22,9 @@ val appearanceEntries = listOf(
 val performanceEntries = listOf(
     SettingEntry("屏幕刷新率", "设置应用渲染帧率上限", PERFORMANCE_ROUTE),
     SettingEntry("固定底栏", "主页底栏不再随滚动自动收起", PERFORMANCE_ROUTE),
+    SettingEntry("状态栏显示时间", "全屏播放器顶部状态栏", PERFORMANCE_ROUTE),
+    SettingEntry("状态栏显示网速", "全屏播放器顶部状态栏", PERFORMANCE_ROUTE),
+    SettingEntry("状态栏显示电量", "全屏播放器顶部状态栏", PERFORMANCE_ROUTE),
 )
 
 val otherEntries = listOf(

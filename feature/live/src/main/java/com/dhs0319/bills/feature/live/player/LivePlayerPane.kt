@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -49,6 +48,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
+import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
 import com.dhs0319.bills.core.model.LivePlaybackViewState
 import com.dhs0319.bills.core.model.LiveQualityOption
 import com.dhs0319.bills.core.model.LiveRoomMessage
@@ -216,11 +216,12 @@ internal fun LivePlayerPane(
                 }
         )
 
-        if (playbackState.isPreparing) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        PlaybackBufferingOverlay(
+            visible = playbackState.error == null &&
+                playbackState.playerError.isNullOrBlank() &&
+                (playbackState.isPreparing || playbackState.playbackState == PlaybackState.Buffering),
+            modifier = Modifier.align(Alignment.Center)
+        )
 
         if (showCtrl) {
             LivePlayerCtrlBar(

@@ -6,6 +6,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,11 +68,14 @@ import androidx.media3.ui.R as Media3UiR
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
+import com.dhs0319.bills.core.designsystem.component.formatPlaybackDownloadSpeed
 import com.dhs0319.bills.infra.player.danmaku.DanmakuLayer
 import com.dhs0319.bills.infra.player.danmaku.DanmakuOverlayState
 import com.dhs0319.bills.infra.player.danmaku.rememberDanmakuOverlayState
 import com.dhs0319.bills.infra.player.PlayerViewTargetBinder
 import com.dhs0319.bills.core.model.PlaybackAudio
+import com.dhs0319.bills.core.model.PlaybackState
 import com.dhs0319.bills.core.model.PlayerSettingsState
 import com.dhs0319.bills.core.model.QualityOption
 import com.dhs0319.bills.core.model.VideoPlaybackState
@@ -118,14 +123,23 @@ internal fun VideoPlayerPane(
     val timeFmt = remember { android.text.format.DateFormat.getTimeFormat(context) }
     val state by viewModel.videoState.collectAsStateWithLifecycle()
     val player by viewModel.player.collectAsStateWithLifecycle()
+    val downloadSpeedBytesPerSecond by viewModel.downloadSpeedBytesPerSecond.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     var activeDialog by remember { mutableStateOf<PlayerDialog?>(null) }
     var showPlaybackSheet by remember { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
+    val replayInteractionSource = remember { MutableInteractionSource() }
     val videoResizeMode = rememberSaveable { mutableStateOf(PlayerVideoResizeMode.Fit) }
-    val topStatus = remember(showCtrl, isFull) {
+    val topStatus = remember(showCtrl, isFull, downloadSpeedBytesPerSecond, settingsState.overlay) {
         if (showCtrl && isFull) {
-            readPlayerTopStatus(context, timeFmt)
+            readPlayerTopStatus(
+                context = context,
+                timeFmt = timeFmt,
+                downloadSpeedBytesPerSecond = downloadSpeedBytesPerSecond,
+                showTime = settingsState.overlay.showTime,
+                showNetworkSpeed = settingsState.overlay.showNetworkSpeed,
+                showBattery = settingsState.overlay.showBattery
+            )
         } else {
             null
         }
@@ -209,6 +223,12 @@ internal fun VideoPlayerPane(
                 modifier = Modifier.fillMaxSize()
             )
 
+            PlaybackBufferingOverlay(
+                visible = state.playerError.isNullOrBlank() &&
+                    (state.isPreparing || state.playbackState == PlaybackState.Buffering),
+                modifier = Modifier.align(Alignment.Center)
+            )
+
             if (danmakuOverlayState != null) {
                 VideoDanmakuLayer(
                     viewModel = viewModel,
@@ -269,24 +289,38 @@ internal fun VideoPlayerPane(
                                     .heightIn(min = 20.dp)
                                     .padding(horizontal = 32.dp)
                             ) {
-                                Text(
-                                    text = status.time,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-                                status.batteryPercent?.let { batteryPercent ->
-                                    Row(
-                                        modifier = Modifier.align(Alignment.CenterEnd),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+                                status.time?.let { time ->
+                                    Text(
+                                        text = time,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.align(Alignment.CenterEnd),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    status.downloadSpeedText?.let { speedText ->
                                         Text(
-                                            text = "$batteryPercent%",
+                                            text = speedText,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color.White.copy(alpha = 0.9f)
                                         )
-                                        BatteryLevelIcon(batteryPercent = batteryPercent)
+                                    }
+                                    status.batteryPercent?.let { batteryPercent ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "$batteryPercent%",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White.copy(alpha = 0.9f)
+                                            )
+                                            BatteryLevelIcon(batteryPercent = batteryPercent)
+                                        }
                                     }
                                 }
                             }
@@ -390,7 +424,44 @@ internal fun VideoPlayerPane(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxSize()
-                )
+                    )
+            }
+
+            if (state.playbackState == PlaybackState.Ended && state.playerError.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .clickable(
+                                interactionSource = replayInteractionSource,
+                                indication = null
+                            ) {
+                                activeDialog = null
+                                showPlaybackSheet = false
+                                showCtrl = false
+                                viewModel.replay()
+                            }
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Replay,
+                            contentDescription = "重播",
+                            tint = Color.White,
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Text(
+                            text = "重播",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -940,8 +1011,9 @@ private fun SpeedSelectionDialog(
 }
 
 private data class PlayerTopStatus(
-    val time: String,
-    val batteryPercent: Int?
+    val time: String?,
+    val batteryPercent: Int?,
+    val downloadSpeedText: String?
 )
 
 @Composable
@@ -986,12 +1058,25 @@ private fun BatteryLevelIcon(
 
 private fun readPlayerTopStatus(
     context: android.content.Context,
-    timeFmt: java.text.DateFormat
+    timeFmt: java.text.DateFormat,
+    downloadSpeedBytesPerSecond: Long,
+    showTime: Boolean,
+    showNetworkSpeed: Boolean,
+    showBattery: Boolean
 ): PlayerTopStatus {
-    val time = timeFmt.format(System.currentTimeMillis())
-    val battery = context.getSystemService(BatteryManager::class.java)
-        ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        ?.takeIf { it in 0..100 }
-    return PlayerTopStatus(time = time, batteryPercent = battery)
+    val time = timeFmt.format(System.currentTimeMillis()).takeIf { showTime }
+    val battery = if (showBattery) {
+        context.getSystemService(BatteryManager::class.java)
+            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            ?.takeIf { it in 0..100 }
+    } else {
+        null
+    }
+    return PlayerTopStatus(
+        time = time,
+        batteryPercent = battery,
+        downloadSpeedText = formatPlaybackDownloadSpeed(downloadSpeedBytesPerSecond)
+            .takeIf { showNetworkSpeed }
+    )
 }
 

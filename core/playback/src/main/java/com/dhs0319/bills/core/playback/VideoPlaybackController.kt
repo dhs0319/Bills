@@ -11,6 +11,7 @@ interface VideoPlaybackController {
     val player: StateFlow<Player?>
     val videoState: StateFlow<VideoPlaybackState>
     val playbackProgress: StateFlow<PlaybackProgress>
+    val downloadSpeedBytesPerSecond: StateFlow<Long>
     val danmakuState: StateFlow<DanmakuSessionState>
 
     fun openVideo(target: VideoTarget)

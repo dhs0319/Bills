@@ -42,6 +42,7 @@ class VideoViewModel @Inject constructor(
     val player: StateFlow<Player?> = playbackController.player
     val videoState: StateFlow<VideoPlaybackState> = playbackController.videoState
     val playbackProgress: StateFlow<PlaybackProgress> = playbackController.playbackProgress
+    val downloadSpeedBytesPerSecond: StateFlow<Long> = playbackController.downloadSpeedBytesPerSecond
     val settingsState = playerSettings.state
 
     internal val videoActions = VideoActionController(videoActionRepository, viewModelScope)
@@ -109,9 +110,16 @@ class VideoViewModel @Inject constructor(
         }
     }
 
+    fun replay() {
+        playbackController.seekTo(0L)
+        playbackController.play()
+    }
+
     fun toggleLike() {
         videoActions.toggleLike()
     }
+
+    fun isLoggedIn(): Boolean = videoActionRepository.isLoggedIn()
 
     fun submitCoins(amount: Int, onSuccess: () -> Unit) {
         videoActions.submitCoins(amount, onSuccess)

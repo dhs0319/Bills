@@ -111,6 +111,7 @@ internal fun VideoDetailPage(
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
+    isLoggedIn: () -> Boolean,
     onSubmitCoins: (Int, () -> Unit) -> Unit,
     onLoadFavoriteFolders: ((List<VideoFavoriteFolder>) -> Unit) -> Unit,
     onSaveFavoriteFolders: (Set<Long>, Set<Long>, () -> Unit) -> Unit,
@@ -190,7 +191,9 @@ internal fun VideoDetailPage(
                 onDownloadClick = onDownloadClick,
                 onToggleLike = onToggleLike,
                 onOpenCoinPicker = {
-                    if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
+                    if (!isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                    } else if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
                         selectedCoinAmount = 1
                         coinSheetVisible = true
                     }

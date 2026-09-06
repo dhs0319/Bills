@@ -21,6 +21,8 @@ class VideoActionRepository @Inject constructor(
     private val restParamBuilder: BiliRestParamBuilder,
     private val authStore: AuthStore
 ) {
+    fun isLoggedIn(): Boolean = authStore.accessToken.isNotBlank()
+
     suspend fun setLiked(aid: Long, liked: Boolean): String? {
         requireAidAndToken(aid)
         val json = restClient.postSigned(

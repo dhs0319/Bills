@@ -278,6 +278,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { appSettings.setReportPlayback(enabled) }
     }
 
+    fun updatePlayerOverlayShowTime(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setPlayerOverlayShowTime(enabled) }
+    }
+
+    fun updatePlayerOverlayShowNetworkSpeed(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setPlayerOverlayShowNetworkSpeed(enabled) }
+    }
+
+    fun updatePlayerOverlayShowBattery(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setPlayerOverlayShowBattery(enabled) }
+    }
+
     fun updatePreferSoftwareDecode(enabled: Boolean) {
         viewModelScope.launch { appSettings.setPreferSoftwareDecode(enabled) }
     }

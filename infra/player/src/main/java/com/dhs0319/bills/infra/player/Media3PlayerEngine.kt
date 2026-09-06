@@ -10,6 +10,9 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -52,10 +55,6 @@ class Media3PlayerEngine @Inject constructor(
 
     private val appContext = context.applicationContext
     private val videoOkHttpClient = okHttpClient
-    private val singleFileDashMediaSourceFactory = SingleFileDashMediaSourceFactory(
-        appContext = appContext,
-        okHttpClient = okHttpClient
-    )
 
     private val _player = MutableStateFlow<Player?>(null)
     override val player: StateFlow<Player?> = _player.asStateFlow()
@@ -65,6 +64,8 @@ class Media3PlayerEngine @Inject constructor(
     override val playbackState: StateFlow<PlayerPlaybackState> = _playbackState.asStateFlow()
     private val _playbackProgress = MutableStateFlow(PlaybackProgress())
     override val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
+    private val _downloadSpeedBytesPerSecond = MutableStateFlow(0L)
+    override val downloadSpeedBytesPerSecond: StateFlow<Long> = _downloadSpeedBytesPerSecond.asStateFlow()
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var playerConfig = PlayerConfig()
     private var videoDecoderName: String? = null
@@ -73,6 +74,50 @@ class Media3PlayerEngine @Inject constructor(
     private var lastEventsPlaybackState = Player.STATE_IDLE
     private var lastEventsIsPlaying = false
     private var progressJob: Job? = null
+    private val downloadSpeedLock = Any()
+    private var speedWindowBytes = 0L
+    private var smoothedSpeedBytesPerSecond = 0.0
+
+    private val downloadSpeedSamplerJob = runtimeScope.launch {
+        while (isActive) {
+            delay(DOWNLOAD_SPEED_SAMPLE_WINDOW_MS)
+            val speedBytesPerSecond = synchronized(downloadSpeedLock) {
+                val bytes = speedWindowBytes
+                speedWindowBytes = 0L
+                val measuredSpeed = bytes * MILLIS_PER_SECOND / DOWNLOAD_SPEED_SAMPLE_WINDOW_MS
+                smoothedSpeedBytesPerSecond +=
+                    (measuredSpeed - smoothedSpeedBytesPerSecond) * DOWNLOAD_SPEED_SMOOTHING_ALPHA
+                smoothedSpeedBytesPerSecond.coerceAtLeast(0.0).toLong()
+            }
+            _downloadSpeedBytesPerSecond.value = speedBytesPerSecond
+        }
+    }
+
+    private val networkTransferListener = object : TransferListener {
+        override fun onTransferInitializing(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
+
+        override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
+
+        override fun onBytesTransferred(
+            source: DataSource,
+            dataSpec: DataSpec,
+            isNetwork: Boolean,
+            bytesTransferred: Int
+        ) {
+            if (!isNetwork || bytesTransferred <= 0) return
+            synchronized(downloadSpeedLock) {
+                speedWindowBytes += bytesTransferred.toLong()
+            }
+        }
+
+        override fun onTransferEnd(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
+    }
+
+    private val singleFileDashMediaSourceFactory = SingleFileDashMediaSourceFactory(
+        appContext = appContext,
+        okHttpClient = okHttpClient,
+        networkTransferListener = networkTransferListener
+    )
 
     private val playerListener = object : Player.Listener {
         override fun onPositionDiscontinuity(
@@ -385,6 +430,7 @@ class Media3PlayerEngine @Inject constructor(
         val requestSpec = source.toPlaybackRequestSpec()
         val upstreamFactory = OkHttpDataSource.Factory(videoOkHttpClient)
             .setUserAgent(requestSpec.userAgent)
+            .setTransferListener(networkTransferListener)
         if (requestSpec.headers.isNotEmpty()) {
             upstreamFactory.setDefaultRequestProperties(requestSpec.headers)
         }
@@ -458,6 +504,11 @@ class Media3PlayerEngine @Inject constructor(
     private fun resetPlaybackFlows() {
         _playbackState.value = PlayerPlaybackState()
         _playbackProgress.value = PlaybackProgress()
+        synchronized(downloadSpeedLock) {
+            speedWindowBytes = 0L
+            smoothedSpeedBytesPerSecond = 0.0
+        }
+        _downloadSpeedBytesPerSecond.value = 0L
     }
 
     private fun resetRuntimeState() {
@@ -484,5 +535,8 @@ class Media3PlayerEngine @Inject constructor(
 
     private companion object {
         const val TAG = "Media3Player"
+        const val MILLIS_PER_SECOND = 1_000.0
+        const val DOWNLOAD_SPEED_SAMPLE_WINDOW_MS = 1_000L
+        const val DOWNLOAD_SPEED_SMOOTHING_ALPHA = 0.35
     }
 }
