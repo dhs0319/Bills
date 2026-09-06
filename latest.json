@@ -1,10 +1,10 @@
 {
-  "version": "1.0.8",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.8/Bills-1.0.8-arm64-v8a-release.apk",
+  "version": "1.0.9",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.0.9/Bills-1.0.9-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.8/Bills-1.0.8-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.8/Bills-1.0.8-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.0.9/Bills-1.0.9-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.0.9/Bills-1.0.9-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.8",
-  "releaseNotes": "## 更新内容\n\n- 支持视频分享功能\n- 优化投币和收藏的面板底部按钮UI\n- 修复私信页面会话输入框被遮挡的问题\n- 修复账号登录成功后未刷新账号列表\n- 修复删除账号后仍显示旧账号信息"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.0.9",
+  "releaseNotes": "## 更新内容\n\n- 支持视频缓冲时的网速显示\n- 设置里新增时间、网速和电量的显示开关\n- 视频缓冲时新增加载动画\n- 视频播放完毕新增重播交互\n- 修复弹出键盘后有空白间距的问题"
 }
