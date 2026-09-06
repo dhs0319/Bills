@@ -1,7 +1,6 @@
 package com.dhs0319.bills.infra.player
 
 import android.content.Context
-import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -75,24 +74,29 @@ class Media3PlayerEngine @Inject constructor(
     private var lastEventsPlaybackState = Player.STATE_IDLE
     private var lastEventsIsPlaying = false
     private var progressJob: Job? = null
-    private var downloadSpeedResetJob: Job? = null
     private val downloadSpeedLock = Any()
-    private var speedWindowStartedAtMs = 0L
     private var speedWindowBytes = 0L
-    private var activeNetworkTransfers = 0
+    private var smoothedSpeedBytesPerSecond = 0.0
+
+    private val downloadSpeedSamplerJob = runtimeScope.launch {
+        while (isActive) {
+            delay(DOWNLOAD_SPEED_SAMPLE_WINDOW_MS)
+            val speedBytesPerSecond = synchronized(downloadSpeedLock) {
+                val bytes = speedWindowBytes
+                speedWindowBytes = 0L
+                val measuredSpeed = bytes * MILLIS_PER_SECOND / DOWNLOAD_SPEED_SAMPLE_WINDOW_MS
+                smoothedSpeedBytesPerSecond +=
+                    (measuredSpeed - smoothedSpeedBytesPerSecond) * DOWNLOAD_SPEED_SMOOTHING_ALPHA
+                smoothedSpeedBytesPerSecond.coerceAtLeast(0.0).toLong()
+            }
+            _downloadSpeedBytesPerSecond.value = speedBytesPerSecond
+        }
+    }
 
     private val networkTransferListener = object : TransferListener {
         override fun onTransferInitializing(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
 
-        override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {
-            if (!isNetwork) return
-            synchronized(downloadSpeedLock) {
-                activeNetworkTransfers += 1
-                if (speedWindowStartedAtMs == 0L) {
-                    speedWindowStartedAtMs = SystemClock.elapsedRealtime()
-                }
-            }
-        }
+        override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
 
         override fun onBytesTransferred(
             source: DataSource,
@@ -101,45 +105,12 @@ class Media3PlayerEngine @Inject constructor(
             bytesTransferred: Int
         ) {
             if (!isNetwork || bytesTransferred <= 0) return
-            val speed = synchronized(downloadSpeedLock) {
-                val nowMs = SystemClock.elapsedRealtime()
-                if (speedWindowStartedAtMs == 0L) {
-                    speedWindowStartedAtMs = nowMs
-                }
+            synchronized(downloadSpeedLock) {
                 speedWindowBytes += bytesTransferred.toLong()
-                val elapsedMs = nowMs - speedWindowStartedAtMs
-                if (elapsedMs < DOWNLOAD_SPEED_SAMPLE_WINDOW_MS) {
-                    null
-                } else {
-                    val bytesPerSecond = (
-                        speedWindowBytes * MILLIS_PER_SECOND / elapsedMs
-                    ).toLong()
-                    speedWindowStartedAtMs = nowMs
-                    speedWindowBytes = 0L
-                    bytesPerSecond
-                }
             }
-            speed?.let(::publishDownloadSpeed)
         }
 
-        override fun onTransferEnd(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {
-            if (!isNetwork) return
-            val speed = synchronized(downloadSpeedLock) {
-                activeNetworkTransfers = (activeNetworkTransfers - 1).coerceAtLeast(0)
-                if (activeNetworkTransfers > 0 || speedWindowBytes <= 0L) {
-                    null
-                } else {
-                    val elapsedMs = (SystemClock.elapsedRealtime() - speedWindowStartedAtMs).coerceAtLeast(1L)
-                    val bytesPerSecond = (
-                        speedWindowBytes * MILLIS_PER_SECOND / elapsedMs
-                    ).toLong()
-                    speedWindowStartedAtMs = 0L
-                    speedWindowBytes = 0L
-                    bytesPerSecond
-                }
-            }
-            speed?.let(::publishDownloadSpeed)
-        }
+        override fun onTransferEnd(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) = Unit
     }
 
     private val singleFileDashMediaSourceFactory = SingleFileDashMediaSourceFactory(
@@ -534,22 +505,10 @@ class Media3PlayerEngine @Inject constructor(
         _playbackState.value = PlayerPlaybackState()
         _playbackProgress.value = PlaybackProgress()
         synchronized(downloadSpeedLock) {
-            speedWindowStartedAtMs = 0L
             speedWindowBytes = 0L
-            activeNetworkTransfers = 0
+            smoothedSpeedBytesPerSecond = 0.0
         }
-        downloadSpeedResetJob?.cancel()
-        downloadSpeedResetJob = null
         _downloadSpeedBytesPerSecond.value = 0L
-    }
-
-    private fun publishDownloadSpeed(bytesPerSecond: Long) {
-        _downloadSpeedBytesPerSecond.value = bytesPerSecond.coerceAtLeast(0L)
-        downloadSpeedResetJob?.cancel()
-        downloadSpeedResetJob = runtimeScope.launch {
-            delay(DOWNLOAD_SPEED_STALE_MS)
-            _downloadSpeedBytesPerSecond.value = 0L
-        }
     }
 
     private fun resetRuntimeState() {
@@ -578,6 +537,6 @@ class Media3PlayerEngine @Inject constructor(
         const val TAG = "Media3Player"
         const val MILLIS_PER_SECOND = 1_000.0
         const val DOWNLOAD_SPEED_SAMPLE_WINDOW_MS = 1_000L
-        const val DOWNLOAD_SPEED_STALE_MS = 1_500L
+        const val DOWNLOAD_SPEED_SMOOTHING_ALPHA = 0.35
     }
 }

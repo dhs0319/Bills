@@ -110,6 +110,11 @@ class VideoViewModel @Inject constructor(
         }
     }
 
+    fun replay() {
+        playbackController.seekTo(0L)
+        playbackController.play()
+    }
+
     fun toggleLike() {
         videoActions.toggleLike()
     }

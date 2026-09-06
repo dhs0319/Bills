@@ -87,7 +87,7 @@ fun DynamicScreen(
                 !state.isLoggedIn -> {
                     StateMessageCard(
                         text = "请先登录后查看动态",
-                        modifier = Modifier.fillMaxSize().padding(24.dp)
+                        modifier = Modifier.fillMaxSize().padding(16.dp)
                     )
                 }
 
@@ -103,7 +103,7 @@ fun DynamicScreen(
                 state.errorMessage != null && state.items.isEmpty() -> {
                     StateMessageCard(
                         text = state.errorMessage.orEmpty().ifBlank { "加载动态失败" },
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
                         isError = true
                     )
                 }
@@ -111,7 +111,7 @@ fun DynamicScreen(
                 state.items.isEmpty() -> {
                     StateMessageCard(
                         text = "暂无动态",
-                        modifier = Modifier.fillMaxSize().padding(24.dp)
+                        modifier = Modifier.fillMaxSize().padding(16.dp)
                     )
                 }
 
