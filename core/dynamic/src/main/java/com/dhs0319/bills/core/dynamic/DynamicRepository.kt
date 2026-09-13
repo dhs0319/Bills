@@ -22,9 +22,11 @@ import com.bapis.bilibili.app.dynamic.v2.MdlDynUGCSeason
 import com.bapis.bilibili.app.dynamic.v2.OpusDetailReq
 import com.bapis.bilibili.app.dynamic.v2.OpusDetailResp
 import com.bapis.bilibili.app.dynamic.v2.Refresh
+import com.bapis.bilibili.app.dynamic.v2.TextNode
 import com.dhs0319.bills.core.common.media.httpsImageUrlOrNull
 import com.dhs0319.bills.core.model.DynamicAuthor
 import com.dhs0319.bills.core.model.DynamicBody
+import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.DynamicCursor
 import com.dhs0319.bills.core.model.DynamicForwardItem
 import com.dhs0319.bills.core.model.DynamicImage
@@ -156,11 +158,12 @@ class DynamicRepository @Inject constructor(
             val p = module.moduleParagraph.paragraph
             when (p.paraType.number) {
                 1 -> { // TEXT
-                    val text = p.text.nodesList.joinToString("") { it.rawText }.blankToNull()
+                    val richText = mapTextNodes(p.text.nodesList)
                     DynamicDetailParagraph(
                         type = DynamicDetailParagraph.TYPE_TEXT,
-                        text = text,
-                        images = emptyList()
+                        text = richText.text,
+                        images = emptyList(),
+                        emotes = richText.emotes
                     )
                 }
                 2 -> { // PICTURES
@@ -313,7 +316,8 @@ class DynamicRepository @Inject constructor(
             spaceRoute = spaceRoute,
             trackId = extend.trackId.blankToNull(),
             reportFlowData = extend.reportMetricData.blankToNull(),
-            canOpen = summary.videoTarget != null || summary.liveRoute != null
+            canOpen = summary.videoTarget != null || summary.liveRoute != null,
+            emotes = mapPrimaryEmotes(item)
         )
     }
 
@@ -335,6 +339,66 @@ class DynamicRepository @Inject constructor(
         return desc.descList.joinToString("") { it.text }.blankToNull()
     }
 
+    private fun mapDescEmotes(desc: ModuleDesc): List<CommentEmote> {
+        return desc.descList.mapNotNull { description ->
+            if (description.type.number != 9 && description.emojiType.number == 0) return@mapNotNull null
+            val text = description.text.ifBlank { description.origText }.blankToNull() ?: return@mapNotNull null
+            val url = description.iconUrl.blankToNull()?.httpsImageUrlOrNull() ?: return@mapNotNull null
+            CommentEmote(
+                text = text,
+                url = url,
+                size = description.emojiSize.toLong().takeIf { it > 0L } ?: 1L
+            )
+        }.distinctBy(CommentEmote::text)
+    }
+
+    private fun mapTextNodeEmote(node: TextNode): CommentEmote? {
+        if (node.nodeType.number != 2 && !node.hasEmote()) return null
+        if (!node.hasEmote()) return null
+        val emote = node.emote
+        val text = node.rawText.blankToNull()
+            ?: emote.rawText.words.blankToNull()
+            ?: return null
+        val url = emote.emoteUrl.blankToNull()?.httpsImageUrlOrNull() ?: return null
+        return CommentEmote(
+            text = text,
+            url = url,
+            size = emote.emoteWidth.emojiSize.toLong().takeIf { it > 0L } ?: 1L
+        )
+    }
+
+    private fun mapTextNodeEmotes(nodes: List<TextNode>): List<CommentEmote> {
+        return nodes.mapNotNull(::mapTextNodeEmote).distinctBy(CommentEmote::text)
+    }
+
+    private fun mapTextNodes(nodes: List<TextNode>): RichText {
+        return RichText(
+            text = nodes.joinToString("") { it.rawText }.blankToNull(),
+            emotes = mapTextNodeEmotes(nodes)
+        )
+    }
+
+    private fun mapPrimaryEmotes(item: DynamicItem): List<CommentEmote> {
+        val moduleEmotes = item.modulesList.flatMap { module ->
+            when {
+                module.hasModuleDesc() -> mapDescEmotes(module.moduleDesc)
+                module.hasModuleParagraph() -> mapTextNodeEmotes(module.moduleParagraph.paragraph.text.nodesList)
+                module.hasModuleOpusSummary() -> {
+                    mapTextNodeEmotes(module.moduleOpusSummary.title.text.nodesList) +
+                        mapTextNodeEmotes(module.moduleOpusSummary.summary.text.nodesList)
+                }
+                else -> emptyList()
+            }
+        }.distinctBy(CommentEmote::text)
+        if (moduleEmotes.isNotEmpty()) return moduleEmotes
+        return item.extend.descList.mapNotNull { description ->
+            if (description.type.number != 9 && description.emojiType.number == 0) return@mapNotNull null
+            val text = description.text.ifBlank { description.origText }.blankToNull() ?: return@mapNotNull null
+            val url = description.iconUrl.blankToNull()?.httpsImageUrlOrNull() ?: return@mapNotNull null
+            CommentEmote(text = text, url = url, size = description.emojiSize.toLong().takeIf { it > 0L } ?: 1L)
+        }.distinctBy(CommentEmote::text)
+    }
+
     private fun mapExtendDesc(item: DynamicItem): String? {
         return item.extend.descList.joinToString("") { it.text }.blankToNull()
     }
@@ -354,8 +418,8 @@ class DynamicRepository @Inject constructor(
             when {
                 module.hasModuleDesc() -> mapDescText(module.moduleDesc)
                 module.hasModuleParagraph() -> module.moduleParagraph.paragraph.text.nodesList
-                    .joinToString("") { it.rawText }
-                    .blankToNull()
+                    .let(::mapTextNodes)
+                    .text
                 module.hasModuleOpusSummary() -> mapOpusSummaryText(module.moduleOpusSummary)
                 else -> null
             }
@@ -590,6 +654,25 @@ class DynamicRepository @Inject constructor(
                 else -> null
             }
         } ?: mapExtendDesc(origin)
+        val originEmotes = origin.modulesList.firstNotNullOfOrNull { module ->
+            when {
+                module.hasModuleDesc() -> mapDescEmotes(module.moduleDesc).takeIf { it.isNotEmpty() }
+                module.hasModuleParagraph() -> mapTextNodeEmotes(module.moduleParagraph.paragraph.text.nodesList)
+                    .takeIf { it.isNotEmpty() }
+                module.hasModuleOpusSummary() -> (
+                    mapTextNodeEmotes(module.moduleOpusSummary.title.text.nodesList) +
+                        mapTextNodeEmotes(module.moduleOpusSummary.summary.text.nodesList)
+                    ).takeIf { it.isNotEmpty() }
+                else -> null
+            }
+        }.orEmpty().ifEmpty {
+            origin.extend.descList.mapNotNull { description ->
+                if (description.type.number != 9 && description.emojiType.number == 0) return@mapNotNull null
+                val text = description.text.ifBlank { description.origText }.blankToNull() ?: return@mapNotNull null
+                val url = description.iconUrl.blankToNull()?.httpsImageUrlOrNull() ?: return@mapNotNull null
+                CommentEmote(text = text, url = url, size = description.emojiSize.toLong().takeIf { it > 0L } ?: 1L)
+            }.distinctBy(CommentEmote::text)
+        }
         val originDynamic = origin.modulesList.firstOrNull { it.hasModuleDynamic() }?.moduleDynamic
         val originTitle = when {
             originDynamic?.hasDynArchive() == true -> originDynamic.dynArchive.title.blankToNull()
@@ -619,7 +702,8 @@ class DynamicRepository @Inject constructor(
                     bodyText = originDesc,
                     title = originTitle,
                     cover = originCover,
-                    badge = originBadge
+                    badge = originBadge,
+                    emotes = originEmotes
                 )
             ),
             title = originTitle,
@@ -722,6 +806,11 @@ class DynamicRepository @Inject constructor(
         val badge: String? = null,
         val videoTarget: VideoTarget? = null,
         val liveRoute: LiveRoute? = null
+    )
+
+    private data class RichText(
+        val text: String?,
+        val emotes: List<CommentEmote>
     )
 
     private companion object {

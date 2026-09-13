@@ -3,24 +3,22 @@ package com.dhs0319.bills.feature.live.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,11 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -49,8 +45,14 @@ import androidx.media3.ui.PlayerView
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
+import com.dhs0319.bills.core.designsystem.component.PlaybackOption
+import com.dhs0319.bills.core.designsystem.component.PlaybackOptionBottomSheet
+import com.dhs0319.bills.core.designsystem.component.PlaybackOptionSidebar
+import com.dhs0319.bills.core.designsystem.component.PlaybackSidePanel
+import com.dhs0319.bills.core.designsystem.component.shouldShowPlaybackSidebar
+import com.dhs0319.bills.core.designsystem.component.PlayerBottomControls
+import com.dhs0319.bills.core.designsystem.component.PlayerControlTextButton
 import com.dhs0319.bills.core.model.LivePlaybackViewState
-import com.dhs0319.bills.core.model.LiveQualityOption
 import com.dhs0319.bills.core.model.LiveRoomMessage
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.LiveRoomSessionState
@@ -89,6 +91,7 @@ internal fun LivePlayerPane(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val useSidebar = shouldShowPlaybackSidebar(isFull)
     val owner = LocalLifecycleOwner.current
     val tapSrc = remember { MutableInteractionSource() }
     var showCtrl by remember { mutableStateOf(true) }
@@ -97,6 +100,15 @@ internal fun LivePlayerPane(
     val qualityText = playbackState.playbackSource?.currentDescription
         ?.takeIf(String::isNotBlank)
         ?: "画质"
+    val qualityOptions = playbackState.playbackSource?.let { source ->
+        source.qualityOptions.map { option ->
+            PlaybackOption(
+                id = option.qn.toString(),
+                label = option.description,
+                selected = option.qn == source.currentQn
+            )
+        }
+    }
     val danmakuOn = settingsState.danmaku.enabled
     val playerView = remember(context) {
         PlayerView(context).apply {
@@ -224,36 +236,89 @@ internal fun LivePlayerPane(
         )
 
         if (showCtrl) {
-            LivePlayerCtrlBar(
-                playText = if (playbackState.isPlaying) "暂停" else "播放",
-                qualityText = qualityText,
-                fullText = if (isFull) "退出全屏" else "全屏",
-                playOn = playbackState.playbackSource != null,
-                qualityOn = (playbackState.playbackSource?.qualityOptions?.size ?: 0) > 1,
-                danmakuText = if (danmakuOn) "弹幕" else "弹幕关",
+            IconButton(
+                onClick = {
+                    showCtrl = true
+                    onToggleDanmaku(!danmakuOn)
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 12.dp, end = 20.dp)
+                    .size(40.dp)
+            ) {
+                Icon(
+                    imageVector = if (danmakuOn) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                    contentDescription = if (danmakuOn) "关闭弹幕" else "开启弹幕",
+                    tint = Color.White
+                )
+            }
+
+            PlayerBottomControls(
+                isPlaying = playbackState.isPlaying,
+                playContentDescription = if (playbackState.isPlaying) "暂停" else "播放",
+                timeText = "",
+                progressValue = 0f,
+                progressEnabled = false,
+                showProgress = false,
+                isFullscreen = isFull,
+                fullscreenContentDescription = if (isFull) "退出全屏" else "全屏",
                 onTogglePlay = {
                     showCtrl = true
                     onTogglePlay()
                 },
-                onDanmakuClick = {
-                    showCtrl = true
-                    onToggleDanmaku(!danmakuOn)
-                },
-                onQualityClick = {
-                    showCtrl = true
-                    showQualityDialog = true
-                },
-                onInfoClick = {
-                    showCtrl = true
-                    showInfoDialog = true
-                },
-                onFullClick = {
+                playEnabled = playbackState.playbackSource != null,
+                onToggleFullscreen = {
                     showCtrl = true
                     onToggleFull()
                 },
+                onProgressChange = {},
+                onProgressChangeFinished = {},
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .align(Alignment.BottomCenter),
+                optionActions = {
+                    PlayerControlTextButton(
+                        label = "画质",
+                        text = qualityText,
+                        enabled = (playbackState.playbackSource?.qualityOptions?.size ?: 0) > 1,
+                        onClick = {
+                            showCtrl = true
+                            showQualityDialog = true
+                            showInfoDialog = false
+                        }
+                    )
+                    PlayerControlTextButton(
+                        text = "信息",
+                        onClick = {
+                            showCtrl = true
+                            showInfoDialog = true
+                            showQualityDialog = false
+                        }
+                    )
+                }
+            )
+        }
+
+        if (showInfoDialog && useSidebar) {
+            LivePlaybackInfoDialog(
+                state = playbackState,
+                onDismiss = { showInfoDialog = false },
+                embedded = true
+            )
+        }
+
+        if (showQualityDialog && useSidebar && qualityOptions != null) {
+            PlaybackOptionSidebar(
+                embedded = true,
+                title = "选择画质",
+                options = qualityOptions,
+                onDismiss = { showQualityDialog = false },
+                onSelect = { quality ->
+                    onSwitchQuality(quality.toInt())
+                    showQualityDialog = false
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxSize()
             )
         }
 
@@ -279,21 +344,19 @@ internal fun LivePlayerPane(
         }
     }
 
-    if (showQualityDialog) {
-        playbackState.playbackSource?.let { source ->
-            LiveQualitySelectionDialog(
-                options = source.qualityOptions,
-                curQuality = source.currentQn,
-                onDismiss = { showQualityDialog = false },
-                onSelect = { quality ->
-                    onSwitchQuality(quality)
-                    showQualityDialog = false
-                }
-            )
-        }
+    if (showQualityDialog && !useSidebar && qualityOptions != null) {
+        PlaybackOptionBottomSheet(
+            title = "选择画质",
+            options = qualityOptions,
+            onDismiss = { showQualityDialog = false },
+            onSelect = { quality ->
+                onSwitchQuality(quality.toInt())
+                showQualityDialog = false
+            }
+        )
     }
 
-    if (showInfoDialog) {
+    if (showInfoDialog && !useSidebar) {
         LivePlaybackInfoDialog(
             state = playbackState,
             onDismiss = { showInfoDialog = false }
@@ -354,168 +417,12 @@ private fun LiveDanmakuEffect(
 }
 
 @Composable
-private fun LivePlayerCtrlBar(
-    playText: String,
-    qualityText: String,
-    danmakuText: String,
-    fullText: String,
-    playOn: Boolean,
-    qualityOn: Boolean,
-    onTogglePlay: () -> Unit,
-    onDanmakuClick: () -> Unit,
-    onQualityClick: () -> Unit,
-    onInfoClick: () -> Unit,
-    onFullClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.56f)
-                    )
-                )
-            )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LiveCtrlBtn(
-                text = playText,
-                enabled = playOn,
-                onClick = onTogglePlay,
-                modifier = Modifier.weight(1f)
-            )
-            LiveCtrlBtn(
-                text = qualityText,
-                enabled = qualityOn,
-                onClick = onQualityClick,
-                modifier = Modifier.weight(1f)
-            )
-            LiveCtrlBtn(
-                text = danmakuText,
-                enabled = true,
-                onClick = onDanmakuClick,
-                modifier = Modifier.weight(1f)
-            )
-            LiveCtrlBtn(
-                text = "信息",
-                enabled = true,
-                onClick = onInfoClick,
-                modifier = Modifier.weight(1f)
-            )
-            LiveCtrlBtn(
-                text = fullText,
-                enabled = true,
-                onClick = onFullClick,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun LiveCtrlBtn(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg = if (enabled) {
-        Color.White.copy(alpha = 0.14f)
-    } else {
-        Color.White.copy(alpha = 0.08f)
-    }
-    val fg = if (enabled) {
-        Color.White
-    } else {
-        Color.White.copy(alpha = 0.45f)
-    }
-
-    Box(
-        modifier = modifier
-            .heightIn(min = 32.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(bg)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = fg,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun LiveQualitySelectionDialog(
-    options: List<LiveQualityOption>,
-    curQuality: Int,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("选择画质") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                options.forEach { option ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(option.qn) }
-                            .padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = option.description,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        if (option.qn == curQuality) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
-}
-
-@Composable
 private fun LivePlaybackInfoDialog(
     state: LivePlaybackViewState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    embedded: Boolean = false
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("播放信息") },
-        text = {
+    PlaybackSidePanel(title = "播放信息", onDismiss = onDismiss, embedded = embedded) {
             Text(
                 text = buildLiveInfoText(state),
                 modifier = Modifier
@@ -524,13 +431,7 @@ private fun LivePlaybackInfoDialog(
                     .verticalScroll(rememberScrollState()),
                 style = MaterialTheme.typography.bodyMedium
             )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
+    }
 }
 
 internal fun liveStatusText(status: LiveStatus): String {

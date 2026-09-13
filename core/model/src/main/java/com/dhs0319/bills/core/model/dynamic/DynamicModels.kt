@@ -56,7 +56,8 @@ data class DynamicItem(
     val spaceRoute: SpaceRoute?,
     val trackId: String?,
     val reportFlowData: String?,
-    val canOpen: Boolean
+    val canOpen: Boolean,
+    val emotes: List<CommentEmote> = emptyList()
 )
 
 @Immutable
@@ -131,7 +132,8 @@ data class DynamicForwardItem(
     val bodyText: String?,
     val title: String?,
     val cover: String?,
-    val badge: String?
+    val badge: String?,
+    val emotes: List<CommentEmote> = emptyList()
 )
 
 @Immutable
@@ -163,7 +165,8 @@ data class DynamicDetailAuthor(
 data class DynamicDetailParagraph(
     val type: String,
     val text: String?,
-    val images: List<DynamicImage>
+    val images: List<DynamicImage>,
+    val emotes: List<CommentEmote> = emptyList()
 ) {
     companion object {
         const val TYPE_TEXT = "TEXT"

@@ -124,12 +124,14 @@ class VideoPlayerRepositoryImpl @Inject constructor(
         val vodInfo = reply.vodInfo
         val biz = request.playable.biz.biz
         val audios = buildList {
-            addAll(vodInfo.dashAudioList.map(::mapAudio))
+            addAll(vodInfo.dashAudioList.mapNotNull(::mapAudio))
             if (vodInfo.hasDolby() && vodInfo.dolby.type != DolbyItem.Type.NONE) {
-                addAll(vodInfo.dolby.audioList.map(::mapAudio))
+                addAll(vodInfo.dolby.audioList.mapNotNull(::mapAudio))
             }
-            if (vodInfo.hasLossLessItem() && vodInfo.lossLessItem.isLosslessAudio) {
-                add(mapAudio(vodInfo.lossLessItem.audio))
+            if (vodInfo.hasLossLessItem() && vodInfo.lossLessItem.isLosslessAudio &&
+                vodInfo.lossLessItem.hasAudio()
+            ) {
+                mapAudio(vodInfo.lossLessItem.audio)?.let { add(it) }
             }
         }
         val streams = vodInfo.streamListList.mapNotNull { mapStream(it, audios) }
@@ -232,11 +234,15 @@ class VideoPlayerRepositoryImpl @Inject constructor(
         )
     }
 
-    private fun mapAudio(item: DashItem): PlaybackAudio {
+    private fun mapAudio(item: DashItem): PlaybackAudio? {
+        if (item.id <= 0) return null
+        val url = item.baseUrl.takeIf(String::isNotBlank)
+            ?: item.backupUrlList.firstOrNull(String::isNotBlank)
+            ?: return null
         return PlaybackAudio(
             id = item.id,
-            url = item.baseUrl,
-            backupUrls = item.backupUrlList,
+            url = url,
+            backupUrls = item.backupUrlList.filter { it.isNotBlank() && it != url },
             bandwidth = item.bandwidth,
             codecId = item.codecid,
             mimeType = "audio/mp4"

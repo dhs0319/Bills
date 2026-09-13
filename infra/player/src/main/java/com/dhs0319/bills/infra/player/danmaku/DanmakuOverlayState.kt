@@ -31,6 +31,7 @@ class DanmakuOverlayState internal constructor(
     private var appliedWindowSignature: Int? = null
     private val itemMapper = DefaultDanmakuItemMapper()
 
+
     fun prepare() {
         if (released.get()) return
         session.prepare()

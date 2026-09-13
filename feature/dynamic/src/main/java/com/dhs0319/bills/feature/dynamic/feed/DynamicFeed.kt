@@ -32,12 +32,14 @@ import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.UpListRow
 import com.dhs0319.bills.core.model.DynamicBody
+import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.DynamicImage
 import com.dhs0319.bills.core.model.DynamicItem
 import com.dhs0319.bills.core.model.DynamicUpList
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
+import com.dhs0319.bills.feature.comment.component.CommentRichText
 
 @Composable
 fun DynamicFeed(
@@ -236,12 +238,12 @@ private fun DynamicHeader(
 private fun DynamicBodyContent(item: DynamicItem) {
     when (val body = item.body) {
         is DynamicBody.Text -> {
-            DynamicText(body.text)
+            DynamicText(body.text, item.emotes)
         }
 
         is DynamicBody.Draw -> {
             body.text?.let { text ->
-                DynamicText(text)
+                DynamicText(text, item.emotes)
             }
             if (body.images.isNotEmpty()) {
                 DynamicImageRow(body.images)
@@ -250,7 +252,7 @@ private fun DynamicBodyContent(item: DynamicItem) {
 
         is DynamicBody.Archive -> {
             body.text?.let { text ->
-                DynamicText(text)
+                DynamicText(text, item.emotes)
             }
             DynamicMediaCard(
                 title = body.title,
@@ -262,7 +264,7 @@ private fun DynamicBodyContent(item: DynamicItem) {
 
         is DynamicBody.Article -> {
             body.text?.let { text ->
-                DynamicText(text)
+                DynamicText(text, item.emotes)
             }
             DynamicMediaCard(
                 title = body.title,
@@ -274,7 +276,7 @@ private fun DynamicBodyContent(item: DynamicItem) {
 
         is DynamicBody.Live -> {
             body.text?.let { text ->
-                DynamicText(text)
+                DynamicText(text, item.emotes)
             }
             DynamicMediaCard(
                 title = body.title,
@@ -286,7 +288,7 @@ private fun DynamicBodyContent(item: DynamicItem) {
 
         is DynamicBody.Forward -> {
             body.text?.let { text ->
-                DynamicText(text)
+                DynamicText(text, item.emotes)
             }
             body.origin?.let { origin ->
                 val forwardBgColor = MaterialTheme.colorScheme.surface
@@ -306,7 +308,7 @@ private fun DynamicBodyContent(item: DynamicItem) {
                         )
                     }
                     origin.bodyText?.let { text ->
-                        DynamicText(text)
+                        DynamicText(text, origin.emotes)
                     }
                     if (!origin.title.isNullOrBlank() || !origin.cover.isNullOrBlank()) {
                         DynamicMediaCard(
@@ -322,7 +324,7 @@ private fun DynamicBodyContent(item: DynamicItem) {
 
         is DynamicBody.Unknown -> {
             body.text?.let { text ->
-                DynamicText(text)
+                DynamicText(text, item.emotes)
             }
         }
     }
@@ -402,12 +404,13 @@ private fun DynamicImageRow(images: List<DynamicImage>) {
 }
 
 @Composable
-private fun DynamicText(text: String) {
+private fun DynamicText(text: String, emotes: List<CommentEmote> = emptyList()) {
     if (text.isBlank()) return
-    Text(
+    CommentRichText(
         text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurface,
+        emotes = emotes,
+        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        modifier = Modifier,
         maxLines = 8,
         overflow = TextOverflow.Ellipsis
     )
