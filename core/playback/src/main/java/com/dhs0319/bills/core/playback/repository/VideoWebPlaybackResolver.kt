@@ -116,13 +116,18 @@ class VideoWebPlaybackResolver @Inject constructor(
         return buildList {
             for (i in 0 until audios.length()) {
                 val item = audios.optJSONObject(i) ?: continue
+                val audioId = item.optInt("id")
+                if (audioId <= 0) continue
+                val backupUrls = item.optStringList("backupUrl", "backup_url")
+                    .filter(String::isNotBlank)
                 val audioUrl = item.optString("baseUrl").ifBlank { item.optString("base_url") }
+                    .ifBlank { backupUrls.firstOrNull().orEmpty() }
                 if (audioUrl.isBlank()) continue
                 add(
                     PlaybackAudio(
-                        id = item.optInt("id"),
+                        id = audioId,
                         url = audioUrl,
-                        backupUrls = item.optStringList("backupUrl", "backup_url"),
+                        backupUrls = backupUrls.filter { it != audioUrl },
                         bandwidth = item.optInt("bandwidth"),
                         codecId = item.optInt("codecid"),
                         mimeType = item.optString("mimeType").ifBlank {

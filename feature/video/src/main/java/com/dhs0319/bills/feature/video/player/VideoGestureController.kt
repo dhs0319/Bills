@@ -4,13 +4,16 @@ import android.app.Activity
 import android.media.AudioManager
 import android.os.SystemClock
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,9 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -57,6 +65,8 @@ class VideoGestureState {
         internal set
     var dragSeekPosMs by mutableStateOf<Long?>(null)
         internal set
+    var dragSeekDeltaMs by mutableLongStateOf(0L)
+        internal set
 
     var seekLabel by mutableStateOf<String?>(null)
         internal set
@@ -74,6 +84,7 @@ class VideoGestureState {
         dragType = DragType.None
         dragFraction = 0f
         dragSeekPosMs = null
+        dragSeekDeltaMs = 0L
         seekLabel = null
     }
 
@@ -98,7 +109,7 @@ private const val DRAG_SENSITIVITY = 0.6f
 private const val SIDE_GESTURE_ZONE = 0.2f
 private const val RIGHT_GESTURE_ZONE_START = 1f - SIDE_GESTURE_ZONE
 private val FullscreenVerticalDragBlockExtra = 8.dp
-private val SpeedBadgeTopPadding = 20.dp
+private val TopGestureFeedbackPadding = 72.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -146,7 +157,7 @@ fun Modifier.videoGestures(
 
         awaitPointerEventScope {
             while (true) {
-                val down = awaitFirstDown(requireUnconsumed = false)
+                val down = awaitFirstDown()
                 val downTime = down.uptimeMillis
                 val downPos = down.position
                 val w = size.width
@@ -181,7 +192,7 @@ fun Modifier.videoGestures(
                         when (phase) {
                             Phase.Press -> {
                                 val second = withTimeoutOrNull(doubleTapTimeout) {
-                                    awaitFirstDown(requireUnconsumed = false)
+                                    awaitFirstDown()
                                 }
                                 if (second != null) {
                                     val sndX = second.position.x / w
@@ -257,9 +268,11 @@ fun Modifier.videoGestures(
                                     val deltaMs = (frac * SEEK_MAX_MS).roundToLong()
                                     val newPos = (state.dragStartPosMs + deltaMs)
                                         .coerceIn(0L, curDurationMs())
+                                    val actualDeltaMs = newPos - state.dragStartPosMs
                                     state.dragFraction = frac.coerceIn(-1f, 1f)
                                     state.dragSeekPosMs = newPos
-                                    state.seekLabel = formatSeekDelta(deltaMs)
+                                    state.dragSeekDeltaMs = actualDeltaMs
+                                    state.seekLabel = formatSeekDelta(actualDeltaMs)
                                 }
                                 DragType.Brightness -> {
                                     val deltaFrac = (-totalDelta.y / (h * DRAG_SENSITIVITY)).coerceIn(-1f, 1f)
@@ -286,29 +299,30 @@ fun Modifier.videoGestures(
 @Composable
 fun VideoGestureFeedback(
     state: VideoGestureState,
+    durationMs: Long,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (state.dragType == DragType.Brightness || state.dragType == DragType.Volume) {
             val isBrightness = state.dragType == DragType.Brightness
-            val label = if (isBrightness) "亮度" else "音量"
             val barH = state.dragFraction.coerceIn(0f, 1f)
 
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clip(MaterialTheme.shapes.large)
-                    .background(Color.Black.copy(alpha = 0.7f))
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .padding(16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = label,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium
+                    Icon(
+                        imageVector = if (isBrightness) Icons.Default.Brightness6 else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = if (isBrightness) "亮度" else "音量",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
                     )
                     Box(
                         modifier = Modifier
@@ -331,16 +345,48 @@ fun VideoGestureFeedback(
         }
 
         if (state.dragType == DragType.Seek && state.seekLabel != null) {
-            Text(
-                text = state.seekLabel.orEmpty(),
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
+            val positionMs = (state.dragSeekPosMs ?: state.dragStartPosMs)
+                .coerceIn(0L, durationMs.coerceAtLeast(0L))
+            val progress = if (durationMs > 0L) {
+                positionMs.toFloat() / durationMs.toFloat()
+            } else {
+                0f
+            }
+            Column(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+                    .align(Alignment.TopCenter)
+                    .padding(top = TopGestureFeedbackPadding)
+                    .widthIn(max = 200.dp)
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "${formatGestureTime(positionMs)} / ${formatGestureTime(durationMs)} [${formatGestureDelta(state.dragSeekDeltaMs)}]",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                ) {
+                    val activeWidth = size.width * progress.coerceIn(0f, 1f)
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.3f),
+                        size = size,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+                    )
+                    drawRoundRect(
+                        color = Color.White,
+                        size = androidx.compose.ui.geometry.Size(activeWidth, size.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+                    )
+                }
+            }
         }
 
         val hint = state.doubleTapHint
@@ -359,9 +405,8 @@ fun VideoGestureFeedback(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.4f))
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .padding(16.dp)
                     ) {
                         Icon(
                             imageVector = if (hint == DoubleTapHint.Pause) AppIcons.Pause else Icons.Default.PlayArrow,
@@ -371,34 +416,78 @@ fun VideoGestureFeedback(
                         )
                     }
                 } else {
-                    Text(
-                        text = hint.text,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
+                    Row(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.4f))
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (hint == DoubleTapHint.Rewind) {
+                                Icons.Default.FastRewind
+                            } else {
+                                Icons.Default.FastForward
+                            },
+                            contentDescription = hint.text,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = hint.text,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                 }
             }
         }
 
         if (state.showSpeedBadge) {
-            Text(
-                text = state.speedBadgeText,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = SpeedBadgeTopPadding)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+                    .padding(top = TopGestureFeedbackPadding)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FastForward,
+                    contentDescription = "倍速播放",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = state.speedBadgeText,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
     }
+}
+
+private fun formatGestureTime(valueMs: Long): String {
+    val totalSeconds = (valueMs / 1_000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0L) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
+}
+
+private fun formatGestureDelta(valueMs: Long): String {
+    val sign = if (valueMs >= 0L) "+" else "-"
+    val absoluteSeconds = kotlin.math.abs(valueMs / 1_000L)
+    return "$sign%02d:%02d".format(absoluteSeconds / 60L, absoluteSeconds % 60L)
 }
 
 private enum class Phase { Press, Drag, LongPress }

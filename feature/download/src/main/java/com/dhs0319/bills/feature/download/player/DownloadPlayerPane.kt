@@ -9,28 +9,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,16 +35,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import com.dhs0319.bills.core.designsystem.component.DanmakuSettingsSection
+import com.dhs0319.bills.core.designsystem.component.PlaybackOption
+import com.dhs0319.bills.core.designsystem.component.PlaybackOptionBottomSheet
+import com.dhs0319.bills.core.designsystem.component.PlaybackOptionSidebar
+import com.dhs0319.bills.core.designsystem.component.PlaybackSettingsPanel
+import com.dhs0319.bills.core.designsystem.component.shouldShowPlaybackSidebar
+import com.dhs0319.bills.core.designsystem.component.PlayerBottomControls
+import com.dhs0319.bills.core.designsystem.component.PlayerControlTextButton
 import com.dhs0319.bills.infra.player.danmaku.DanmakuLayer
 import com.dhs0319.bills.infra.player.danmaku.rememberDanmakuOverlayState
 import com.dhs0319.bills.core.model.DanmakuConfig
@@ -76,6 +76,7 @@ internal fun DownloadPlayerPane(
     val danmakuState by viewModel.danmakuState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+    val useSidebar = shouldShowPlaybackSidebar(isFull)
     val tapSource = remember { MutableInteractionSource() }
     var showControls by remember { mutableStateOf(true) }
     var showSpeedDialog by remember { mutableStateOf(false) }
@@ -163,82 +164,154 @@ internal fun DownloadPlayerPane(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(
+                        start = 12.dp,
+                        top = 12.dp,
+                        end = if (isFull) 20.dp else 10.dp,
+                        bottom = 12.dp
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.size(40.dp)
+                ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
                         tint = Color.White
                     )
                 }
-                IconButton(
-                    onClick = {
-                        showControls = true
-                        showSettingsSheet = true
-                    }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(if (isFull) 0.dp else 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "更多设置",
-                        tint = Color.White
-                    )
+                    IconButton(
+                        onClick = {
+                            showControls = true
+                            viewModel.updateDanmaku(
+                                danmakuConfig.copy(enabled = !danmakuConfig.enabled)
+                            )
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (danmakuConfig.enabled) {
+                                Icons.Default.Subtitles
+                            } else {
+                                Icons.Default.SubtitlesOff
+                            },
+                            contentDescription = if (danmakuConfig.enabled) "关闭弹幕" else "开启弹幕",
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            showControls = true
+                            showSettingsSheet = true
+                            showSpeedDialog = false
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "更多设置",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
 
         if (showControls) {
-            DownloadPlayerControls(
-                playText = if (state.isPlaying) "暂停" else "播放",
+            PlayerBottomControls(
+                isPlaying = state.isPlaying,
+                playContentDescription = if (state.isPlaying) "暂停" else "播放",
                 timeText = formatDownloadPlaybackTime(barPositionMs, durationMs),
-                danmakuText = if (danmakuConfig.enabled) "弹幕" else "弹幕关",
-                speedText = formatDownloadSpeed(state.speed),
-                fullText = if (isFull) "还原" else "全屏",
-                sliderValue = sliderValue,
-                sliderEnabled = durationMs > 0L,
+                progressValue = sliderValue,
+                progressEnabled = durationMs > 0L,
+                isFullscreen = isFull,
+                fullscreenContentDescription = if (isFull) "还原" else "全屏",
                 onTogglePlay = viewModel::togglePlayPause,
-                onToggleDanmaku = {
-                    showControls = true
-                    viewModel.updateDanmaku(danmakuConfig.copy(enabled = !danmakuConfig.enabled))
-                },
-                onSpeedClick = {
-                    showControls = true
-                    showSpeedDialog = true
-                },
-                onFullClick = {
+                onToggleFullscreen = {
                     showControls = true
                     onToggleFull()
                 },
-                onSeekChange = { fraction ->
+                onProgressChange = { fraction ->
                     showControls = true
                     dragPositionMs = (durationMs * fraction).toLong()
                 },
-                onSeekDone = {
-                    val next = dragPositionMs ?: return@DownloadPlayerControls
+                onProgressChangeFinished = {
+                    val next = dragPositionMs ?: return@PlayerBottomControls
                     viewModel.seekTo(next)
                     dragPositionMs = null
                 },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                modifier = Modifier.align(Alignment.BottomCenter),
+                optionActions = {
+                    PlayerControlTextButton(
+                        label = "倍速",
+                        text = formatDownloadSpeed(state.speed),
+                        onClick = {
+                            showControls = true
+                            showSpeedDialog = true
+                            showSettingsSheet = false
+                        }
+                    )
+                }
+            )
+        }
+
+        if (showSettingsSheet && useSidebar) {
+            DownloadPlayerSettingsSheet(
+                settingsState = settingsState,
+                onDismiss = { showSettingsSheet = false },
+                onDanmakuConfigChange = viewModel::updateDanmaku,
+                onBackgroundPlaybackChange = viewModel::updateBackgroundPlayback,
+                embedded = true
+            )
+        }
+
+        if (showSpeedDialog && useSidebar) {
+            PlaybackOptionSidebar(
+                embedded = true,
+                title = "播放速度",
+                options = downloadSpeedOptions.map { speed ->
+                    PlaybackOption(
+                        id = speed.toString(),
+                        label = formatDownloadSpeed(speed),
+                        selected = speed == state.speed
+                    )
+                },
+                onDismiss = { showSpeedDialog = false },
+                onSelect = { speed ->
+                    viewModel.setSpeed(speed.toFloat())
+                    showSpeedDialog = false
+                },
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
 
-    if (showSpeedDialog) {
-        DownloadSpeedDialog(
-            currentSpeed = state.speed,
+    if (showSpeedDialog && !useSidebar) {
+        PlaybackOptionBottomSheet(
+            title = "播放速度",
+            options = downloadSpeedOptions.map { speed ->
+                PlaybackOption(
+                    id = speed.toString(),
+                    label = formatDownloadSpeed(speed),
+                    selected = speed == state.speed
+                )
+            },
             onDismiss = { showSpeedDialog = false },
             onSelect = { speed ->
-                viewModel.setSpeed(speed)
+                viewModel.setSpeed(speed.toFloat())
                 showSpeedDialog = false
             }
         )
     }
 
-    if (showSettingsSheet) {
+    if (showSettingsSheet && !useSidebar) {
         DownloadPlayerSettingsSheet(
             settingsState = settingsState,
             onDismiss = { showSettingsSheet = false },
@@ -248,179 +321,16 @@ internal fun DownloadPlayerPane(
     }
 }
 
-@Composable
-private fun DownloadPlayerControls(
-    playText: String,
-    timeText: String,
-    danmakuText: String,
-    speedText: String,
-    fullText: String,
-    sliderValue: Float,
-    sliderEnabled: Boolean,
-    onTogglePlay: () -> Unit,
-    onToggleDanmaku: () -> Unit,
-    onSpeedClick: () -> Unit,
-    onFullClick: () -> Unit,
-    onSeekChange: (Float) -> Unit,
-    onSeekDone: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.54f)
-                    )
-                )
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 2.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Slider(
-                value = sliderValue,
-                onValueChange = onSeekChange,
-                onValueChangeFinished = onSeekDone,
-                enabled = sliderEnabled,
-                valueRange = 0f..1f,
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color.White,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.24f),
-                    disabledThumbColor = Color.White.copy(alpha = 0.24f),
-                    disabledActiveTrackColor = Color.White.copy(alpha = 0.16f),
-                    disabledInactiveTrackColor = Color.White.copy(alpha = 0.1f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp)
-                    .heightIn(min = 24.dp)
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                DownloadControlButton(
-                    text = playText,
-                    onClick = onTogglePlay,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = timeText,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.widthIn(min = 88.dp)
-                )
-                DownloadControlButton(
-                    text = danmakuText,
-                    onClick = onToggleDanmaku,
-                    modifier = Modifier.weight(1f)
-                )
-                DownloadControlButton(
-                    text = speedText,
-                    onClick = onSpeedClick,
-                    modifier = Modifier.weight(1f)
-                )
-                DownloadControlButton(
-                    text = fullText,
-                    onClick = onFullClick,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DownloadControlButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .heightIn(min = 28.dp)
-            .background(Color.White.copy(alpha = 0.14f), MaterialTheme.shapes.small)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = Color.White,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun DownloadSpeedDialog(
-    currentSpeed: Float,
-    onDismiss: () -> Unit,
-    onSelect: (Float) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("播放速度") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                downloadSpeedOptions.forEach { speed ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(speed) }
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = formatDownloadSpeed(speed),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        if (speed == currentSpeed) {
-                            Text(
-                                text = "当前",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DownloadPlayerSettingsSheet(
     settingsState: PlayerSettingsState,
     onDismiss: () -> Unit,
     onDanmakuConfigChange: (DanmakuConfig) -> Unit,
-    onBackgroundPlaybackChange: (Boolean) -> Unit
+    onBackgroundPlaybackChange: (Boolean) -> Unit,
+    embedded: Boolean = false
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
-    ) {
+    PlaybackSettingsPanel(title = "更多设置", onDismiss = onDismiss, embedded = embedded) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

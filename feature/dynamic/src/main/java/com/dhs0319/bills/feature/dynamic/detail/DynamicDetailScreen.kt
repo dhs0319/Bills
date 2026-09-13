@@ -42,7 +42,6 @@ import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.PreviewImage
 import com.dhs0319.bills.core.designsystem.component.PreviewImageGrid
-import com.dhs0319.bills.core.designsystem.component.SelectableText
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.model.CommentSubject
 import com.dhs0319.bills.core.model.DynamicDetail
@@ -52,6 +51,7 @@ import com.dhs0319.bills.core.model.DynamicImage
 import com.dhs0319.bills.core.model.DynamicStats
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.feature.comment.CommentPanel
+import com.dhs0319.bills.feature.comment.component.CommentRichText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -226,10 +226,10 @@ private fun DynamicDetailParagraphItem(paragraph: DynamicDetailParagraph) {
     when (paragraph.type) {
         DynamicDetailParagraph.TYPE_TEXT -> {
             paragraph.text?.let { text ->
-                SelectableText(
+                CommentRichText(
                     text = text,
+                    emotes = paragraph.emotes,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }

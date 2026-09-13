@@ -5,35 +5,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -42,11 +32,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.designsystem.component.PlaybackSettingsPanel
 import com.dhs0319.bills.core.designsystem.component.DanmakuSettingsSection
 import com.dhs0319.bills.core.model.PlaybackError
 import com.dhs0319.bills.core.model.PlayerBufferProfile
@@ -71,57 +59,13 @@ private enum class PlaybackSheetSection(
     Danmaku("弹幕设置")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VideoPlaybackSheet(
     state: VideoPlaybackState,
     viewModel: VideoViewModel,
-    limitUnderPlayer: Boolean,
     onDismiss: () -> Unit
 ) {
-    val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var section by rememberSaveable { mutableStateOf(PlaybackSheetSection.Info) }
-    val windowInfo = LocalWindowInfo.current
-    val density = LocalDensity.current
-    val shouldLimitHeight = limitUnderPlayer && windowInfo.containerSize.height > windowInfo.containerSize.width
-    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val maxContentHeight = remember(shouldLimitHeight, windowInfo.containerSize, statusBarHeight, density) {
-        if (shouldLimitHeight) {
-            val screenHeight = with(density) { windowInfo.containerSize.height.toDp() }
-            val screenWidth = with(density) { windowInfo.containerSize.width.toDp() }
-            val playerHeight = statusBarHeight + (screenWidth * (9f / 16f))
-            val sheetTopPadding = 24.dp
-            (screenHeight - playerHeight - sheetTopPadding).coerceAtLeast(240.dp)
-        } else {
-            Dp.Unspecified
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
-    ) {
-        VideoPlaybackPanelContent(
-            state = state,
-            ids = state.ids,
-            settingsState = settingsState,
-            viewModel = viewModel,
-            section = section,
-            onSectionChange = { section = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    if (shouldLimitHeight && maxContentHeight != Dp.Unspecified) {
-                        Modifier.heightIn(max = maxContentHeight)
-                    } else {
-                        Modifier
-                    }
-                )
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-    }
+    VideoPlaybackSidebar(state = state, viewModel = viewModel, onDismiss = onDismiss)
 }
 
 @Composable
@@ -129,39 +73,22 @@ internal fun VideoPlaybackSidebar(
     state: VideoPlaybackState,
     viewModel: VideoViewModel,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    embedded: Boolean = false
 ) {
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     var section by rememberSaveable { mutableStateOf(PlaybackSheetSection.Playback) }
 
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val panelWidth = (maxWidth * 0.42f).coerceIn(240.dp, 360.dp)
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable(onClick = onDismiss)
-            )
-            Card(
-                modifier = Modifier
-                    .width(panelWidth)
-                    .fillMaxHeight()
-            ) {
-                VideoPlaybackPanelContent(
-                    state = state,
-                    ids = state.ids,
-                    settingsState = settingsState,
-                    viewModel = viewModel,
-                    section = section,
-                    onSectionChange = { section = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                )
-            }
-        }
+    PlaybackSettingsPanel(title = "更多设置", onDismiss = onDismiss, modifier = modifier, embedded = embedded) {
+        VideoPlaybackPanelContent(
+            state = state,
+            ids = state.ids,
+            settingsState = settingsState,
+            viewModel = viewModel,
+            section = section,
+            onSectionChange = { section = it },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -215,7 +142,6 @@ private fun PlaybackSettingsSection(
     settingsState: PlayerSettingsState,
     viewModel: VideoViewModel
 ) {
-    val videoResizeModeState = LocalVideoResizeModeState.current
     var showCdnDialog by rememberSaveable { mutableStateOf(false) }
     SheetSectionTitle("播放设置")
 
@@ -266,15 +192,6 @@ private fun PlaybackSettingsSection(
         currentValue = settingsState.playback.gestureSpeed,
         options = speedOps,
         onSelect = viewModel::updateGestureSpeed
-    )
-
-    SheetChoiceCard(
-        title = "全屏视频大小",
-        subtitle = "调整画面尺寸",
-        currentValue = videoResizeModeState.value.ordinal,
-        options = PlayerVideoResizeMode.entries.indices.toList(),
-        label = { videoResizeModeText(PlayerVideoResizeMode.entries[it]) },
-        onSelect = { videoResizeModeState.value = PlayerVideoResizeMode.entries[it] }
     )
 
 }
@@ -582,7 +499,7 @@ private fun bufferProfileText(value: PlayerBufferProfile): String {
     }
 }
 
-private fun videoResizeModeText(value: PlayerVideoResizeMode): String {
+internal fun videoResizeModeText(value: PlayerVideoResizeMode): String {
     return when (value) {
         PlayerVideoResizeMode.Fit -> "适应"
         PlayerVideoResizeMode.Zoom -> "裁剪铺满"

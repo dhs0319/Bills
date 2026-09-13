@@ -13,6 +13,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
@@ -33,11 +34,13 @@ private data class ParsedCommentEmote(
 )
 
 @Composable
-internal fun CommentRichText(
+fun CommentRichText(
     text: String,
     emotes: List<CommentEmote>,
     modifier: Modifier = Modifier,
-    style: TextStyle
+    style: TextStyle,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip
 ) {
     val parsed = remember(text, emotes) {
         parseCommentText(text, emotes)
@@ -46,6 +49,8 @@ internal fun CommentRichText(
         Text(
             text = text,
             style = style,
+            maxLines = maxLines,
+            overflow = overflow,
             modifier = modifier.copyTextOnLongPress(text, "评论")
         )
         return
@@ -75,6 +80,8 @@ internal fun CommentRichText(
         text = parsed.text,
         inlineContent = inlineContent,
         style = style,
+        maxLines = maxLines,
+        overflow = overflow,
         modifier = modifier.copyTextOnLongPress(text, "评论")
     )
 }
