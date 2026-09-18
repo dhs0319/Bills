@@ -60,8 +60,7 @@ internal fun ImSessionCard(
             AvatarImage(
                 url = item.avatar,
                 contentDescription = item.name,
-                modifier = Modifier.size(48.dp),
-                fallbackText = item.name.take(1)
+                modifier = Modifier.size(48.dp)
             )
 
             Column(

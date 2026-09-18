@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
@@ -13,6 +14,7 @@ import com.dhs0319.bills.core.common.media.avatarThumbnailUrl
 import com.dhs0319.bills.core.common.media.coverThumbnailUrl
 import com.dhs0319.bills.core.common.media.originImageUrl
 import com.dhs0319.bills.core.common.media.thumbnailUrl
+import com.dhs0319.bills.core.designsystem.R
 
 enum class BiliImageVariant(
     val q: Int = BILI_IMAGE_DEFAULT_Q,
@@ -56,10 +58,18 @@ fun BiliAsyncImage(
     contentScale: ContentScale = ContentScale.Crop
 ) {
     val request = rememberBiliImageRequest(url = url, variant = variant)
+    val avatarPlaceholder = if (variant == BiliImageVariant.Avatar) {
+        painterResource(R.drawable.noface)
+    } else {
+        null
+    }
     AsyncImage(
         model = request,
         contentDescription = contentDescription,
         modifier = modifier,
-        contentScale = contentScale
+        contentScale = contentScale,
+        placeholder = avatarPlaceholder,
+        error = avatarPlaceholder,
+        fallback = avatarPlaceholder
     )
 }

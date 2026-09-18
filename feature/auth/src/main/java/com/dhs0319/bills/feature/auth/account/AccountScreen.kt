@@ -17,7 +17,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -186,15 +185,7 @@ private fun GuestCard(
             AvatarImage(
                 url = null,
                 contentDescription = "游客",
-                modifier = Modifier.size(56.dp),
-                fallbackContent = {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                modifier = Modifier.size(56.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -276,15 +267,7 @@ private fun AccountCard(
             AvatarImage(
                 url = userInfo?.avatar?.takeIf(String::isNotBlank),
                 contentDescription = userInfo?.name ?: "UID: ${account.mid}",
-                modifier = Modifier.size(56.dp),
-                fallbackContent = {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                modifier = Modifier.size(56.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))

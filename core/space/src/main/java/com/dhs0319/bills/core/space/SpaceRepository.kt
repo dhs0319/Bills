@@ -244,12 +244,16 @@ class SpaceRepository @Inject constructor(
                     ?: continue
                 val title = item.optString("title").ifBlank { continue }
                 val cover = item.optString("cover").httpsImageUrl().ifBlank { continue }
+                val author = item.optString("author").ifBlank { null }
                 val target = VideoTarget.Ugc(
                     aid = aid,
                     cid = cid,
                     bvid = item.optString("bvid").ifBlank { null }
                         ?: VideoTargetTool.bvid(uri),
-                    src = VideoTargetTool.space()
+                    src = VideoTargetTool.space().copy(
+                        titleHint = title,
+                        ownerNameHint = author
+                    )
                 )
                 add(
                     SpaceVideo(
@@ -258,7 +262,7 @@ class SpaceRepository @Inject constructor(
                         target = target,
                         title = title,
                         cover = cover,
-                        author = item.optString("author").ifBlank { null },
+                        author = author,
                         categoryName = item.optString("tname").ifBlank { null },
                         durationSec = item.optLong("duration").coerceAtLeast(0L),
                         viewText = item.optString("view_content").ifBlank {

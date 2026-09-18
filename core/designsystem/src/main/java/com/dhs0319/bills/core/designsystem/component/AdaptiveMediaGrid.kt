@@ -1,5 +1,6 @@
 package com.dhs0319.bills.core.designsystem.component
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +27,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -35,8 +37,13 @@ fun rememberAdaptiveGridColumnCount(
     medium: Int = 3,
     expanded: Int = 4
 ): Int {
+    val configuration = LocalConfiguration.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val isPhoneLandscape =
+        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+            configuration.smallestScreenWidthDp < 600
     return when {
+        isPhoneLandscape -> medium
         windowSizeClass.isWidthAtLeastBreakpoint(840) -> expanded
         windowSizeClass.isWidthAtLeastBreakpoint(600) -> medium
         else -> compact

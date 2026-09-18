@@ -130,6 +130,10 @@ class SearchRepository @Inject constructor(
             src = VideoTargetTool.search(
                 uri = item.uri,
                 fallbackTrackId = pageTrackId
+            ).copy(
+                titleHint = av.title,
+                ownerNameHint = av.author,
+                ownerMidHint = av.mid.takeIf { it > 0L }
             )
         )
         return SearchVideo(

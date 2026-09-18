@@ -171,8 +171,7 @@ private fun MsgFeedCard(
                     AvatarImage(
                         url = user.avatar,
                         contentDescription = user.name,
-                        modifier = Modifier.size(40.dp),
-                        fallbackText = user.name.take(1)
+                        modifier = Modifier.size(40.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {

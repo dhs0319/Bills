@@ -34,6 +34,24 @@ sealed interface VideoTarget {
     ) : VideoTarget
 }
 
+fun VideoTarget.previewDetail(): VideoDetail? {
+    val title = src.titleHint?.takeIf(String::isNotBlank)
+    val ownerName = src.ownerNameHint?.takeIf(String::isNotBlank)
+    if (title == null && ownerName == null) return null
+    return VideoDetail(
+        title = title ?: "视频详情",
+        owner = ownerName?.let { name ->
+            VideoOwner(
+                mid = src.ownerMidHint ?: 0L,
+                name = name,
+                fansText = null,
+                arcCountText = null,
+                face = null
+            )
+        }
+    )
+}
+
 fun VideoTarget.isSameEntry(other: VideoTarget?): Boolean {
     other ?: return false
     return when (this) {
@@ -105,7 +123,10 @@ data class VideoSrc(
     val from: String = VideoTargetTool.FROM_FEED,
     val fromSpmid: String = VideoTargetTool.FROM_SPMID_FEED,
     val trackId: String? = null,
-    val reportFlowData: String? = null
+    val reportFlowData: String? = null,
+    val titleHint: String? = null,
+    val ownerNameHint: String? = null,
+    val ownerMidHint: Long? = null
 )
 
 object VideoTargetTool {
@@ -129,13 +150,19 @@ object VideoTargetTool {
 
     fun feed(
         trackId: String? = null,
-        reportFlowData: String? = null
+        reportFlowData: String? = null,
+        titleHint: String? = null,
+        ownerNameHint: String? = null,
+        ownerMidHint: Long? = null
     ): VideoSrc {
         return VideoSrc(
             from = FROM_FEED,
             fromSpmid = FROM_SPMID_FEED,
             trackId = trackId.blankToNull(),
-            reportFlowData = reportFlowData.blankToNull()
+            reportFlowData = reportFlowData.blankToNull(),
+            titleHint = titleHint.blankToNull(),
+            ownerNameHint = ownerNameHint.blankToNull(),
+            ownerMidHint = ownerMidHint?.takeIf { it > 0L }
         )
     }
 

@@ -37,6 +37,9 @@ private const val VIDEO_FROM_ARG = "from"
 private const val VIDEO_FROM_SPMID_ARG = "fromSpmid"
 private const val VIDEO_TRACK_ID_ARG = "trackId"
 private const val VIDEO_REPORT_FLOW_DATA_ARG = "reportFlowData"
+private const val VIDEO_TITLE_HINT_ARG = "titleHint"
+private const val VIDEO_OWNER_NAME_HINT_ARG = "ownerNameHint"
+private const val VIDEO_OWNER_MID_HINT_ARG = "ownerMidHint"
 
 private const val VIDEO_ROUTE_PATTERN =
     "$VIDEO_ROUTE?$VIDEO_KIND_ARG={$VIDEO_KIND_ARG}" +
@@ -49,7 +52,10 @@ private const val VIDEO_ROUTE_PATTERN =
         "&$VIDEO_FROM_ARG={$VIDEO_FROM_ARG}" +
         "&$VIDEO_FROM_SPMID_ARG={$VIDEO_FROM_SPMID_ARG}" +
         "&$VIDEO_TRACK_ID_ARG={$VIDEO_TRACK_ID_ARG}" +
-        "&$VIDEO_REPORT_FLOW_DATA_ARG={$VIDEO_REPORT_FLOW_DATA_ARG}"
+        "&$VIDEO_REPORT_FLOW_DATA_ARG={$VIDEO_REPORT_FLOW_DATA_ARG}" +
+        "&$VIDEO_TITLE_HINT_ARG={$VIDEO_TITLE_HINT_ARG}" +
+        "&$VIDEO_OWNER_NAME_HINT_ARG={$VIDEO_OWNER_NAME_HINT_ARG}" +
+        "&$VIDEO_OWNER_MID_HINT_ARG={$VIDEO_OWNER_MID_HINT_ARG}"
 
 fun NavController.navigateToVideo(target: VideoTarget) {
     navigate(target.toRoute())
@@ -126,6 +132,9 @@ private val videoNavArguments = listOf(
     navArgument(VIDEO_FROM_SPMID_ARG) { type = NavType.StringType; defaultValue = VideoTargetTool.FROM_SPMID_FEED },
     navArgument(VIDEO_TRACK_ID_ARG) { type = NavType.StringType; defaultValue = "" },
     navArgument(VIDEO_REPORT_FLOW_DATA_ARG) { type = NavType.StringType; defaultValue = "" },
+    navArgument(VIDEO_TITLE_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
+    navArgument(VIDEO_OWNER_NAME_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
+    navArgument(VIDEO_OWNER_MID_HINT_ARG) { type = NavType.LongType; defaultValue = -1L },
 )
 
 private fun VideoTarget.toRoute(): String {
@@ -144,7 +153,10 @@ private fun VideoTarget.toRoute(): String {
         "&$VIDEO_FROM_ARG=${src.from.encode()}" +
         "&$VIDEO_FROM_SPMID_ARG=${src.fromSpmid.encode()}" +
         "&$VIDEO_TRACK_ID_ARG=${src.trackId.orEmpty().encode()}" +
-        "&$VIDEO_REPORT_FLOW_DATA_ARG=${src.reportFlowData.orEmpty().encode()}"
+        "&$VIDEO_REPORT_FLOW_DATA_ARG=${src.reportFlowData.orEmpty().encode()}" +
+        "&$VIDEO_TITLE_HINT_ARG=${src.titleHint.orEmpty().encode()}" +
+        "&$VIDEO_OWNER_NAME_HINT_ARG=${src.ownerNameHint.orEmpty().encode()}" +
+        "&$VIDEO_OWNER_MID_HINT_ARG=${src.ownerMidHint ?: -1L}"
 }
 
 private data class VideoRouteValues(
@@ -164,6 +176,9 @@ private fun NavBackStackEntry.toVideoTarget(): VideoTarget {
         fromSpmid = args.getString(VIDEO_FROM_SPMID_ARG).orEmpty(),
         trackId = args.getString(VIDEO_TRACK_ID_ARG).orEmpty().ifBlank { null },
         reportFlowData = args.getString(VIDEO_REPORT_FLOW_DATA_ARG).orEmpty().ifBlank { null },
+        titleHint = args.getString(VIDEO_TITLE_HINT_ARG).orEmpty().ifBlank { null },
+        ownerNameHint = args.getString(VIDEO_OWNER_NAME_HINT_ARG).orEmpty().ifBlank { null },
+        ownerMidHint = args.getLong(VIDEO_OWNER_MID_HINT_ARG).takeIf { it > 0L },
     )
     val aid = args.getLong(VIDEO_AID_ARG)
     val cid = args.getLong(VIDEO_CID_ARG)
