@@ -1,268 +1,351 @@
 package com.dhs0319.bills.feature.user.collage
 
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Refresh
-
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.SaveAlt
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.WatchLater
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import kotlin.math.roundToInt
+import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.User
 import com.dhs0319.bills.feature.user.UserDest
 
-private object UserCollageShapes {
-    val octagon = PolygonShape(sides = 8, rotationDeg = 22f, cornerScale = 0.14f)
-    val hexagon = PolygonShape(sides = 6, rotationDeg = -18f, cornerScale = 0.2f)
-    val statHexagon = PolygonShape(sides = 6, rotationDeg = -30f, cornerScale = 0.2f)
-    val watchLaterStar = StarShape(points = 5, innerScale = 0.65f, cornerScale = 0.50f)
-    val followerStar = StarShape(points = 6, innerScale = 0.78f, rotationDeg = -30f, cornerScale = 0.82f)
-}
-
-private object UserCollageFrames {
-    val avatar = UserCollageFrame("avatar", 0.29f, 0.29f, Alignment.TopStart, 0.04f, 0.05f, -8f)
-    val name = UserCollageFrame("name", 0.41f, 0.41f, Alignment.TopEnd, -0.03f, 0.05f, 7f)
-    val dynamic = UserCollageFrame("dynamic", 0.29f, 0.29f, Alignment.CenterEnd, -0.05f, -0.25f, -9f)
-    val following = UserCollageFrame("following", 0.31f, 0.20f, Alignment.CenterStart, 0.06f, -0.13f, -12f)
-    val follower = UserCollageFrame("follower", 0.23f, 0.23f, Alignment.CenterEnd, -0.05f, -0.09f, 10f)
-    val offline = UserCollageFrame("offline", 0.31f, 0.31f, Alignment.BottomStart, 0.03f, -0.47f, -7f)
-    val history = UserCollageFrame("history", 0.31f, 0.31f, Alignment.BottomCenter, -0.02f, -0.48f, 13f)
-    val favorite = UserCollageFrame("favorite", 0.31f, 0.31f, Alignment.BottomEnd, -0.03f, -0.47f, -10f)
-    val watchLater = UserCollageFrame("watchLater", 0.35f, 0.35f, Alignment.BottomStart, 0.11f, -0.34f, 6f)
-}
-
-private data class UserCollageFrame(
-    val key: String,
-    val widthScale: Float,
-    val heightScale: Float,
-    val alignment: Alignment,
-    val offsetXScale: Float,
-    val offsetYScale: Float,
-    val rotationZ: Float
+@Immutable
+internal data class UserCollagePalette(
+    val canvasTop: Color,
+    val canvasMid: Color,
+    val canvasBottom: Color,
+    val tilePrimary: Color,
+    val tileSecondary: Color,
+    val tileHighlight: Color,
+    val tileSurface: Color,
+    val tileSurfaceStrong: Color
 )
 
 @Composable
+internal fun rememberUserCollagePalette(): UserCollagePalette {
+    val colors = MaterialTheme.colorScheme
+    return remember(
+        colors.primaryContainer,
+        colors.surfaceContainer,
+        colors.surface,
+        colors.surfaceContainerLow,
+        colors.surfaceContainerHigh
+    ) {
+        UserCollagePalette(
+            // Keep the surface hierarchy, but retain a soft wash of the selected theme color.
+            canvasTop = colors.primaryContainer.copy(alpha = 0.52f).compositeOver(colors.surface),
+            canvasMid = colors.primary.copy(alpha = 0.05f).compositeOver(colors.surfaceContainerLow),
+            canvasBottom = colors.primaryContainer.copy(alpha = 0.26f).compositeOver(colors.surfaceContainer),
+            tilePrimary = colors.primaryContainer.copy(alpha = 0.98f),
+            tileSecondary = colors.surfaceContainerHigh,
+            tileHighlight = colors.primaryContainer.copy(alpha = 0.72f),
+            tileSurface = colors.surfaceContainerLow,
+            tileSurfaceStrong = colors.surfaceContainerHigh.copy(alpha = 0.98f)
+        )
+    }
+}
+
+@Composable
+internal fun rememberUserCollageBackgroundBrush(palette: UserCollagePalette): Brush {
+    return remember(palette.canvasTop, palette.canvasMid, palette.canvasBottom) {
+        Brush.verticalGradient(listOf(palette.canvasTop, palette.canvasMid, palette.canvasBottom))
+    }
+}
+
+/** Fixed responsive layout for the profile page. The previous collage was draggable and
+ * persisted offsets, which made the page difficult to scan and inconsistent after rotation. */
+@Composable
 internal fun UserCollageSection(
     user: User?,
-    collageOffsets: Map<String, Offset>,
-    onCollageOffsetChange: (String, Offset) -> Unit,
+    onNavigateToAccount: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onNavigate: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
     palette: UserCollagePalette,
     modifier: Modifier = Modifier
 ) {
-    val spaceRoute = user?.takeUnless { it.mid <= 0L && it.name.isBlank() }?.let {
-        SpaceRoute(
-            mid = it.mid,
-            name = it.name.takeIf(String::isNotBlank)
-        )
-    }
+    val spaceRoute = user
+        ?.takeUnless { it.mid <= 0L && it.name.isBlank() }
+        ?.let { SpaceRoute(mid = it.mid, name = it.name.takeIf(String::isNotBlank)) }
 
-    BoxWithConstraints(
-        modifier = modifier.fillMaxSize()
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        val base = minOf(maxWidth, maxHeight)
-        val extraLarge = MaterialTheme.shapes.extraLarge
+        val landscape = maxWidth > maxHeight
+        if (landscape) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                AccountPanel(
+                    user = user,
+                    onNavigateToAccount = onNavigateToAccount,
+                    palette = palette,
+                    onOpenSpace = spaceRoute?.let { { onOpenSpace(it) } },
+                    modifier = Modifier
+                        .weight(0.43f)
+                        .fillMaxHeight()
+                )
+                EntryPanel(
+                    onNavigateToDownload = onNavigateToDownload,
+                    onNavigate = onNavigate,
+                    palette = palette,
+                    modifier = Modifier
+                        .weight(0.57f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                AccountPanel(
+                    user = user,
+                    onNavigateToAccount = onNavigateToAccount,
+                    palette = palette,
+                    onOpenSpace = spaceRoute?.let { { onOpenSpace(it) } },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                EntryPanel(
+                    onNavigateToDownload = onNavigateToDownload,
+                    onNavigate = onNavigate,
+                    palette = palette,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
 
-        @Composable
-        fun BoxScope.CollageItem(
-            frame: UserCollageFrame,
-            shape: Shape,
-            color: Color,
-            onClick: (() -> Unit)? = null,
-            content: @Composable () -> Unit
-        ) {
-            UserCollageItem(
-                frame = frame,
-                base = base,
-                shape = shape,
-                color = color,
-                collageOffsets = collageOffsets,
-                onOffsetChange = onCollageOffsetChange,
-                onClick = onClick,
-                content = content
-            )
+@Composable
+private fun AccountPanel(
+    user: User?,
+    onNavigateToAccount: () -> Unit,
+    palette: UserCollagePalette,
+    onOpenSpace: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier
+                    .size(88.dp)
+                    .then(onOpenSpace?.let { Modifier.clickable(onClick = it) } ?: Modifier),
+                shape = CircleShape,
+                color = palette.tileSurfaceStrong
+            ) {
+                AvatarImage(
+                    url = user?.avatar?.takeIf(String::isNotBlank),
+                    contentDescription = user?.name ?: "未登录",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Spacer(Modifier.width(18.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val loggedOut = user == null
+                Text(
+                    text = user?.name?.takeIf(String::isNotBlank) ?: "点击登录",
+                    style = if (loggedOut) {
+                        MaterialTheme.typography.titleMedium
+                    } else {
+                        MaterialTheme.typography.headlineSmall
+                    },
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = if (loggedOut) {
+                        Modifier.clickable(onClick = onNavigateToAccount)
+                    } else {
+                        Modifier
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (user == null) "登录后同步你的观看记录" else user.sign.ifBlank { "这个人很神秘，什么都没有写" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "硬币 ${user?.coins?.takeUnless { it == 0.0 } ?: "--"}   Lv${user?.level ?: 0}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AccountStat("动态", user?.dynamic?.toString() ?: "--", Modifier.weight(1f))
+            AccountStat("关注", user?.following?.toString() ?: "--", Modifier.weight(1f))
+            AccountStat("粉丝", user?.follower?.toString() ?: "--", Modifier.weight(1f))
+        }
+    }
+}
 
-        CollageItem(
-            frame = UserCollageFrames.avatar,
-            shape = CircleShape,
-            color = Color.Transparent,
-            onClick = spaceRoute?.let { { onOpenSpace(it) } }
-        ) {
-            UserAvatarTileContent(user = user)
-        }
-        CollageItem(
-            frame = UserCollageFrames.name,
-            shape = UserCollageShapes.octagon,
-            color = palette.tileHighlight
-        ) {
-            UserNameTileContent(user = user)
-        }
-        CollageItem(
-            frame = UserCollageFrames.dynamic,
-            shape = UserCollageShapes.statHexagon,
-            color = palette.tilePrimary
-        ) {
-            UserStatTileContent(
-                title = "动态",
-                value = user?.dynamic?.toString() ?: "--"
-            )
-        }
-        CollageItem(
-            frame = UserCollageFrames.following,
-            shape = extraLarge,
-            color = palette.tileSurface
-        ) {
-            UserStatTileContent(
-                title = "关注",
-                value = user?.following?.toString() ?: "--"
-            )
-        }
-        CollageItem(
-            frame = UserCollageFrames.follower,
-            shape = UserCollageShapes.followerStar,
-            color = palette.tileSecondary
-        ) {
-            UserStatTileContent(
-                title = "粉丝",
-                value = user?.follower?.toString() ?: "--"
-            )
-        }
-        CollageItem(
-            frame = UserCollageFrames.offline,
-            shape = extraLarge,
-            color = palette.tilePrimary,
-            onClick = onNavigateToDownload
-        ) {
-            UserEntryTileContent(
-                icon = Icons.Default.Refresh,
+@Composable
+private fun AccountStat(title: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun EntryPanel(
+    onNavigateToDownload: () -> Unit,
+    onNavigate: (UserDest) -> Unit,
+    palette: UserCollagePalette,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "快捷入口",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            EntryTile(
+                icon = Icons.Outlined.SaveAlt,
                 title = "离线缓存",
-                subtitle = "本地视频"
+                subtitle = "本地视频",
+                color = palette.tilePrimary,
+                onClick = onNavigateToDownload,
+                modifier = Modifier.weight(1f)
+            )
+            EntryTile(
+                icon = Icons.Outlined.History,
+                title = "观看记录",
+                subtitle = "继续观看",
+                color = palette.tileSurface,
+                onClick = { onNavigate(UserDest.History) },
+                modifier = Modifier.weight(1f)
             )
         }
-        CollageItem(
-            frame = UserCollageFrames.history,
-            shape = UserCollageShapes.octagon,
-            color = palette.tileSurface,
-            onClick = { onNavigate(UserDest.History) }
-        ) {
-            UserEntryTileContent(
-                icon = null,
-                title = "历史记录",
-                subtitle = "继续看",
-                centered = true
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            EntryTile(
+                icon = Icons.Outlined.StarBorder,
+                title = "我的收藏",
+                subtitle = "收藏夹",
+                color = palette.tileSecondary,
+                onClick = { onNavigate(UserDest.Favorite) },
+                modifier = Modifier.weight(1f)
             )
-        }
-        CollageItem(
-            frame = UserCollageFrames.favorite,
-            shape = UserCollageShapes.hexagon,
-            color = palette.tileSecondary,
-            onClick = { onNavigate(UserDest.Favorite) }
-        ) {
-            UserEntryTileContent(
-                icon = Icons.Default.FavoriteBorder,
-                title = "收藏",
-                centered = true
-            )
-        }
-        CollageItem(
-            frame = UserCollageFrames.watchLater,
-            shape = UserCollageShapes.watchLaterStar,
-            color = palette.tileHighlight,
-            onClick = { onNavigate(UserDest.WatchLater) }
-        ) {
-            UserEntryTileContent(
-                icon = null,
+            EntryTile(
+                icon = Icons.Outlined.WatchLater,
                 title = "稍后再看",
                 subtitle = "待看清单",
-                centered = true
+                color = palette.tileHighlight,
+                onClick = { onNavigate(UserDest.WatchLater) },
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
 @Composable
-private fun BoxScope.UserCollageItem(
-    frame: UserCollageFrame,
-    base: Dp,
-    shape: Shape,
+private fun EntryTile(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
     color: Color,
-    collageOffsets: Map<String, Offset>,
-    onOffsetChange: (String, Offset) -> Unit,
-    onClick: (() -> Unit)? = null,
-    content: @Composable () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    minHeight: Dp = 104.dp
 ) {
-    val savedOffset = collageOffsets[frame.key] ?: Offset.Zero
-    val latestSavedOffset by rememberUpdatedState(savedOffset)
-    val latestOffsetChange by rememberUpdatedState(onOffsetChange)
-
-    var dragOffsetX by remember(frame.key) { mutableFloatStateOf(0f) }
-    var dragOffsetY by remember(frame.key) { mutableFloatStateOf(0f) }
-
-    UserCollageTile(
-        modifier = Modifier
-            .width(base * frame.widthScale)
-            .height(base * frame.heightScale)
-            .align(frame.alignment)
-            .offset(x = base * frame.offsetXScale, y = base * frame.offsetYScale)
-            .offset { IntOffset(savedOffset.x.roundToInt(), savedOffset.y.roundToInt()) }
-            .graphicsLayer {
-                rotationZ = frame.rotationZ
-                translationX = dragOffsetX
-                translationY = dragOffsetY
-            }
-            .pointerInput(frame.key) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        dragOffsetX = 0f
-                        dragOffsetY = 0f
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        dragOffsetX += dragAmount.x
-                        dragOffsetY += dragAmount.y
-                    },
-                    onDragEnd = {
-                        val finalOffset = Offset(dragOffsetX, dragOffsetY)
-                        if (finalOffset != Offset.Zero) {
-                            latestOffsetChange(frame.key, latestSavedOffset + finalOffset)
-                        }
-                        dragOffsetX = 0f
-                        dragOffsetY = 0f
-                    },
-                    onDragCancel = {
-                        dragOffsetX = 0f
-                        dragOffsetY = 0f
-                    }
-                )
-            },
-        shape = shape,
-        color = color,
+    Surface(
         onClick = onClick,
-        content = content
-    )
+        modifier = modifier.height(minHeight),
+        shape = MaterialTheme.shapes.large,
+        color = color,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
 }

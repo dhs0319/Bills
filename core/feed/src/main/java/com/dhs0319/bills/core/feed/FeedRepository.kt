@@ -235,7 +235,10 @@ class FeedRepository @Inject constructor(
             val src = VideoTargetTool.feed(
                 trackId = card.optString("track_id").takeIf(String::isNotEmpty)
                     ?: obj.optString("track_id").takeIf(String::isNotEmpty),
-                reportFlowData = reportFlowData
+                reportFlowData = reportFlowData,
+                titleHint = title,
+                ownerNameHint = ownerName,
+                ownerMidHint = args?.optLong("up_id")?.takeIf { it > 0L }
             )
             when {
                 isPugv -> {

@@ -209,7 +209,6 @@ private fun ImMessageBubble(
                         AvatarImage(
                             url = avatar,
                             contentDescription = title ?: "头像",
-                            fallbackText = title?.take(1),
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -320,7 +319,9 @@ private fun MessageContent(
                                 VideoTarget.Ugc(
                                     aid = message.shareAid,
                                     cid = 0L,
-                                    src = VideoTargetTool.default()
+                                    src = VideoTargetTool.default().copy(
+                                        titleHint = message.content.takeIf(String::isNotBlank)
+                                    )
                                 )
                             )
                         } else Modifier)

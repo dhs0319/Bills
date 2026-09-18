@@ -54,7 +54,7 @@ class VideoViewModel @Inject constructor(
                 .map { state ->
                     VideoActionSeed(
                         aid = state.ids.aid,
-                        detailLoaded = state.detail != null,
+                        detailLoaded = state.detail != null && !state.detailLoading,
                         liked = state.detail?.isLiked == true,
                         favorited = state.detail?.isFavorited == true,
                         userCoinCount = state.detail?.userCoinCount ?: 0

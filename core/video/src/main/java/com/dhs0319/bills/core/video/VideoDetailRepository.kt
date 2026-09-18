@@ -263,7 +263,7 @@ class VideoDetailRepository @Inject constructor(
                     aid = ep.aid,
                     cid = ep.cid,
                     epId = epId,
-                    src = src
+                    src = src.copy(titleHint = title)
                 ),
                 cid = ep.cid,
                 title = title,

@@ -165,14 +165,24 @@ class FavoriteRepository @Inject constructor(
             playbackDesc = item.optString("playback_desc").blankToNull(),
             typeDesc = item.optString("otype_desc").blankToNull(),
             isInvalid = item.optBoolean("is_invalid"),
-            target = buildTarget(item, oid, otype)
+            target = buildTarget(
+                item = item,
+                oid = oid,
+                otype = otype,
+                title = title,
+                ownerName = upper?.optString("name").blankToNull(),
+                ownerMid = upper?.optLong("mid")?.takeIf { it > 0L }
+            )
         )
     }
 
     private fun buildTarget(
         item: JSONObject,
         oid: Long,
-        otype: Int
+        otype: Int,
+        title: String,
+        ownerName: String?,
+        ownerMid: Long?
     ): FavoriteContentTarget? {
         if (item.optBoolean("is_invalid")) return null
         return when (otype) {
@@ -184,7 +194,11 @@ class FavoriteRepository @Inject constructor(
                     VideoTarget.Ugc(
                         aid = aid,
                         cid = cid,
-                        src = VideoTargetTool.favorite()
+                        src = VideoTargetTool.favorite().copy(
+                            titleHint = title,
+                            ownerNameHint = ownerName,
+                            ownerMidHint = ownerMid
+                        )
                     )
                 )
             }
@@ -199,7 +213,11 @@ class FavoriteRepository @Inject constructor(
                         aid = aid,
                         seasonId = seasonId,
                         subType = ogv?.optInt("type_id")?.takeIf { it > 0 },
-                        src = VideoTargetTool.favorite()
+                        src = VideoTargetTool.favorite().copy(
+                            titleHint = title,
+                            ownerNameHint = ownerName,
+                            ownerMidHint = ownerMid
+                        )
                     )
                 )
             }

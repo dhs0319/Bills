@@ -173,14 +173,7 @@ private fun ProfileCard(
                         .size(72.dp)
                         .clickable(enabled = !faceUrl.isNullOrBlank()) {
                             showAvatarPreview = true
-                        },
-                    fallbackContent = {
-                        Text(
-                            text = profile.name.take(1),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                        }
                 )
                 Column(
                     modifier = Modifier.weight(1f),

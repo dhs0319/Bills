@@ -192,8 +192,7 @@ private fun ArticleAuthorRow(
         AvatarImage(
             url = item.authorFace,
             contentDescription = item.authorName ?: "作者",
-            modifier = Modifier.size(20.dp),
-            fallbackText = item.authorName?.take(1)
+            modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.size(6.dp))
         Box(modifier = Modifier.weight(1f)) {

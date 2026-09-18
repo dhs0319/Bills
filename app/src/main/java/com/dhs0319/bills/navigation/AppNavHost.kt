@@ -1,17 +1,29 @@
 package com.dhs0319.bills.navigation
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.FilledIconButton
@@ -19,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -41,7 +54,10 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,6 +67,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dhs0319.bills.core.designsystem.component.roundScreenSafePadding
+import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.theme.ThemeConfig
 import com.dhs0319.bills.core.designsystem.theme.buildNavTransitions
 import com.dhs0319.bills.core.model.FavoriteContentTarget
@@ -445,18 +462,14 @@ private fun MainTabsScaffold(
     }
     val userViewModel: UserViewModel = hiltViewModel()
     val userState by userViewModel.uiState.collectAsStateWithLifecycle()
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val useStartAlignedBottomToolbar = windowSizeClass.isWidthAtLeastBreakpoint(600)
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .nestedScroll(navVisibilityController.connection)
-    ) {
+    val tabContent: @Composable () -> Unit = {
         TopLevelRoute.entries.forEach { tab ->
             if (currentTab == tab) {
                 saveableStateHolder.SaveableStateProvider(tab.route) {
@@ -465,6 +478,7 @@ private fun MainTabsScaffold(
                             onNavigateToSearch = onNavigateToSearch,
                             onNavigateToProfile = { selectTab(TopLevelRoute.PROFILE) },
                             profileAvatar = userState.user?.avatar,
+                            showTopActions = !isLandscape,
                             onOpenVideo = onNavigateToVideo,
                             onOpenSpace = onNavigateToSpace,
                             onOpenLive = onNavigateToLive,
@@ -496,22 +510,157 @@ private fun MainTabsScaffold(
                 }
             }
         }
+    }
 
-        TopLevelFloatingNavigation(
+    if (isLandscape) {
+        Row(
             modifier = Modifier
-                .align(
-                    if (useStartAlignedBottomToolbar) Alignment.BottomStart else Alignment.BottomCenter
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            TopLevelSideNavigation(
+                currentTab = currentTab,
+                profileAvatar = userState.user?.avatar,
+                onTabChange = selectTab,
+                onNavigateToSearch = onNavigateToSearch
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                content = { tabContent() }
+            )
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .nestedScroll(navVisibilityController.connection)
+        ) {
+            tabContent()
+            TopLevelFloatingNavigation(
+                modifier = Modifier
+                    .align(
+                        if (useStartAlignedBottomToolbar) {
+                            Alignment.BottomStart
+                        } else {
+                            Alignment.BottomCenter
+                        }
+                    )
+                    .padding(
+                        start = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
+                        bottom = topLevelNavEdgePadding
+                    )
+                    .zIndex(1f),
+                currentTab = currentTab,
+                visibilityController = navVisibilityController,
+                onTabChange = selectTab,
+                onNavigateToSearch = onNavigateToSearch
+            )
+        }
+    }
+}
+
+@Composable
+private fun TopLevelSideNavigation(
+    currentTab: TopLevelRoute,
+    profileAvatar: String?,
+    onTabChange: (TopLevelRoute) -> Unit,
+    onNavigateToSearch: () -> Unit
+) {
+    val layoutDirection = LocalLayoutDirection.current
+    val startSafeInset = WindowInsets.safeDrawing
+        .asPaddingValues()
+        .calculateStartPadding(layoutDirection)
+    Surface(
+        modifier = Modifier
+            .width(112.dp + startSafeInset)
+            .fillMaxHeight(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Start + WindowInsetsSides.Vertical
+                    )
                 )
-                .padding(
-                    start = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
-                    bottom = topLevelNavEdgePadding
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            IconButton(onClick = { onTabChange(TopLevelRoute.PROFILE) }) {
+                AvatarImage(
+                    url = profileAvatar,
+                    contentDescription = TopLevelRoute.PROFILE.label,
+                    modifier = Modifier.size(44.dp)
                 )
-                .zIndex(1f),
-            currentTab = currentTab,
-            visibilityController = navVisibilityController,
-            onTabChange = selectTab,
-            onNavigateToSearch = onNavigateToSearch
-        )
+            }
+            IconButton(onClick = onNavigateToSearch) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "搜索",
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            TopLevelRoute.entries.forEach { tab ->
+                TopLevelSideNavigationItem(
+                    tab = tab,
+                    selected = currentTab == tab,
+                    onClick = { onTabChange(tab) }
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+            Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun TopLevelSideNavigationItem(
+    tab: TopLevelRoute,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            androidx.compose.ui.graphics.Color.Transparent
+        },
+        contentColor = if (selected) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (selected) tab.selectedIcon else tab.icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = tab.label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Clip
+            )
+        }
     }
 }
 
@@ -587,7 +736,7 @@ private fun TopLevelFloatingNavigationItem(
     if (selected) {
         FilledIconButton(onClick = onClick) {
             Icon(
-                imageVector = tab.icon,
+                imageVector = tab.selectedIcon,
                 contentDescription = tab.label
             )
         }

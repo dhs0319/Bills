@@ -72,8 +72,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
+import com.dhs0319.bills.core.designsystem.component.SkeletonBlock
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
 import com.dhs0319.bills.core.designsystem.component.VideoRelateCardSkeleton
@@ -425,11 +427,25 @@ private fun LazyListScope.detailItems(
     val curCid = ids.cid.takeIf { it > 0L }
     when {
         detailLoading -> {
-            item(
-                key = "detail_loading_summary",
-                contentType = "skeleton"
-            ) {
-                VideoDetailInfoSkeleton(modifier = itemMod)
+            if (detail != null) {
+                item(
+                    key = "detail_loading_summary_preview",
+                    contentType = "summary_preview"
+                ) {
+                    VideoDetailPreviewSection(
+                        detail = detail,
+                        ids = ids,
+                        onOpenSpace = onOpenSpace,
+                        modifier = itemMod
+                    )
+                }
+            } else {
+                item(
+                    key = "detail_loading_summary",
+                    contentType = "skeleton"
+                ) {
+                    VideoDetailInfoSkeleton(modifier = itemMod)
+                }
             }
             items(
                 count = DETAIL_RELATE_SKELETON_COUNT,
@@ -536,6 +552,40 @@ private fun LazyListScope.detailItems(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+private fun VideoDetailPreviewSection(
+    detail: VideoDetail,
+    ids: ResolvedVideoIds,
+    onOpenSpace: (SpaceRoute) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        detail.owner?.let { owner ->
+            OwnerCapsule(
+                owner = owner,
+                showStatsSkeleton = true,
+                onClick = spaceRoute?.let { route ->
+                    { onOpenSpace(route) }
+                }
+            )
+        }
+        InfoCapsule(
+            detail = detail,
+            ids = ids,
+            descOn = false,
+            tagOn = false,
+            onToggleDesc = {},
+            onToggleTag = {},
+            onOpenComments = {}
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 private fun VideoSummarySection(
     detail: VideoDetail,
     ids: ResolvedVideoIds,
@@ -591,6 +641,7 @@ private fun VideoSummarySection(
 private fun OwnerCapsule(
     owner: VideoOwner,
     modifier: Modifier = Modifier,
+    showStatsSkeleton: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     CapsuleCard(
@@ -601,18 +652,13 @@ private fun OwnerCapsule(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            owner.face?.takeIf(String::isNotBlank)?.let { face ->
-                BiliAsyncImage(
-                    url = face,
-                    contentDescription = owner.name,
-                    modifier = Modifier
-                        .width(72.dp)
-                        .aspectRatio(1f)
-                        .clip(CircleShape),
-                    variant = BiliImageVariant.Avatar,
-                    contentScale = ContentScale.Fit
-                )
-            }
+            AvatarImage(
+                url = owner.face,
+                contentDescription = owner.name,
+                modifier = Modifier
+                    .width(72.dp)
+                    .aspectRatio(1f)
+            )
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -626,16 +672,32 @@ private fun OwnerCapsule(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    owner.fansText?.takeIf(String::isNotBlank)?.let { fans ->
-                        SoftChip(fans)
+                    val fansText = owner.fansText?.takeIf(String::isNotBlank)
+                    val arcCountText = owner.arcCountText?.takeIf(String::isNotBlank)
+                    if (fansText != null) {
+                        SoftChip(fansText)
+                    } else if (showStatsSkeleton) {
+                        OwnerStatSkeleton(width = 68.dp)
                     }
-                    owner.arcCountText?.takeIf(String::isNotBlank)?.let { arcCount ->
-                        SoftChip(arcCount)
+                    if (arcCountText != null) {
+                        SoftChip(arcCountText)
+                    } else if (showStatsSkeleton) {
+                        OwnerStatSkeleton(width = 76.dp)
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun OwnerStatSkeleton(width: Dp) {
+    SkeletonBlock(
+        modifier = Modifier
+            .width(width)
+            .height(28.dp),
+        shape = MaterialTheme.shapes.extraLarge
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

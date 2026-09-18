@@ -9,14 +9,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,7 +59,6 @@ import kotlin.math.roundToInt
 
 private val homeTabs = listOf("FM", "推荐", "直播", "专栏")
 private val homeProfileAvatarSize = 38.dp
-private val homeProfileIconSize = 24.dp
 private const val homeDefaultPage = 1
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -67,6 +67,7 @@ fun HomeScreen(
     onNavigateToSearch: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     profileAvatar: String? = null,
+    showTopActions: Boolean = true,
     onOpenVideo: (VideoTarget) -> Unit = {},
     onOpenSpace: (SpaceRoute) -> Unit = {},
     onOpenLive: (LiveRoute) -> Unit = {},
@@ -125,6 +126,7 @@ fun HomeScreen(
                 onNavigateToSearch = onNavigateToSearch,
                 onNavigateToProfile = onNavigateToProfile,
                 profileAvatar = profileAvatar,
+                showTopActions = showTopActions,
                 onSelectTab = { page ->
                     scope.launch { pagerState.animateScrollToPage(page) }
                 }
@@ -198,6 +200,7 @@ private fun HomeTopBar(
     onNavigateToSearch: () -> Unit,
     onNavigateToProfile: () -> Unit,
     profileAvatar: String?,
+    showTopActions: Boolean,
     onSelectTab: (Int) -> Unit
 ) {
     Column(
@@ -219,52 +222,50 @@ private fun HomeTopBar(
             }
             .padding(top = 4.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Card(
-                onClick = onNavigateToSearch,
-                modifier = Modifier.weight(1f),
-                colors = CardDefaults.cardColors(
-                    MaterialTheme.colorScheme.surface
-                )
+        if (showTopActions) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                Card(
+                    onClick = onNavigateToSearch,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "搜索",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            IconButton(onClick = onNavigateToProfile) {
-                AvatarImage(
-                    url = profileAvatar,
-                    contentDescription = "我的",
-                    modifier = Modifier.size(homeProfileAvatarSize),
-                    fallbackContent = {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "我的",
-                            modifier = Modifier.size(homeProfileIconSize),
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "搜索",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = onNavigateToProfile) {
+                    AvatarImage(
+                        url = profileAvatar,
+                        contentDescription = "我的",
+                        modifier = Modifier.size(homeProfileAvatarSize)
+                    )
+                }
             }
         }
         FilledTabRow(

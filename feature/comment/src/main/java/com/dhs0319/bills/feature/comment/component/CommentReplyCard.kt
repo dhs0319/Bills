@@ -152,15 +152,7 @@ private fun ReplyBody(
             AvatarImage(
                 url = reply.user.face,
                 contentDescription = reply.user.name,
-                modifier = Modifier.fillMaxSize(),
-                fallbackContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                fallbackContent = {
-                    Text(
-                        text = reply.user.name.take(1).ifBlank { "?" },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
+                modifier = Modifier.fillMaxSize()
             )
         }
 
