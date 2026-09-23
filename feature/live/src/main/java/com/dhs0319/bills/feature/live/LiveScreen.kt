@@ -16,7 +16,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -52,10 +52,10 @@ fun LiveScreen(
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val owner = LocalLifecycleOwner.current
     val act = LocalActivity.current
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val isExpandedWidth = LocalConfiguration.current.screenWidthDp >= 840
     var isFull by rememberSaveable { mutableStateOf(false) }
     val fullOn = hostExpanded && isFull
-    val isExpanded = hostExpanded && windowSizeClass.isWidthAtLeastBreakpoint(840) && !fullOn
+    val isExpanded = hostExpanded && isExpandedWidth && !fullOn
 
     val toggleFull = { isFull = !isFull }
     val handleBack = {

@@ -18,7 +18,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -38,14 +37,13 @@ fun rememberAdaptiveGridColumnCount(
     expanded: Int = 4
 ): Int {
     val configuration = LocalConfiguration.current
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isPhoneLandscape =
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
             configuration.smallestScreenWidthDp < 600
     return when {
         isPhoneLandscape -> medium
-        windowSizeClass.isWidthAtLeastBreakpoint(840) -> expanded
-        windowSizeClass.isWidthAtLeastBreakpoint(600) -> medium
+        configuration.screenWidthDp >= 840 -> expanded
+        configuration.screenWidthDp >= 600 -> medium
         else -> compact
     }
 }
