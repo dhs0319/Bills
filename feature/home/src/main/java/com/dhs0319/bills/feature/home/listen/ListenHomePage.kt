@@ -31,6 +31,11 @@ import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.model.listen.ListenItem
 import com.dhs0319.bills.feature.home.component.UploaderBadge
 
+private val listenCoverMetadataBrush = Brush.verticalGradient(
+    0f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.72f)
+)
+
 @Composable
 fun ListenHomePage(
     isActive: Boolean,
@@ -53,7 +58,7 @@ fun ListenHomePage(
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
         onRetryLoadMore = viewModel::retryLoadMore,
-        key = { _, item -> item.actionKey() }
+        key = { _, item -> item.identityKey }
     ) { item ->
         ListenCard(
             item = item,
@@ -61,11 +66,6 @@ fun ListenHomePage(
         )
     }
 }
-
-private fun ListenItem.actionKey(): String {
-    return "${oid}_${itemType}_${subId}"
-}
-
 @Composable
 private fun ListenCard(
     item: ListenItem,
@@ -90,15 +90,10 @@ private fun ListenCard(
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(40.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    0f to Color.Transparent,
-                                    1f to Color.Black.copy(alpha = 0.72f)
-                                )
-                            )
+                            .background(listenCoverMetadataBrush)
                     ) {
                         Text(
-                            text = formatDuration(item.duration),
+                            text = item.durationText,
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -137,11 +132,4 @@ private fun ListenCard(
             }
         }
     }
-}
-
-private fun formatDuration(seconds: Long): String {
-    if (seconds <= 0L) return ""
-    val m = seconds / 60
-    val s = seconds % 60
-    return "%d:%02d".format(m, s)
 }

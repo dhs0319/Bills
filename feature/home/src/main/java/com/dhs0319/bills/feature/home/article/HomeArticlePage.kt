@@ -18,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,13 +86,7 @@ private fun ArticleRecommendCard(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                val statLine = remember(
-                    item.viewCount,
-                    item.likeCount,
-                    item.replyCount
-                ) {
-                    buildStatLine(item)
-                }
+                val statLine = item.statLine
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.bodyMedium,
@@ -155,14 +148,7 @@ private fun ArticleAuthorRow(
     item: ArticleRecommendItem,
     onOpenSpace: (SpaceRoute) -> Unit
 ) {
-    val route = remember(item.authorMid, item.authorName) {
-        item.authorMid?.let { mid ->
-            SpaceRoute(
-                mid = mid,
-                name = item.authorName
-            )
-        }
-    }
+    val route = item.spaceRoute
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -197,12 +183,4 @@ private fun ArticleAuthorRow(
             )
         }
     }
-}
-
-private fun buildStatLine(item: ArticleRecommendItem): String? {
-    return buildList {
-        if (item.viewCount > 0) add("${item.viewCount} 阅读")
-        if (item.likeCount > 0) add("${item.likeCount} 点赞")
-        if (item.replyCount > 0) add("${item.replyCount} 评论")
-    }.takeIf { it.isNotEmpty() }?.joinToString("  ")
 }

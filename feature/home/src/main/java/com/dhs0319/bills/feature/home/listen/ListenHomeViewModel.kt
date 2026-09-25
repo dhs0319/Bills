@@ -17,7 +17,7 @@ class ListenHomeViewModel @Inject constructor(
     private val pager = HomePager<ListenItem, String>(
         scope = viewModelScope,
         initialKey = { "" },
-        itemKey = { "${it.oid}_${it.itemType}_${it.subId}" },
+        itemKey = { it.identityKey },
         loadPage = { token ->
             val result = if (token.isEmpty()) listenRepo.fetchRcmdPlaylist(needTopCards = true)
                 else listenRepo.fetchRcmdPlaylistNext(token)

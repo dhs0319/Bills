@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.live.LiveRecommendRepository
 import com.dhs0319.bills.core.model.LiveRecommendItem
+import com.dhs0319.bills.core.model.LiveRecommendUpList
 import com.dhs0319.bills.feature.home.paging.HomePage
 import com.dhs0319.bills.feature.home.paging.HomePager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +21,8 @@ class HomeLiveViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeLiveUiState())
     val uiState = _uiState.asStateFlow()
     private var hasLoaded = false
+    private data class PendingUpList(val value: LiveRecommendUpList?)
+    private var pendingUpList: PendingUpList? = null
 
     private val pager = HomePager<LiveRecommendItem, Int>(
         scope = viewModelScope,
@@ -34,10 +37,21 @@ class HomeLiveViewModel @Inject constructor(
             )
             HomePage(page.items, (number + 1).takeIf { page.hasMore }) {
                 hasLoaded = true
-                _uiState.update { it.copy(upList = if (number == 1) page.upList else it.upList ?: page.upList) }
+                if (number == 1 || _uiState.value.upList == null) {
+                    pendingUpList = PendingUpList(page.upList)
+                }
             }
         },
-        onStateChanged = { paging -> _uiState.update { it.copy(paging = paging) } },
+        onStateChanged = { paging ->
+            val upListUpdate = pendingUpList
+            pendingUpList = null
+            _uiState.update {
+                it.copy(
+                    paging = paging,
+                    upList = if (upListUpdate != null) upListUpdate.value else it.upList
+                )
+            }
+        },
         onError = { Logger.e("HomeLiveViewModel", it) { "加载直播推荐失败" } }
     )
 

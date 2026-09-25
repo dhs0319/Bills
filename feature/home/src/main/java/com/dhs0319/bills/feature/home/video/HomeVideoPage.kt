@@ -60,6 +60,12 @@ import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.home.component.UploaderBadge
 import kotlinx.coroutines.launch
 
+private const val FEED_CARD_CONTENT_TYPE = "feed_card"
+private val feedCoverMetadataBrush = Brush.verticalGradient(
+    0f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.72f)
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeVideoPage(
@@ -92,7 +98,7 @@ fun HomeVideoPage(
     LaunchedEffect(isActive, refreshRequest) {
         if (isActive && onActivate(refreshRequest)) gridState.scrollToItem(0)
     }
-    val firstItemKey = paging.items.firstOrNull()?.actionKey()
+    val firstItemKey = paging.items.firstOrNull()?.actionKey
     var shownFirstItemKey by rememberSaveable { mutableStateOf(firstItemKey) }
     LaunchedEffect(isActive, firstItemKey) {
         if (isActive) {
@@ -109,8 +115,8 @@ fun HomeVideoPage(
         onRefresh = onRefresh,
         onLoadMore = onLoadMore,
         onRetryLoadMore = onRetryLoadMore,
-        key = { _, item -> item.actionKey() },
-        contentType = { _, item -> item.cardType },
+        key = { _, item -> item.identityKey },
+        contentType = { _, _ -> FEED_CARD_CONTENT_TYPE },
         separatorIndex = paging.refreshBoundaryIndex,
         separatorContent = {
             LastSeenBoundaryCard(
@@ -125,7 +131,7 @@ fun HomeVideoPage(
         FeedCard(
             item = item,
             onOpenSpace = onOpenSpace,
-            dislikedReason = dislikedReasons[item.actionKey()],
+            dislikedReason = dislikedReasons[item.actionKey],
             onDislike = onDislike,
             onCancelDislike = onCancelDislike,
             onClick = {
@@ -203,20 +209,7 @@ private fun FeedCard(
                 val threePoint = item.threePointV2
                 val hasMoreMenu = !isDisliked && !threePoint.isNullOrEmpty()
                 val recommendationReason = item.rcmdReason?.takeIf { it.text.isNotEmpty() }
-                val spaceRoute = remember(item.args, item.target) {
-                    item.args?.let { args ->
-                        if (args.upId <= 0L && args.upName.isNullOrBlank()) {
-                            null
-                        } else {
-                            SpaceRoute(
-                                mid = args.upId,
-                                name = args.upName,
-                                fromViewAid = args.aid.takeIf { it > 0L }
-                                    ?: (item.target as? VideoTarget.Ugc)?.aid?.takeIf { it > 0L }
-                            )
-                        }
-                    }
-                }
+                val spaceRoute = item.spaceRoute
                 Text(
                     text = item.title,
                     maxLines = 2,
@@ -310,12 +303,7 @@ private fun FeedCoverMetadata(item: FeedItem, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(40.dp)
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.72f)
-                )
-            )
+            .background(feedCoverMetadataBrush)
     ) {
         Row(
             modifier = Modifier
@@ -471,8 +459,4 @@ private fun DislikedOverlay(
             }
         }
     }
-}
-
-private fun FeedItem.actionKey(): String {
-    return "$goto|$param|$idx"
 }

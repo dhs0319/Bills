@@ -1,5 +1,6 @@
 package com.dhs0319.bills.core.feed
 
+import android.os.SystemClock
 import com.dhs0319.bills.core.auth.AuthStore
 import com.dhs0319.bills.core.common.BiliConstants
 import com.dhs0319.bills.core.common.media.httpsImageUrl
@@ -23,11 +24,16 @@ import com.dhs0319.bills.core.model.VideoSrc
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoTargetTool
 import com.dhs0319.bills.core.settings.AppSettings
+import com.dhs0319.bills.core.settings.FeedRequestSettings
 import com.dhs0319.bills.infra.network.BiliRestClient
 import com.dhs0319.bills.infra.network.BiliRestParamBuilder
 import com.dhs0319.bills.infra.network.BiliRestProfile
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
@@ -52,17 +58,80 @@ class FeedRepository @Inject constructor(
 
     companion object {
         private const val FEED_ENDPOINT = "/x/v2/feed/index"
+        private const val INITIAL_PREFETCH_TTL_MS = 30_000L
     }
 
     private val _toastFlow = MutableSharedFlow<FeedToast>(extraBufferCapacity = 1)
     val toastFlow: SharedFlow<FeedToast> = _toastFlow
 
+    private data class InitialPrefetch(
+        val mid: Long,
+        val guestMode: Boolean,
+        val startedAtMillis: Long,
+        val result: Deferred<FeedResult>
+    )
+
+    private var initialPrefetch: InitialPrefetch? = null
+    private var initialPrefetchStarted = false
+
+    /** Start the default home tab's first request while the activity is being created. */
+    fun prefetchInitialFeed(scope: CoroutineScope) {
+        synchronized(this) {
+            if (initialPrefetchStarted) return
+            initialPrefetchStarted = true
+            initialPrefetch = InitialPrefetch(
+                mid = authStore.mid,
+                guestMode = authStore.guestMode,
+                startedAtMillis = SystemClock.elapsedRealtime(),
+                result = scope.async { fetchFeedDirect(0L, pull = true, flush = 0) }
+            )
+        }
+    }
+
+    fun discardInitialPrefetch() {
+        synchronized(this) {
+            initialPrefetch?.result?.cancel()
+            initialPrefetch = null
+        }
+    }
+
     suspend fun fetchFeed(idx: Long, pull: Boolean, flush: Int): FeedResult {
-        val hdFeed = appSettings.hdFeed.first()
+        if (idx == 0L && pull && flush == 0) {
+            val prefetch = synchronized(this) { initialPrefetch }
+            if (prefetch != null) {
+                if (prefetch.mid == authStore.mid && prefetch.guestMode == authStore.guestMode &&
+                    SystemClock.elapsedRealtime() - prefetch.startedAtMillis < INITIAL_PREFETCH_TTL_MS
+                ) {
+                    try {
+                        return prefetch.result.await().also {
+                            synchronized(this) {
+                                if (initialPrefetch === prefetch) initialPrefetch = null
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // A startup request can fail while the network is still connecting.
+                    }
+                }
+                synchronized(this) {
+                    if (initialPrefetch === prefetch) {
+                        prefetch.result.cancel()
+                        initialPrefetch = null
+                    }
+                }
+            }
+        }
+        return fetchFeedDirect(idx, pull, flush)
+    }
+
+    private suspend fun fetchFeedDirect(idx: Long, pull: Boolean, flush: Int): FeedResult {
+        val settings = appSettings.feedRequestSettings.first()
+        val hdFeed = settings.hdFeed
         val profile = if (hdFeed) BiliRestProfile.HD else BiliRestProfile.APP
         val json = restClient.getSigned(
             url = "${BiliConstants.BASE_URL_APP}$FEED_ENDPOINT",
-            params = buildParams(idx, pull, flush, profile, hdFeed),
+            params = buildParams(idx, pull, flush, profile, settings),
             profile = profile
         )
         return withContext(Dispatchers.Default) { parseResponse(json, hdFeed) }
@@ -76,11 +145,12 @@ class FeedRepository @Inject constructor(
         interestResult: String,
         interestPosIds: String
     ): FeedResult {
-        val hdFeed = appSettings.hdFeed.first()
+        val settings = appSettings.feedRequestSettings.first()
+        val hdFeed = settings.hdFeed
         val profile = if (hdFeed) BiliRestProfile.HD else BiliRestProfile.APP
         val json = restClient.getSigned(
             url = "${BiliConstants.BASE_URL_APP}$FEED_ENDPOINT",
-            params = buildParams(idx, pull, flush, profile, hdFeed) + mapOf(
+            params = buildParams(idx, pull, flush, profile, settings) + mapOf(
                 "interest_id" to interestId.toString(),
                 "interest_result" to interestResult,
                 "interest_pos_ids" to interestPosIds
@@ -110,19 +180,15 @@ class FeedRepository @Inject constructor(
         return FeedResult(items, toast, interestChoose, nextIdx)
     }
 
-    private suspend fun buildParams(
+    private fun buildParams(
         idx: Long,
         pull: Boolean,
         flush: Int,
         profile: BiliRestProfile,
-        hdFeed: Boolean
+        settings: FeedRequestSettings
     ): Map<String, String> {
-        val personalizedRcmd = appSettings.personalizedRcmd.first()
-        val lessonsMode = appSettings.lessonsMode.first()
-        val teenagersMode = appSettings.teenagersMode.first()
-        val teenagersAge = appSettings.teenagersAge.first()
         val ts = System.currentTimeMillis() / 1000
-        val token = if (hdFeed) authStore.getHdAccessKeyForCurrent() else authStore.accessToken
+        val token = if (settings.hdFeed) authStore.getHdAccessKeyForCurrent() else authStore.accessToken
         val isColdStart = idx == 0L
         return restParamBuilder.app(profile, ts, token) + buildMap {
             put("auto_refresh_state", "1")
@@ -133,7 +199,7 @@ class FeedRepository @Inject constructor(
             put("column_timestamp", "0")
             put("device_name", android.os.Build.MODEL)
             put("device_type", "0")
-            put("disable_rcmd", if (personalizedRcmd) "0" else "1")
+            put("disable_rcmd", if (settings.personalizedRcmd) "0" else "1")
             put("flush", flush.toString())
             put("fnval", "272")
             put("fnver", "0")
@@ -146,7 +212,7 @@ class FeedRepository @Inject constructor(
             put("inline_sound", "1")
             put("inline_sound_cold_state", "2")
             put("interest_id", "0")
-            if (lessonsMode) {
+            if (settings.lessonsMode) {
                 put("lessons_mode", "1")
             }
             put("login_event", when {
@@ -164,8 +230,8 @@ class FeedRepository @Inject constructor(
             put("recsys_mode", "0")
             put("splash_creative_id", "0")
             put("splash_id", "")
-            if (teenagersMode) {
-                put("teenagers_age", teenagersAge.toString())
+            if (settings.teenagersMode) {
+                put("teenagers_age", settings.teenagersAge.toString())
                 put("teenagers_mode", "1")
             }
             put("video_mode", "1")

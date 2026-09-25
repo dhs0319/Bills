@@ -23,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -40,6 +39,11 @@ import com.dhs0319.bills.core.model.LiveRecommendItem
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.feature.home.component.UploaderBadge
+
+private val liveCoverMetadataBrush = Brush.verticalGradient(
+    0f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.72f)
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +69,7 @@ fun HomeLivePage(
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
         onRetryLoadMore = viewModel::retryLoadMore,
-        key = { _, item -> item.actionKey() },
+        key = { _, item -> item.roomId },
         headerContent = state.upList?.let { upList ->
             {
                 UpListRow(
@@ -87,10 +91,6 @@ fun HomeLivePage(
             onOpenSpace = onOpenSpace
         )
     }
-}
-
-private fun LiveRecommendItem.actionKey(): String {
-    return "${roomId}_${sessionId.orEmpty()}"
 }
 
 @Composable
@@ -116,14 +116,7 @@ private fun LiveRecommendCard(
             }
 
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                val spaceRoute = remember(item.ownerMid, item.ownerName) {
-                    item.ownerMid?.let { mid ->
-                        SpaceRoute(
-                            mid = mid,
-                            name = item.ownerName
-                        )
-                    }
-                }
+                val spaceRoute = item.spaceRoute
                 Text(
                     text = item.title,
                     maxLines = 2,
@@ -169,12 +162,7 @@ private fun LiveCoverMetadata(item: LiveRecommendItem, modifier: Modifier = Modi
         modifier = modifier
             .fillMaxWidth()
             .height(40.dp)
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.72f)
-                )
-            )
+            .background(liveCoverMetadataBrush)
     ) {
         Row(
             modifier = Modifier

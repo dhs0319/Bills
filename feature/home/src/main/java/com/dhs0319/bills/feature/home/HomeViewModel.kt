@@ -44,8 +44,9 @@ class HomeViewModel @Inject constructor(
             FeedKey(if (pendingInterest != null) 0L else _uiState.value.paging.items.firstOrNull()?.idx ?: 0L,
                 interest = pendingInterest)
         },
-        itemKey = { "${it.goto}|${it.param}" },
+        itemKey = { it.identityKey },
         loadPage = { key ->
+            if (key.interest != null) feedRepo.discardInitialPrefetch()
             val feed = key.interest?.let { interest ->
                 feedRepo.fetchFeedWithInterest(key.idx, key.pull, key.flush,
                     interest.id, interest.result, interestPosIds = interest.posIds)
@@ -69,10 +70,6 @@ class HomeViewModel @Inject constructor(
         onError = { Logger.e(TAG, it) { "加载推荐失败" } },
         prependOnRefresh = true
     )
-
-    private fun FeedItem.actionKey(): String {
-        return "$goto|$param|$idx"
-    }
 
     fun refreshPageAction() {
         pageActionTracker.refresh()
@@ -108,7 +105,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(toastMessage = "当前卡片暂不支持此操作") }
             return
         }
-        val itemKey = item.actionKey()
+        val itemKey = item.actionKey
         viewModelScope.launch {
             runCatching { feedDislikeRepo.dislike(context, reason) }
                 .onSuccess { result ->
@@ -135,7 +132,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(toastMessage = "当前卡片暂不支持此操作") }
             return
         }
-        val itemKey = item.actionKey()
+        val itemKey = item.actionKey
         viewModelScope.launch {
             runCatching { feedDislikeRepo.cancelDislike(context) }
                 .onSuccess { result ->

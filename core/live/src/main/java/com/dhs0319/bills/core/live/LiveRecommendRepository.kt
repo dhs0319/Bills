@@ -15,6 +15,8 @@ import com.dhs0319.bills.infra.network.BiliRestParamBuilder
 import com.dhs0319.bills.infra.network.BiliRestProfile
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -54,7 +56,7 @@ class LiveRecommendRepository @Inject constructor(
             },
             profile = BiliRestProfile.APP
         )
-        return parsePage(json)
+        return withContext(Dispatchers.Default) { parsePage(json) }
     }
 
     private fun parsePage(json: JSONObject): LiveRecommendPage {

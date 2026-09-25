@@ -42,6 +42,7 @@ internal class HomePager<T, K : Any>(
     private val _state = MutableStateFlow(HomePagingState<T>())
     val state = _state.asStateFlow()
     private var nextKey: K? = null
+    private var acceptedItemKeys = mutableSetOf<Any>()
     private var request: Job? = null
     private var generation = 0
     private var handledRefreshRequest = 0
@@ -100,18 +101,20 @@ internal class HomePager<T, K : Any>(
             try {
                 var cursor = key
                 var addedCount = 0
-                val seenKeys = when {
-                    !refresh -> state.value.items.mapTo(mutableSetOf(), itemKey)
-                    prependOnRefresh -> oldItems.mapTo(mutableSetOf(), itemKey)
-                    else -> mutableSetOf()
-                }
+                // Reuse the keys accepted by previous pages so appends never scan
+                // the entire feed on the UI thread as the list grows.
+                val seenKeys = if (refresh && !prependOnRefresh) mutableSetOf() else acceptedItemKeys
                 val visitedCursors = mutableSetOf<K>()
                 for (pageIndex in 0 until maxPagesPerLoad) {
                     visitedCursors.add(cursor)
                     val page = loadPage(cursor)
                     currentCoroutineContext().ensureActive()
                     if (version != generation) return@launch
-                    val additions = page.items.filter { seenKeys.add(itemKey(it)) }
+                    val pageKeys = mutableSetOf<Any>()
+                    val additions = page.items.filter { item ->
+                        val key = itemKey(item)
+                        key !in seenKeys && pageKeys.add(key)
+                    }
                     addedCount += additions.size
                     nextKey = page.nextKey?.takeUnless { it in visitedCursors }
                     val items = when {
@@ -124,6 +127,8 @@ internal class HomePager<T, K : Any>(
                     }
                     acceptedPage = true
                     page.onAccepted()
+                    seenKeys.addAll(pageKeys)
+                    acceptedItemKeys = seenKeys
                     // Publish each successful page immediately, while filling the buffer.
                     publish(state.value.copy(items = items, hasLoaded = true,
                         refreshBoundaryIndex = if (refresh && prependOnRefresh && refreshedItems.isNotEmpty()) {

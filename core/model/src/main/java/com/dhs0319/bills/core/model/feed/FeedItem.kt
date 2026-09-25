@@ -22,7 +22,23 @@ data class FeedItem(
     val args: FeedArgs?,
     val threePointV2: List<ThreePointItem>?,
     val dislikeContext: FeedDislikeContext?
-)
+) {
+    /** Stable across feed cursors and shared with the pager's duplicate check. */
+    val identityKey: String = "$goto|$param"
+    val actionKey: String = "$identityKey|$idx"
+
+    /** Prepare the uploader route off the UI thread with the rest of the feed item. */
+    val spaceRoute: SpaceRoute? = args?.takeIf {
+        it.upId > 0L || !it.upName.isNullOrBlank()
+    }?.let {
+        SpaceRoute(
+            mid = it.upId,
+            name = it.upName,
+            fromViewAid = it.aid.takeIf { aid -> aid > 0L }
+                ?: (target as? VideoTarget.Ugc)?.aid?.takeIf { aid -> aid > 0L }
+        )
+    }
+}
 
 @Immutable
 data class DescButton(

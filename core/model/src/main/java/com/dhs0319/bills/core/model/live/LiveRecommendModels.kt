@@ -13,7 +13,9 @@ data class LiveRecommendItem(
     val onlineText: String?,
     val sessionId: String?,
     val route: LiveRoute
-)
+) {
+    val spaceRoute: SpaceRoute? = ownerMid?.let { SpaceRoute(mid = it, name = ownerName) }
+}
 
 @Immutable
 data class LiveRecommendPage(
