@@ -14,7 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyLayoutScrollScope
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,9 +36,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
-import com.dhs0319.bills.core.designsystem.component.FilledTabRow
+import com.dhs0319.bills.core.designsystem.component.PagerSlidingTabRow
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
@@ -54,12 +62,17 @@ import com.dhs0319.bills.feature.home.interest.InterestDialog
 import com.dhs0319.bills.feature.home.listen.ListenHomePage
 import com.dhs0319.bills.feature.home.live.HomeLivePage
 import com.dhs0319.bills.feature.home.video.HomeVideoPage
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val homeTabs = listOf("FM", "推荐", "直播", "专栏")
 private val homeProfileAvatarSize = 38.dp
+private val homeSearchRowHeight = 48.dp
+private val homeTopContentPadding = 4.dp
 private const val homeDefaultPage = 1
+private const val homeScrollToTopInstantThresholdViewports = 8f
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -79,20 +92,25 @@ fun HomeScreen(
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
     val pagerState = rememberPagerState(initialPage = homeDefaultPage, pageCount = { homeTabs.size })
-    var listenRefreshRequest by remember { mutableIntStateOf(0) }
-    var videoRefreshRequest by remember { mutableIntStateOf(0) }
-    var liveRefreshRequest by remember { mutableIntStateOf(0) }
-    var articleRefreshRequest by remember { mutableIntStateOf(0) }
+    val listenGridState = rememberLazyStaggeredGridState()
+    val videoGridState = rememberLazyStaggeredGridState()
+    val liveGridState = rememberLazyStaggeredGridState()
+    val articleGridState = rememberLazyStaggeredGridState()
+    val scope = rememberCoroutineScope()
+    var scrollToTopJob by remember { mutableStateOf<Job?>(null) }
+    var listenRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
+    var videoRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
+    var liveRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
+    var articleRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         viewModel.refreshPageAction()
     }
+    var handledRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(refreshRequest) {
         if (refreshRequest == 0) {
-            listenRefreshRequest = 0
-            videoRefreshRequest = 0
-            liveRefreshRequest = 0
-            articleRefreshRequest = 0
-        } else {
+            handledRefreshRequest = 0
+        } else if (refreshRequest != handledRefreshRequest) {
+            handledRefreshRequest = refreshRequest
             when (pagerState.currentPage) {
                 0 -> listenRefreshRequest++
                 1 -> videoRefreshRequest++
@@ -101,8 +119,6 @@ fun HomeScreen(
             }
         }
     }
-    val scope = rememberCoroutineScope()
-
     state.interestChoose?.let { interestChoose ->
         InterestDialog(
             data = interestChoose,
@@ -122,13 +138,22 @@ fun HomeScreen(
             }
             HomeTopBar(
                 scrollBehavior = scrollBehavior,
-                selectedIndex = pagerState.currentPage,
+                pagerState = pagerState,
                 onNavigateToSearch = onNavigateToSearch,
                 onNavigateToProfile = onNavigateToProfile,
                 profileAvatar = profileAvatar,
                 showTopActions = showTopActions,
-                onSelectTab = { page ->
-                    scope.launch { pagerState.animateScrollToPage(page) }
+                onReselectTab = { page ->
+                    val gridState = when (page) {
+                        0 -> listenGridState
+                        1 -> videoGridState
+                        2 -> liveGridState
+                        else -> articleGridState
+                    }
+                    scrollToTopJob?.cancel()
+                    scrollToTopJob = scope.launch {
+                        gridState.animateToTop()
+                    }
                 }
             )
         }
@@ -143,6 +168,7 @@ fun HomeScreen(
                 0 -> ListenHomePage(
                     isActive = pagerState.currentPage == page,
                     refreshRequest = listenRefreshRequest,
+                    gridState = listenGridState,
                     onItemClick = { item ->
                         onOpenListenItem(
                             item.oid,
@@ -156,13 +182,14 @@ fun HomeScreen(
                 )
 
                 1 -> HomeVideoPage(
-                    items = state.items,
-                    isRefreshing = state.isRefreshing,
-                    isLoadingMore = state.isLoadingMore,
-                    errorMessage = state.errorMessage,
+                    paging = state.paging,
+                    isActive = pagerState.currentPage == page,
+                    onActivate = viewModel::activate,
+                    onRetryLoadMore = viewModel::retryLoadMore,
                     toastMessage = state.toastMessage,
                     dislikedReasons = state.dislikedReasons,
                     refreshRequest = videoRefreshRequest,
+                    gridState = videoGridState,
                     onRefresh = viewModel::refresh,
                     onLoadMore = viewModel::loadMore,
                     onOpenVideo = onOpenVideo,
@@ -177,6 +204,7 @@ fun HomeScreen(
                 2 -> HomeLivePage(
                     isActive = pagerState.currentPage == page,
                     refreshRequest = liveRefreshRequest,
+                    gridState = liveGridState,
                     onOpenLive = onOpenLive,
                     onOpenSpace = onOpenSpace
                 )
@@ -184,6 +212,7 @@ fun HomeScreen(
                 else -> HomeArticlePage(
                     isActive = pagerState.currentPage == page,
                     refreshRequest = articleRefreshRequest,
+                    gridState = articleGridState,
                     onOpenArticle = onOpenArticle,
                     onOpenSpace = onOpenSpace
                 )
@@ -192,16 +221,49 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private suspend fun LazyStaggeredGridState.animateToTop() {
+    if (!canScrollBackward) return
+
+    scroll {
+        val lazyScope = LazyLayoutScrollScope(this@animateToTop, this)
+        val viewportPx = layoutInfo.viewportSize.height.coerceAtLeast(1).toFloat()
+        val remainingPx = abs(lazyScope.calculateDistanceTo(0).toFloat())
+        if (remainingPx >= viewportPx * homeScrollToTopInstantThresholdViewports) {
+            lazyScope.snapToItem(0)
+            return@scroll
+        }
+        val durationSeconds = (180f + remainingPx / viewportPx * 35f)
+            .coerceAtMost(700f) / 1000f
+        val pixelsPerSecond = (remainingPx / durationSeconds)
+            .coerceIn(80f, (viewportPx * 18f).coerceAtLeast(80f))
+        var previousFrame = withFrameNanos { it }
+
+        while (this@animateToTop.canScrollBackward) {
+            val frame = withFrameNanos { it }
+            val elapsedNanos = (frame - previousFrame).coerceIn(0L, 32_000_000L)
+            if (elapsedNanos == 0L) continue
+            val consumed = lazyScope.scrollBy(-pixelsPerSecond * elapsedNanos / 1_000_000_000f)
+            if (consumed == 0f) break
+            previousFrame = frame
+        }
+        if (this@animateToTop.canScrollBackward &&
+            abs(lazyScope.calculateDistanceTo(0)) <= 2
+        ) {
+            lazyScope.snapToItem(0)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeTopBar(
     scrollBehavior: TopAppBarScrollBehavior,
-    selectedIndex: Int,
+    pagerState: PagerState,
     onNavigateToSearch: () -> Unit,
     onNavigateToProfile: () -> Unit,
     profileAvatar: String?,
     showTopActions: Boolean,
-    onSelectTab: (Int) -> Unit
+    onReselectTab: (Int) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -210,9 +272,12 @@ private fun HomeTopBar(
             .clipToBounds()
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)
-                val heightPx = placeable.height.toFloat()
                 val state = scrollBehavior.state
-                val limit = -heightPx
+                val limit = if (showTopActions) {
+                    -(homeSearchRowHeight.roundToPx() + homeTopContentPadding.roundToPx()).toFloat()
+                } else {
+                    0f
+                }
                 if (state.heightOffsetLimit != limit) state.heightOffsetLimit = limit
                 val offsetY = state.heightOffset.roundToInt()
                 val layoutHeight = (placeable.height + offsetY).coerceAtLeast(0)
@@ -220,7 +285,7 @@ private fun HomeTopBar(
                     placeable.placeRelative(0, offsetY)
                 }
             }
-            .padding(top = 4.dp)
+            .padding(top = homeTopContentPadding)
     ) {
         if (showTopActions) {
             Row(
@@ -233,7 +298,7 @@ private fun HomeTopBar(
                     onClick = onNavigateToSearch,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(homeSearchRowHeight),
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -268,11 +333,16 @@ private fun HomeTopBar(
                 }
             }
         }
-        FilledTabRow(
-            tabs = homeTabs,
-            selectedIndex = selectedIndex,
-            onSelect = onSelectTab,
-            modifier = Modifier
-        )
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            PagerSlidingTabRow(
+                tabs = homeTabs,
+                pagerState = pagerState,
+                modifier = Modifier.widthIn(max = 288.dp),
+                onReselect = onReselectTab
+            )
+        }
     }
 }

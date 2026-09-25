@@ -31,9 +31,16 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-data class FeedResult(val items: List<FeedItem>, val toast: FeedToast?, val interestChoose: InterestChoose? = null)
+data class FeedResult(
+    val items: List<FeedItem>,
+    val toast: FeedToast?,
+    val interestChoose: InterestChoose? = null,
+    val nextIdx: Long? = null
+)
 
 @Singleton
 class FeedRepository @Inject constructor(
@@ -58,7 +65,7 @@ class FeedRepository @Inject constructor(
             params = buildParams(idx, pull, flush, profile, hdFeed),
             profile = profile
         )
-        return parseResponse(json, hdFeed)
+        return withContext(Dispatchers.Default) { parseResponse(json, hdFeed) }
     }
 
     suspend fun fetchFeedWithInterest(
@@ -80,13 +87,17 @@ class FeedRepository @Inject constructor(
             ),
             profile = profile
         )
-        return parseResponse(json, hdFeed)
+        return withContext(Dispatchers.Default) { parseResponse(json, hdFeed) }
     }
 
     private fun parseResponse(json: JSONObject, useHdProfile: Boolean): FeedResult {
-        val data = json.optJSONObject("data")
-        val items = parseItems(data?.optJSONArray("items"), useHdProfile)
-        val toast = data?.optJSONObject("toast")?.let { t ->
+        val data = json.optJSONObject("data") ?: error("推荐数据缺少 data")
+        val rawItems = data.optJSONArray("items")
+        val items = parseItems(rawItems, useHdProfile)
+        // Keep the server cursor even when the last card is filtered out (e.g. an ad).
+        val nextIdx = rawItems?.takeIf { it.length() > 0 }
+            ?.optJSONObject(rawItems.length() - 1)?.optLong("idx")?.takeIf { it != 0L }
+        val toast = data.optJSONObject("toast")?.let { t ->
             if (t.optBoolean("has_toast")) {
                 val msg = FeedToast(true, t.optString("toast_message"))
                 _toastFlow.tryEmit(msg)
@@ -95,8 +106,8 @@ class FeedRepository @Inject constructor(
                 null
             }
         }
-        val interestChoose = data?.optJSONObject("interest_choose")?.let(::parseInterestChoose)
-        return FeedResult(items, toast, interestChoose)
+        val interestChoose = data.optJSONObject("interest_choose")?.let(::parseInterestChoose)
+        return FeedResult(items, toast, interestChoose, nextIdx)
     }
 
     private suspend fun buildParams(
@@ -163,7 +174,14 @@ class FeedRepository @Inject constructor(
         }
     }
 
-    private val adCardGotos = setOf("banner", "ad_web_s", "ad_inline_egg", "ad_web", "ad_web_gif")
+    private val adCardGotos = setOf(
+        "banner",
+        "ad_web_s",
+        "ad_inline_egg",
+        "ad_inline_eggs",
+        "ad_web",
+        "ad_web_gif"
+    )
 
     private fun parseItems(arr: org.json.JSONArray?, useHdProfile: Boolean): List<FeedItem> {
         if (arr == null) return emptyList()
@@ -180,13 +198,13 @@ class FeedRepository @Inject constructor(
         val item = obj.optJSONObject("item")
         val inline = item?.optJSONObject("inline_pgc")
         val card = inline ?: obj
-        val args = card.optJSONObject("args") ?: obj.optJSONObject("args")
-        val descBtn = card.optJSONObject("desc_button") ?: obj.optJSONObject("desc_button")
-        val rcmd = card.optJSONObject("rcmd_reason_style") ?: obj.optJSONObject("rcmd_reason_style")
+        val args = card.optJSONObject("args") ?: item?.optJSONObject("args") ?: obj.optJSONObject("args")
+        val descBtn = card.optJSONObject("desc_button") ?: item?.optJSONObject("desc_button") ?: obj.optJSONObject("desc_button")
+        val rcmd = card.optJSONObject("rcmd_reason_style") ?: item?.optJSONObject("rcmd_reason_style") ?: obj.optJSONObject("rcmd_reason_style")
         val player = card.optJSONObject("player_args")
             ?: item?.optJSONObject("player_args")
             ?: obj.optJSONObject("player_args")
-        val uri = card.optString("uri").ifBlank { obj.optString("uri") }
+        val uri = card.optString("uri").ifBlank { item?.optString("uri").orEmpty() }.ifBlank { obj.optString("uri") }
         val reportFlowData = card.optString("report_flow_data")
             .takeIf(String::isNotEmpty)
             ?: obj.optString("report_flow_data").takeIf(String::isNotEmpty)
@@ -195,13 +213,15 @@ class FeedRepository @Inject constructor(
             .takeIf(String::isNotEmpty)
             ?: obj.optString("report_data").takeIf(String::isNotEmpty)
             ?: VideoTargetTool.arg(uri, "report_data")
-        val cardGoto = card.optString("card_goto").ifBlank { obj.optString("card_goto") }
-        val goto = card.optString("goto").ifBlank { obj.optString("goto") }
-        val param = card.optString("param").ifBlank { obj.optString("param") }
+        val cardGoto = card.optString("card_goto").ifBlank { item?.optString("card_goto").orEmpty() }.ifBlank { obj.optString("card_goto") }
+        val goto = card.optString("goto").ifBlank { item?.optString("goto").orEmpty() }.ifBlank { obj.optString("goto") }
+        val param = card.optString("param").ifBlank { item?.optString("param").orEmpty() }.ifBlank { obj.optString("param") }
         val title = card.optString("title")
+            .ifBlank { item?.optString("title").orEmpty() }
             .ifBlank { item?.optString("subtitle").orEmpty() }
             .ifBlank { obj.optString("title") }
         val cover = card.optString("cover")
+            .ifBlank { item?.optString("cover").orEmpty() }
             .ifBlank { item?.optString("large_cover").orEmpty() }
             .ifBlank { obj.optString("cover") }
             .httpsImageUrl()

@@ -30,6 +30,7 @@ class ListenRepository @Inject constructor(
             .setId(0L)
             .setNeedHistory(false)
             .setNeedTopCards(needTopCards)
+            .setPage(Pagination.newBuilder().setPageSize(PAGE_SIZE).build())
             .setPlayerArgs(buildPlayerArgs())
             .build()
         val resp = grpcClient.call(
@@ -41,7 +42,7 @@ class ListenRepository @Inject constructor(
             ListenRcmdResult(
                 items = resp.listList.map(::mapDetailItem),
                 historyLen = resp.historyLen,
-                hasMore = resp.hasNextPage(),
+                hasMore = resp.hasNextPage() && resp.nextPage.next.isNotBlank(),
                 nextPageToken = if (resp.hasNextPage()) resp.nextPage.next else ""
             )
         }
@@ -70,7 +71,7 @@ class ListenRepository @Inject constructor(
             ListenRcmdResult(
                 items = resp.listList.map(::mapDetailItem),
                 historyLen = resp.historyLen,
-                hasMore = resp.hasNextPage(),
+                hasMore = resp.hasNextPage() && resp.nextPage.next.isNotBlank() && resp.nextPage.next != nextToken,
                 nextPageToken = if (resp.hasNextPage()) resp.nextPage.next else ""
             )
         }

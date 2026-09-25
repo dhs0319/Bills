@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -568,14 +569,10 @@ private fun MainTabsScaffold(
                             Alignment.BottomCenter
                         }
                     )
-                    .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
-                    .padding(
-                        start = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
-                        bottom = topLevelNavEdgePadding
-                    )
                     .zIndex(1f),
                 currentTab = currentTab,
                 visibilityController = navVisibilityController,
+                startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
                 onTabChange = selectTab,
                 onNavigateToSearch = onNavigateToSearch
             )
@@ -690,14 +687,14 @@ private fun TopLevelFloatingNavigation(
     modifier: Modifier = Modifier,
     currentTab: TopLevelRoute,
     visibilityController: TopLevelNavVisibilityController,
+    startPadding: Dp,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit
 ) {
     val toolbarShape = MaterialTheme.shapes.extraLarge
-    val edgePaddingPx = with(LocalDensity.current) { topLevelNavEdgePadding.toPx() }
     var hiddenDistancePx by remember { mutableFloatStateOf(0f) }
     val animatedOffsetPx by animateFloatAsState(
-        targetValue = if (visibilityController.hidden) hiddenDistancePx + edgePaddingPx else 0f,
+        targetValue = if (visibilityController.hidden) hiddenDistancePx else 0f,
         animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
         label = "top level nav offset"
     )
@@ -708,6 +705,8 @@ private fun TopLevelFloatingNavigation(
         .graphicsLayer {
             translationY = animatedOffsetPx
         }
+        .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+        .padding(start = startPadding, bottom = topLevelNavEdgePadding)
     val tabs: @Composable () -> Unit = {
         TopLevelRoute.entries.forEach { tab ->
             TopLevelFloatingNavigationItem(

@@ -60,6 +60,10 @@ fun <T> AdaptiveMediaGrid(
     state: LazyStaggeredGridState? = null,
     errorMessage: String? = null,
     loadMoreEnabled: Boolean = true,
+    prefetchScreens: Int = 0,
+    loadMoreError: String? = null,
+    onRetryLoadMore: () -> Unit = onLoadMore,
+    endReached: Boolean = false,
     columns: Int = rememberAdaptiveGridColumnCount(),
     loadingPlaceholderCount: Int = 10,
     horizontalSpacing: Dp = 6.dp,
@@ -85,14 +89,29 @@ fun <T> AdaptiveMediaGrid(
 ) {
     val gridState = state ?: rememberLazyStaggeredGridState()
     val currentItems by rememberUpdatedState(items)
-    val shouldLoadMore by remember(gridState, loadMoreEnabled) {
+    val expectedItemCount by rememberUpdatedState(
+        items.size + (if (headerContent != null) 1 else 0) +
+            (if (!errorMessage.isNullOrBlank()) 1 else 0) +
+            (if (isLoadingMore || loadMoreError != null || endReached) 1 else 0)
+    )
+    val shouldLoadMore by remember(gridState, loadMoreEnabled, prefetchScreens, columns) {
         derivedStateOf {
-            loadMoreEnabled && !gridState.canScrollForward && currentItems.isNotEmpty()
+            val layout = gridState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.maxOfOrNull { it.index }
+            loadMoreEnabled && currentItems.isNotEmpty() &&
+                if (prefetchScreens == 0) {
+                    !gridState.canScrollForward
+                } else {
+                    // Wait for the current data to be measured; stale layout can request twice.
+                    lastVisible != null && layout.totalItemsCount == expectedItemCount &&
+                        layout.totalItemsCount - lastVisible - 1 <=
+                        maxOf(layout.visibleItemsInfo.size * prefetchScreens, columns * 2)
+                }
         }
     }
 
-    LaunchedEffect(shouldLoadMore, loadMoreEnabled, isRefreshing, isLoadingMore) {
-        if (loadMoreEnabled && shouldLoadMore && !isRefreshing && !isLoadingMore) {
+    LaunchedEffect(shouldLoadMore, loadMoreEnabled, isRefreshing, isLoadingMore, loadMoreError) {
+        if (loadMoreEnabled && shouldLoadMore && !isRefreshing && !isLoadingMore && loadMoreError == null) {
             onLoadMore()
         }
     }
@@ -151,6 +170,7 @@ fun <T> AdaptiveMediaGrid(
                         val err = errorMessage.orEmpty()
                         item(
                             key = "error",
+                            span = StaggeredGridItemSpan.FullLine,
                             contentType = "error"
                         ) {
                             errorContent(err)
@@ -178,9 +198,25 @@ fun <T> AdaptiveMediaGrid(
                     if (isLoadingMore) {
                         item(
                             key = "loading_more",
+                            span = StaggeredGridItemSpan.FullLine,
                             contentType = "loading_more"
                         ) {
                             loadMoreContent()
+                        }
+                    } else if (loadMoreError != null) {
+                        item(key = "load_more_error", span = StaggeredGridItemSpan.FullLine) {
+                            StateMessageCard(
+                                text = loadMoreError,
+                                isError = true,
+                                actionText = "重试",
+                                onAction = onRetryLoadMore
+                            )
+                        }
+                    } else if (endReached) {
+                        item(key = "end_reached", span = StaggeredGridItemSpan.FullLine) {
+                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                Text("没有更多内容了", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }

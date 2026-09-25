@@ -1,66 +1,59 @@
 package com.dhs0319.bills.feature.home.listen
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
+import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeleton
 import com.dhs0319.bills.core.model.listen.ListenItem
+import com.dhs0319.bills.feature.home.component.UploaderBadge
 
 @Composable
 fun ListenHomePage(
     isActive: Boolean,
     refreshRequest: Int,
     onItemClick: (ListenItem) -> Unit,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     viewModel: ListenHomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val gridState = rememberLazyStaggeredGridState()
 
-    androidx.compose.runtime.LaunchedEffect(isActive) {
-        if (isActive) viewModel.ensureLoaded()
-    }
-    androidx.compose.runtime.LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0) {
+    LaunchedEffect(isActive, refreshRequest) {
+        if (isActive && viewModel.activate(refreshRequest)) {
             gridState.scrollToItem(0)
-            viewModel.refresh()
         }
     }
-
-    AdaptiveMediaGrid(
-        items = state.items,
-        isRefreshing = state.isRefreshing,
-        isLoadingMore = state.isLoadingMore,
+    HomeMediaGrid(
+        paging = state,
+        isActive = isActive,
+        gridState = gridState,
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
-        modifier = Modifier.fillMaxSize(),
-        state = gridState,
-        errorMessage = state.errorMessage,
-        loadMoreEnabled = state.hasMore,
-        key = { _, item -> item.actionKey() },
-        loadingContent = {
-            VideoGridCardSkeleton()
-        }
+        onRetryLoadMore = viewModel::retryLoadMore,
+        key = { _, item -> item.actionKey() }
     ) { item ->
         ListenCard(
             item = item,
@@ -90,7 +83,32 @@ private fun ListenCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 10f)
-            )
+            ) {
+                if (item.duration > 0L) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color.Transparent,
+                                    1f to Color.Black.copy(alpha = 0.72f)
+                                )
+                            )
+                    ) {
+                        Text(
+                            text = formatDuration(item.duration),
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Text(
                     text = item.title,
@@ -99,24 +117,22 @@ private fun ListenCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = item.author,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = formatDuration(item.duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (item.author.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        UploaderBadge()
+                        Text(
+                            text = item.author,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

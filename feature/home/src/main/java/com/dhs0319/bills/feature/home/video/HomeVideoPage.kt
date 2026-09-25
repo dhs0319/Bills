@@ -14,12 +14,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,34 +32,37 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
+import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
+import com.dhs0319.bills.feature.home.paging.HomePagingState
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeleton
 import com.dhs0319.bills.core.model.FeedItem
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.ThreePointItem
 import com.dhs0319.bills.core.model.ThreePointReason
 import com.dhs0319.bills.core.model.VideoTarget
+import com.dhs0319.bills.feature.home.component.UploaderBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeVideoPage(
-    items: List<FeedItem>,
-    isRefreshing: Boolean,
-    isLoadingMore: Boolean,
-    errorMessage: String?,
+    paging: HomePagingState<FeedItem>,
+    isActive: Boolean,
+    onActivate: (Int) -> Boolean,
+    onRetryLoadMore: () -> Unit,
     toastMessage: String,
     dislikedReasons: Map<String, String>,
     refreshRequest: Int,
@@ -67,45 +74,28 @@ fun HomeVideoPage(
     onOpenDynamic: (String) -> Unit,
     onDislike: (FeedItem, ThreePointReason) -> Unit,
     onCancelDislike: (FeedItem) -> Unit,
-    onToastShown: () -> Unit
+    onToastShown: () -> Unit,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState()
 ) {
     val context = LocalContext.current
-    val gridState = rememberLazyStaggeredGridState()
-    var wasRefreshing by remember { mutableStateOf(false) }
     LaunchedEffect(toastMessage, context) {
         if (toastMessage.isNotEmpty()) {
             Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
             onToastShown()
         }
     }
-    LaunchedEffect(isRefreshing, items) {
-        if (wasRefreshing && !isRefreshing && items.isNotEmpty()) {
-            gridState.scrollToItem(0)
-        }
-        wasRefreshing = isRefreshing
+    LaunchedEffect(isActive, refreshRequest) {
+        if (isActive && onActivate(refreshRequest)) gridState.scrollToItem(0)
     }
-    LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0) {
-            if (items.isNotEmpty()) {
-                gridState.scrollToItem(0)
-            }
-            onRefresh()
-        }
-    }
-    AdaptiveMediaGrid(
-        items = items,
-        isRefreshing = isRefreshing,
-        isLoadingMore = isLoadingMore,
+    HomeMediaGrid(
+        paging = paging,
+        isActive = isActive,
+        gridState = gridState,
         onRefresh = onRefresh,
         onLoadMore = onLoadMore,
-        modifier = Modifier.fillMaxSize(),
-        state = gridState,
-        errorMessage = errorMessage,
+        onRetryLoadMore = onRetryLoadMore,
         key = { _, item -> item.actionKey() },
-        contentType = { _, item -> item.cardType },
-        loadingContent = {
-            VideoGridCardSkeleton()
-        }
+        contentType = { _, item -> item.cardType }
     ) { item ->
         FeedCard(
             item = item,
@@ -158,33 +148,7 @@ private fun FeedCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    val hasLeftText = item.coverLeftText1 != null
-                    if (hasLeftText) {
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(4.dp)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            item.coverLeftText1?.let {
-                                Text(it, color = Color.White, style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                    }
-
-                    item.coverRightText?.let { text ->
-                        Text(
-                            text = text,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(4.dp)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+                    FeedCoverMetadata(item, Modifier.align(Alignment.BottomCenter))
                 }
             }
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
@@ -219,19 +183,25 @@ private fun FeedCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val upName = item.descButton?.text ?: item.args?.upName ?: ""
-                    if (upName.isNotEmpty()) {
-                        Box(modifier = Modifier.weight(1f)) {
+                    if (upName.isNotBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(
+                                    if (spaceRoute == null || isDisliked) Modifier
+                                    else Modifier.clickable { onOpenSpace(spaceRoute) }
+                                ),
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            UploaderBadge()
                             Text(
                                 text = upName,
+                                modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = if (spaceRoute == null || isDisliked) {
-                                    Modifier
-                                } else {
-                                    Modifier.clickable { onOpenSpace(spaceRoute) }
-                                }
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -277,6 +247,95 @@ private fun FeedCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FeedCoverMetadata(item: FeedItem, modifier: Modifier = Modifier) {
+    val views = item.coverLeftText1?.takeIf(String::isNotBlank)
+    val danmaku = item.coverLeftText2?.takeIf(String::isNotBlank)
+        .takeIf { item.target != null }
+    val duration = item.coverRightText?.takeIf(String::isNotBlank)
+    if (views == null && danmaku == null && duration == null) return
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = 0.72f)
+                )
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                views?.let {
+                    CoverMetric(
+                        icon = if (item.target != null) Icons.Outlined.PlayCircleOutline else Icons.Outlined.Visibility,
+                        label = if (item.target != null) "播放" else "观看",
+                        value = it,
+                        modifier = Modifier.weight(1.2f, fill = false)
+                    )
+                }
+                danmaku?.let {
+                    CoverMetric(
+                        icon = Icons.Outlined.Subtitles,
+                        label = "弹幕",
+                        value = it,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+            }
+            duration?.let {
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = it,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverMetric(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = Color.White,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = value,
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

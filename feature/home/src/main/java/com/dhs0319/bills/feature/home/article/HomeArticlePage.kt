@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,11 +25,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
+import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.StateMessageCard
-import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeleton
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.article.ArticleRecommendItem
 
@@ -40,43 +37,24 @@ fun HomeArticlePage(
     refreshRequest: Int,
     onOpenArticle: (String, Int) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     viewModel: HomeArticleViewModel = hiltViewModel()
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
-    val gridState = rememberLazyStaggeredGridState()
 
-    LaunchedEffect(isActive) {
-        if (isActive) viewModel.ensureLoaded()
-    }
-    LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0) {
+    LaunchedEffect(isActive, refreshRequest) {
+        if (isActive && viewModel.activate(refreshRequest)) {
             gridState.scrollToItem(0)
-            viewModel.refresh()
         }
     }
-    AdaptiveMediaGrid(
-        items = state.items,
-        isRefreshing = state.isRefreshing,
-        isLoadingMore = state.isLoadingMore,
+    HomeMediaGrid(
+        paging = state,
+        isActive = isActive,
+        gridState = gridState,
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
-        modifier = Modifier.fillMaxSize(),
-        state = gridState,
-        errorMessage = state.errorMessage,
-        loadMoreEnabled = isActive,
-        key = { _, item -> item.id },
-        loadingContent = {
-            VideoGridCardSkeleton()
-        },
-        emptyContent = {
-            StateMessageCard(
-                title = "暂无专栏推荐",
-                text = state.errorMessage ?: "下拉试试重新获取",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 48.dp)
-            )
-        }
+        onRetryLoadMore = viewModel::retryLoadMore,
+        key = { _, item -> item.id }
     ) { item ->
         ArticleRecommendCard(
             item = item,
