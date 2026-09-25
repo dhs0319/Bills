@@ -31,6 +31,8 @@ internal fun <T> HomeMediaGrid(
     key: (Int, T) -> Any,
     contentType: (Int, T) -> Any? = { _, _ -> null },
     headerContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
+    separatorIndex: Int? = null,
+    separatorContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     itemContent: @Composable LazyStaggeredGridItemScope.(T) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -81,6 +83,8 @@ internal fun <T> HomeMediaGrid(
                 contentType = contentType,
                 loadingContent = { VideoGridCardSkeleton() },
                 headerContent = headerContent,
+                separatorIndex = separatorIndex,
+                separatorContent = separatorContent,
                 emptyContent = {
                     StateMessageCard(
                         text = paging.errorMessage ?: paging.loadMoreError ?: "暂无内容，下拉试试重新获取",

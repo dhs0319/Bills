@@ -66,7 +66,8 @@ class HomeViewModel @Inject constructor(
             }
         },
         onStateChanged = { paging -> _uiState.update { it.copy(paging = paging) } },
-        onError = { Logger.e(TAG, it) { "加载推荐失败" } }
+        onError = { Logger.e(TAG, it) { "加载推荐失败" } },
+        prependOnRefresh = true
     )
 
     private fun FeedItem.actionKey(): String {

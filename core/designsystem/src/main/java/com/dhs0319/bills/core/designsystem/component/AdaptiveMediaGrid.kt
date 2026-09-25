@@ -78,6 +78,8 @@ fun <T> AdaptiveMediaGrid(
     contentType: (index: Int, item: T) -> Any? = { _, _ -> null },
     loadingContent: @Composable LazyStaggeredGridItemScope.() -> Unit,
     headerContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
+    separatorIndex: Int? = null,
+    separatorContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     emptyContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     errorContent: @Composable LazyStaggeredGridItemScope.(String) -> Unit = { msg ->
         DefaultGridError(msg)
@@ -89,8 +91,15 @@ fun <T> AdaptiveMediaGrid(
 ) {
     val gridState = state ?: rememberLazyStaggeredGridState()
     val currentItems by rememberUpdatedState(items)
+    val validSeparatorIndex = separatorIndex?.takeIf {
+        separatorContent != null && it > 0 && it < items.size
+    }
+    val separatorCount = if (validSeparatorIndex != null) 1 else 0
+    val itemIndex = { gridIndex: Int ->
+        if (validSeparatorIndex != null && gridIndex > validSeparatorIndex) gridIndex - 1 else gridIndex
+    }
     val expectedItemCount by rememberUpdatedState(
-        items.size + (if (headerContent != null) 1 else 0) +
+        items.size + separatorCount + (if (headerContent != null) 1 else 0) +
             (if (!errorMessage.isNullOrBlank()) 1 else 0) +
             (if (isLoadingMore || loadMoreError != null || endReached) 1 else 0)
     )
@@ -188,11 +197,18 @@ fun <T> AdaptiveMediaGrid(
                     }
 
                     items(
-                        count = items.size,
-                        key = { index -> key(index, items[index]) },
-                        contentType = { index -> contentType(index, items[index]) }
+                        count = items.size + separatorCount,
+                        key = { index ->
+                            if (index == validSeparatorIndex) "refresh_separator"
+                            else itemIndex(index).let { key(it, items[it]) }
+                        },
+                        contentType = { index ->
+                            if (index == validSeparatorIndex) "refresh_separator"
+                            else itemIndex(index).let { contentType(it, items[it]) }
+                        }
                     ) { index ->
-                        itemContent(items[index])
+                        if (index == validSeparatorIndex) separatorContent?.invoke(this)
+                        else itemContent(items[itemIndex(index)])
                     }
 
                     if (isLoadingMore) {

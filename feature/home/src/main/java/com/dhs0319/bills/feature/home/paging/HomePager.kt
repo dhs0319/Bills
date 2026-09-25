@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 
 data class HomePagingState<T>(
     val items: List<T> = emptyList(),
+    val refreshBoundaryIndex: Int? = null,
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
     val isInitialLoading: Boolean = false,
@@ -35,7 +36,8 @@ internal class HomePager<T, K : Any>(
     private val onStateChanged: (HomePagingState<T>) -> Unit = {},
     private val onError: (Exception) -> Unit = {},
     private val batchSize: Int = 20,
-    private val maxPagesPerLoad: Int = 3
+    private val maxPagesPerLoad: Int = 3,
+    private val prependOnRefresh: Boolean = false
 ) {
     private val _state = MutableStateFlow(HomePagingState<T>())
     val state = _state.asStateFlow()
@@ -80,6 +82,9 @@ internal class HomePager<T, K : Any>(
 
     private fun start(refresh: Boolean, key: K) {
         val version = ++generation
+        val oldItems = if (refresh && prependOnRefresh) state.value.items else emptyList()
+        val keepOldCursor = oldItems.isNotEmpty()
+        val oldNextKey = if (keepOldCursor) nextKey else null
         request?.cancel()
         // Set the guard before launching, including with a queued dispatcher.
         publish(state.value.copy(
@@ -91,11 +96,15 @@ internal class HomePager<T, K : Any>(
         ))
         request = scope.launch {
             var acceptedPage = false
+            var refreshedItems = emptyList<T>()
             try {
                 var cursor = key
                 var addedCount = 0
-                val seenKeys = if (refresh) mutableSetOf() else
-                    state.value.items.mapTo(mutableSetOf(), itemKey)
+                val seenKeys = when {
+                    !refresh -> state.value.items.mapTo(mutableSetOf(), itemKey)
+                    prependOnRefresh -> oldItems.mapTo(mutableSetOf(), itemKey)
+                    else -> mutableSetOf()
+                }
                 val visitedCursors = mutableSetOf<K>()
                 for (pageIndex in 0 until maxPagesPerLoad) {
                     visitedCursors.add(cursor)
@@ -105,15 +114,28 @@ internal class HomePager<T, K : Any>(
                     val additions = page.items.filter { seenKeys.add(itemKey(it)) }
                     addedCount += additions.size
                     nextKey = page.nextKey?.takeUnless { it in visitedCursors }
-                    val items = if (refresh && !acceptedPage) additions else state.value.items + additions
+                    val items = when {
+                        refresh && prependOnRefresh -> {
+                            refreshedItems = refreshedItems + additions
+                            refreshedItems + oldItems
+                        }
+                        refresh && !acceptedPage -> additions
+                        else -> state.value.items + additions
+                    }
                     acceptedPage = true
                     page.onAccepted()
                     // Publish each successful page immediately, while filling the buffer.
-                    publish(state.value.copy(items = items, hasLoaded = true, hasMore = nextKey != null))
+                    publish(state.value.copy(items = items, hasLoaded = true,
+                        refreshBoundaryIndex = if (refresh && prependOnRefresh && refreshedItems.isNotEmpty()) {
+                            refreshedItems.size.takeIf { it < items.size }
+                        } else {
+                            state.value.refreshBoundaryIndex
+                        },
+                        hasMore = if (keepOldCursor) oldNextKey != null else nextKey != null))
                     if (addedCount >= batchSize) break
                     cursor = nextKey ?: break
                 }
-                if (addedCount == 0 && nextKey != null) {
+                if (addedCount == 0 && nextKey != null && !keepOldCursor) {
                     publish(state.value.copy(loadMoreError = "暂未获取到新内容，请点击重试"))
                 }
             } catch (e: CancellationException) {
@@ -122,10 +144,12 @@ internal class HomePager<T, K : Any>(
                 if (version != generation) return@launch
                 onError(e)
                 val message = e.message?.takeIf { it.isNotBlank() } ?: "加载失败，请重试"
-                publish(if (refresh && !acceptedPage) state.value.copy(errorMessage = message)
+                publish(if (refresh && (!acceptedPage || keepOldCursor)) state.value.copy(errorMessage = message)
                     else state.value.copy(loadMoreError = message))
             } finally {
                 if (version == generation) {
+                    // The visible tail is still the old list, so continue paging from its cursor.
+                    if (keepOldCursor) nextKey = oldNextKey
                     publish(state.value.copy(isRefreshing = false, isLoadingMore = false, isInitialLoading = false))
                 }
             }

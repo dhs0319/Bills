@@ -254,4 +254,88 @@ class HomePagerTest {
         advanceUntilIdle()
         assertEquals(listOf(2, 99), pager.state.value.items)
     }
+
+    @Test
+    fun prependRefreshKeepsOldItemsAfterAllNewPagesAndRetainsOldAppendCursor() = runTest {
+        val secondRefreshPage = CompletableDeferred<Unit>()
+        val calls = mutableListOf<Int>()
+        var refreshRound = 0
+        val pager = HomePager<Int, Int>(this, { 0 }, { it }, { key ->
+            calls += key
+            when (key) {
+                0 -> when (refreshRound) {
+                    0 -> HomePage(listOf(10, 11), 100)
+                    1 -> HomePage(listOf(1, 10), 1)
+                    else -> HomePage(listOf(3, 1), null)
+                }
+                1 -> {
+                    secondRefreshPage.await()
+                    HomePage(listOf(2, 11), 2)
+                }
+                100 -> HomePage(listOf(12, 13), 200)
+                200 -> HomePage(listOf(14, 15), null)
+                else -> error("Unexpected cursor: $key")
+            }
+        }, batchSize = 2, prependOnRefresh = true)
+
+        pager.refresh()
+        advanceUntilIdle()
+        pager.loadMore()
+        advanceUntilIdle()
+        refreshRound = 1
+        pager.refresh()
+        runCurrent()
+        assertEquals(listOf(1, 10, 11, 12, 13), pager.state.value.items)
+        assertTrue(pager.state.value.isRefreshing)
+        secondRefreshPage.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf(1, 2, 10, 11, 12, 13), pager.state.value.items)
+
+        pager.loadMore()
+        advanceUntilIdle()
+        assertEquals(listOf(1, 2, 10, 11, 12, 13, 14, 15), pager.state.value.items)
+        assertEquals(listOf(0, 100, 0, 1, 200), calls)
+
+        refreshRound = 2
+        pager.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf(3, 1, 2, 10, 11, 12, 13, 14, 15), pager.state.value.items)
+    }
+
+    @Test
+    fun failedSecondPrependPageKeepsOldItemsAndRetriesRefresh() = runTest {
+        var refreshRound = 0
+        val calls = mutableListOf<Int>()
+        val pager = HomePager<Int, Int>(this, { 0 }, { it }, { key ->
+            calls += key
+            when (key) {
+                0 -> when (refreshRound) {
+                    0 -> HomePage(listOf(10, 11), 100)
+                    1 -> HomePage(listOf(1, 10), 1)
+                    else -> HomePage(listOf(2, 1), null)
+                }
+                1 -> error("offline")
+                100 -> HomePage(listOf(12, 13), null)
+                else -> error("Unexpected cursor: $key")
+            }
+        }, batchSize = 2, prependOnRefresh = true)
+
+        pager.refresh()
+        advanceUntilIdle()
+        refreshRound = 1
+        pager.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf(1, 10, 11), pager.state.value.items)
+        assertEquals("offline", pager.state.value.errorMessage)
+        assertNull(pager.state.value.loadMoreError)
+
+        refreshRound = 2
+        pager.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf(2, 1, 10, 11), pager.state.value.items)
+        pager.loadMore()
+        advanceUntilIdle()
+        assertEquals(listOf(2, 1, 10, 11, 12, 13), pager.state.value.items)
+        assertEquals(listOf(0, 0, 1, 0, 100), calls)
+    }
 }

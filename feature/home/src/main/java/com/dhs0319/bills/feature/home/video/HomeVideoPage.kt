@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -55,6 +58,7 @@ import com.dhs0319.bills.core.model.ThreePointItem
 import com.dhs0319.bills.core.model.ThreePointReason
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.home.component.UploaderBadge
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +82,7 @@ fun HomeVideoPage(
     gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState()
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     LaunchedEffect(toastMessage, context) {
         if (toastMessage.isNotEmpty()) {
             Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
@@ -87,6 +92,16 @@ fun HomeVideoPage(
     LaunchedEffect(isActive, refreshRequest) {
         if (isActive && onActivate(refreshRequest)) gridState.scrollToItem(0)
     }
+    val firstItemKey = paging.items.firstOrNull()?.actionKey()
+    var shownFirstItemKey by rememberSaveable { mutableStateOf(firstItemKey) }
+    LaunchedEffect(isActive, firstItemKey) {
+        if (isActive) {
+            if (shownFirstItemKey != null && firstItemKey != shownFirstItemKey) {
+                gridState.scrollToItem(0)
+            }
+            shownFirstItemKey = firstItemKey
+        }
+    }
     HomeMediaGrid(
         paging = paging,
         isActive = isActive,
@@ -95,7 +110,17 @@ fun HomeVideoPage(
         onLoadMore = onLoadMore,
         onRetryLoadMore = onRetryLoadMore,
         key = { _, item -> item.actionKey() },
-        contentType = { _, item -> item.cardType }
+        contentType = { _, item -> item.cardType },
+        separatorIndex = paging.refreshBoundaryIndex,
+        separatorContent = {
+            LastSeenBoundaryCard(
+                enabled = !paging.isRefreshing,
+                onClick = {
+                    onRefresh()
+                    scope.launch { gridState.scrollToItem(0) }
+                }
+            )
+        }
     ) { item ->
         FeedCard(
             item = item,
@@ -112,6 +137,29 @@ fun HomeVideoPage(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun LastSeenBoundaryCard(enabled: Boolean, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("上次看到这里", style = MaterialTheme.typography.bodyLarge)
+            Text("点击刷新", style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
