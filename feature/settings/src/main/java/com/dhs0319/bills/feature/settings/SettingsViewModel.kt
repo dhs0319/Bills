@@ -266,6 +266,10 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun updateAutoPlay(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setAutoPlay(enabled) }
+    }
+
     fun updateBackgroundPlayback(enabled: Boolean) {
         viewModelScope.launch { appSettings.setBackgroundPlayback(enabled) }
     }

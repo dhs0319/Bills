@@ -117,7 +117,8 @@ class WatchLaterRepository @Inject constructor(
                 pageCid = item.optJSONObject("page")?.optLong("cid") ?: 0L,
                 title = title,
                 ownerName = owner?.optString("name").blankToNull(),
-                ownerMid = owner?.optLong("mid")?.takeIf { it > 0L }
+                ownerMid = owner?.optLong("mid")?.takeIf { it > 0L },
+                cover = item.optString("pic").blankToNull().httpsImageUrlOrNull()
             )
         )
     }
@@ -130,7 +131,8 @@ class WatchLaterRepository @Inject constructor(
         pageCid: Long,
         title: String,
         ownerName: String?,
-        ownerMid: Long?
+        ownerMid: Long?,
+        cover: String?
     ): VideoTarget? {
         val targetAid = aid.takeIf { it > 0L } ?: VideoTargetTool.aid(uri) ?: return null
         val targetCid = cid.takeIf { it > 0L } ?: pageCid.takeIf { it > 0L } ?: VideoTargetTool.cid(uri) ?: return null
@@ -141,7 +143,8 @@ class WatchLaterRepository @Inject constructor(
             src = WATCH_LATER_VIDEO_SRC.copy(
                 titleHint = title,
                 ownerNameHint = ownerName,
-                ownerMidHint = ownerMid
+                ownerMidHint = ownerMid,
+                coverHint = cover
             )
         )
     }

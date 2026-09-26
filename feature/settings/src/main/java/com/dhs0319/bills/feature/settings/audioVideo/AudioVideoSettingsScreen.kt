@@ -137,6 +137,13 @@ fun AudioVideoSettingsScreen(
             SettingCategory(title = "播放行为")
 
             SettingSwitch(
+                title = "自动播放",
+                subtitle = "进入视频详情页时自动加载并播放视频",
+                checked = playerSettings.playback.autoPlay,
+                onCheckedChange = viewModel::updateAutoPlay
+            )
+
+            SettingSwitch(
                 title = "后台播放",
                 subtitle = "退出页面或切到后台后继续播放，并显示系统通知",
                 checked = playerSettings.playback.backgroundPlayback,

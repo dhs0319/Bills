@@ -35,6 +35,7 @@ val audioVideoEntries = listOf(
     SettingEntry("默认画质", "设置默认视频和音频质量", AUDIO_VIDEO_ROUTE),
     SettingEntry("编码格式", "选择优先的编码格式", AUDIO_VIDEO_ROUTE),
     SettingEntry("强制 HTTPS", "使用 HTTPS 播放地址", AUDIO_VIDEO_ROUTE),
+    SettingEntry("自动播放", "进入视频详情页时自动加载并播放视频", AUDIO_VIDEO_ROUTE),
 )
 
 val feedEntries = listOf(

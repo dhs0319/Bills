@@ -40,6 +40,7 @@ private const val VIDEO_REPORT_FLOW_DATA_ARG = "reportFlowData"
 private const val VIDEO_TITLE_HINT_ARG = "titleHint"
 private const val VIDEO_OWNER_NAME_HINT_ARG = "ownerNameHint"
 private const val VIDEO_OWNER_MID_HINT_ARG = "ownerMidHint"
+private const val VIDEO_COVER_HINT_ARG = "coverHint"
 
 private const val VIDEO_ROUTE_PATTERN =
     "$VIDEO_ROUTE?$VIDEO_KIND_ARG={$VIDEO_KIND_ARG}" +
@@ -55,7 +56,8 @@ private const val VIDEO_ROUTE_PATTERN =
         "&$VIDEO_REPORT_FLOW_DATA_ARG={$VIDEO_REPORT_FLOW_DATA_ARG}" +
         "&$VIDEO_TITLE_HINT_ARG={$VIDEO_TITLE_HINT_ARG}" +
         "&$VIDEO_OWNER_NAME_HINT_ARG={$VIDEO_OWNER_NAME_HINT_ARG}" +
-        "&$VIDEO_OWNER_MID_HINT_ARG={$VIDEO_OWNER_MID_HINT_ARG}"
+        "&$VIDEO_OWNER_MID_HINT_ARG={$VIDEO_OWNER_MID_HINT_ARG}" +
+        "&$VIDEO_COVER_HINT_ARG={$VIDEO_COVER_HINT_ARG}"
 
 fun NavController.navigateToVideo(target: VideoTarget) {
     navigate(target.toRoute())
@@ -135,6 +137,7 @@ private val videoNavArguments = listOf(
     navArgument(VIDEO_TITLE_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
     navArgument(VIDEO_OWNER_NAME_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
     navArgument(VIDEO_OWNER_MID_HINT_ARG) { type = NavType.LongType; defaultValue = -1L },
+    navArgument(VIDEO_COVER_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
 )
 
 private fun VideoTarget.toRoute(): String {
@@ -156,7 +159,8 @@ private fun VideoTarget.toRoute(): String {
         "&$VIDEO_REPORT_FLOW_DATA_ARG=${src.reportFlowData.orEmpty().encode()}" +
         "&$VIDEO_TITLE_HINT_ARG=${src.titleHint.orEmpty().encode()}" +
         "&$VIDEO_OWNER_NAME_HINT_ARG=${src.ownerNameHint.orEmpty().encode()}" +
-        "&$VIDEO_OWNER_MID_HINT_ARG=${src.ownerMidHint ?: -1L}"
+        "&$VIDEO_OWNER_MID_HINT_ARG=${src.ownerMidHint ?: -1L}" +
+        "&$VIDEO_COVER_HINT_ARG=${src.coverHint.orEmpty().encode()}"
 }
 
 private data class VideoRouteValues(
@@ -179,6 +183,7 @@ private fun NavBackStackEntry.toVideoTarget(): VideoTarget {
         titleHint = args.getString(VIDEO_TITLE_HINT_ARG).orEmpty().ifBlank { null },
         ownerNameHint = args.getString(VIDEO_OWNER_NAME_HINT_ARG).orEmpty().ifBlank { null },
         ownerMidHint = args.getLong(VIDEO_OWNER_MID_HINT_ARG).takeIf { it > 0L },
+        coverHint = args.getString(VIDEO_COVER_HINT_ARG).orEmpty().ifBlank { null },
     )
     val aid = args.getLong(VIDEO_AID_ARG)
     val cid = args.getLong(VIDEO_CID_ARG)

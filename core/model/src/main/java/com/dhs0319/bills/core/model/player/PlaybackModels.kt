@@ -277,6 +277,7 @@ data class PlayerSessionState(
     val playbackSource: PlaybackSource? = null,
     val currentStream: PlaybackStream? = null,
     val currentAudio: PlaybackAudio? = null,
+    val waitingForPlay: Boolean = false,
     val isPreparing: Boolean = false,
     val error: PlaybackError? = null
 )

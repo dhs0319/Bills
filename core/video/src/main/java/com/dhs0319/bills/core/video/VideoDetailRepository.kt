@@ -222,7 +222,12 @@ class VideoDetailRepository @Inject constructor(
                     cid = ep.cid
                 )
                 VideoSeasonEpisode(
-                    target = ids.toUgcTarget(VideoTargetTool.relate()),
+                    target = ids.toUgcTarget(
+                        VideoTargetTool.relate().copy(
+                            titleHint = epTitle,
+                            coverHint = ep.cover.httpsImageUrl().ifBlank { null }
+                        )
+                    ),
                     cid = ids.cid,
                     title = epTitle,
                     subTitle = ep.coverRightText.ifBlank { null },
@@ -263,7 +268,10 @@ class VideoDetailRepository @Inject constructor(
                     aid = ep.aid,
                     cid = ep.cid,
                     epId = epId,
-                    src = src.copy(titleHint = title)
+                    src = src.copy(
+                        titleHint = title,
+                        coverHint = ep.cover.httpsImageUrl().ifBlank { null }
+                    )
                 ),
                 cid = ep.cid,
                 title = title,
@@ -328,6 +336,10 @@ class VideoDetailRepository @Inject constructor(
                         trackId = basic.trackId,
                         reportFlowData = basic.reportFlowData,
                         fromSpmidSuffix = basic.fromSpmidSuffix
+                    ).copy(
+                        titleHint = title,
+                        ownerNameHint = basic.author.title.ifBlank { null },
+                        coverHint = basic.cover.httpsImageUrl().ifBlank { null }
                     )
                 ),
                 title = title,

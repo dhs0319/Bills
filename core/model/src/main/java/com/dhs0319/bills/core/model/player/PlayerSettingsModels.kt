@@ -95,6 +95,7 @@ enum class VideoCdnMode(
 
 @Immutable
 data class PlayerPlaybackPrefs(
+    val autoPlay: Boolean = false,
     val backgroundPlayback: Boolean = true,
     val inAppMiniPlayer: Boolean = true,
     val reportPlayback: Boolean = true,

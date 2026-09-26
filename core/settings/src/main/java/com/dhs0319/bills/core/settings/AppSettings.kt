@@ -232,6 +232,7 @@ class AppSettings @Inject constructor(
     private val playerBufferProfileKey = intPreferencesKey("player_buffer_profile")
     private val preferSoftDecKey = booleanPreferencesKey("prefer_soft_dec")
     private val decFallbackKey = booleanPreferencesKey("dec_fallback")
+    private val autoPlayKey = booleanPreferencesKey("auto_play")
     private val bgPlayKey = booleanPreferencesKey("bg_play")
     private val inAppMiniPlayerKey = booleanPreferencesKey("in_app_mini_player")
     private val autoRotateFullscreenKey = booleanPreferencesKey("auto_rotate_fullscreen")
@@ -268,6 +269,7 @@ class AppSettings @Inject constructor(
                     .toPlayerBufferProfile(defaultBufferSettings.profile)
             ),
             playback = PlayerPlaybackPrefs(
+                autoPlay = prefs[autoPlayKey] ?: defaultPlaybackPrefs.autoPlay,
                 backgroundPlayback = prefs[bgPlayKey] ?: defaultPlaybackPrefs.backgroundPlayback,
                 inAppMiniPlayer = prefs[inAppMiniPlayerKey] ?: defaultPlaybackPrefs.inAppMiniPlayer,
                 reportPlayback = prefs[reportPlaybackKey] ?: defaultPlaybackPrefs.reportPlayback,
@@ -338,6 +340,10 @@ class AppSettings @Inject constructor(
 
     suspend fun setBufferProfile(profile: PlayerBufferProfile) {
         context.appSettingsDataStore.edit { it[playerBufferProfileKey] = profile.ordinal }
+    }
+
+    suspend fun setAutoPlay(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[autoPlayKey] = enabled }
     }
 
     suspend fun setBackgroundPlayback(enabled: Boolean) {

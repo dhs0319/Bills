@@ -197,7 +197,8 @@ class FavoriteRepository @Inject constructor(
                         src = VideoTargetTool.favorite().copy(
                             titleHint = title,
                             ownerNameHint = ownerName,
-                            ownerMidHint = ownerMid
+                            ownerMidHint = ownerMid,
+                            coverHint = item.optString("cover").blankToNull().httpsImageUrlOrNull()
                         )
                     )
                 )
@@ -216,7 +217,8 @@ class FavoriteRepository @Inject constructor(
                         src = VideoTargetTool.favorite().copy(
                             titleHint = title,
                             ownerNameHint = ownerName,
-                            ownerMidHint = ownerMid
+                            ownerMidHint = ownerMid,
+                            coverHint = item.optString("cover").blankToNull().httpsImageUrlOrNull()
                         )
                     )
                 )

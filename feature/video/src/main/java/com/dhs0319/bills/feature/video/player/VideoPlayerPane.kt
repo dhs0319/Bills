@@ -18,13 +18,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.CropFree
-import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.SubtitlesOff
@@ -67,6 +69,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
+import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.PlaybackOption
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionBottomSheet
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionSidebar
@@ -207,7 +210,7 @@ internal fun VideoPlayerPane(
         }
     }
     val danmakuOn = settingsState.danmaku.enabled
-    val danmakuOverlayState = if (danmakuOn) {
+    val danmakuOverlayState = if (danmakuOn && !state.waitingForPlay) {
         rememberDanmakuOverlayState(
             initialConfig = settingsState.danmaku,
             initialPositionMs = viewModel.playbackProgress.value.positionMs,
@@ -246,14 +249,24 @@ internal fun VideoPlayerPane(
         playerView.keepScreenOn = state.playWhenReady
     }
 
-    DisposableEffect(owner, playerView, player) {
+    LaunchedEffect(state.waitingForPlay) {
+        if (state.waitingForPlay) {
+            showCtrl = false
+            activeDialog = null
+            showPlaybackSheet = false
+        }
+    }
+
+    DisposableEffect(owner, playerView, player, state.waitingForPlay) {
         val lifecycle = owner.lifecycle
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+        if (!state.waitingForPlay && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             PlayerViewTargetBinder.bind(playerView, player)
         }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> PlayerViewTargetBinder.bind(playerView, player)
+                Lifecycle.Event.ON_START -> if (!state.waitingForPlay) {
+                    PlayerViewTargetBinder.bind(playerView, player)
+                }
                 Lifecycle.Event.ON_STOP -> PlayerViewTargetBinder.unbind(playerView)
                 else -> Unit
             }
@@ -270,23 +283,73 @@ internal fun VideoPlayerPane(
             modifier = modifier
                 .background(Color.Black)
         ) {
-            AndroidView(
-                factory = { playerView },
-                update = { view ->
-                    val content = view.findViewById<AspectRatioFrameLayout>(Media3UiR.id.exo_content_frame)
-                    if (content != null) {
-                        content.resizeMode = resizeMode
-                        if (lastWarmAspect != videoAspect) {
-                            content.setAspectRatio(videoAspect ?: 0f)
-                            lastWarmAspect = videoAspect
+            if (!state.waitingForPlay) {
+                AndroidView(
+                    factory = { playerView },
+                    update = { view ->
+                        val content = view.findViewById<AspectRatioFrameLayout>(Media3UiR.id.exo_content_frame)
+                        if (content != null) {
+                            content.resizeMode = resizeMode
+                            if (lastWarmAspect != videoAspect) {
+                                content.setAspectRatio(videoAspect ?: 0f)
+                                lastWarmAspect = videoAspect
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            if (
+                state.waitingForPlay ||
+                !state.hasRenderedFirstFrame &&
+                !state.detail?.cover.isNullOrBlank() &&
+                (state.isPreparing || state.playbackSource != null)
+            ) {
+                val onPlayVideo: () -> Unit = {
+                    showCtrl = false
+                    activeDialog = null
+                    showPlaybackSheet = false
+                    viewModel.resume()
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .then(
+                            if (state.waitingForPlay) {
+                                Modifier.clickable(onClickLabel = "播放视频", onClick = onPlayVideo)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    BiliAsyncImage(
+                        url = state.detail?.cover,
+                        contentDescription = state.detail?.title,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    if (state.waitingForPlay) {
+                        IconButton(
+                            onClick = onPlayVideo,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(64.dp)
+                                .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "播放视频",
+                                tint = Color.White,
+                                modifier = Modifier.size(36.dp)
+                            )
                         }
                     }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                }
+            }
 
             PlaybackBufferingOverlay(
-                visible = state.playerError.isNullOrBlank() &&
+                visible = !state.waitingForPlay && state.playerError.isNullOrBlank() &&
                     (state.isPreparing || state.playbackState == PlaybackState.Buffering),
                 modifier = Modifier.align(Alignment.Center)
             )
@@ -301,38 +364,40 @@ internal fun VideoPlayerPane(
                 )
             }
 
-            VideoPlayerOverlay(
-                viewModel = viewModel,
-                state = state,
-                player = player,
-                settingsState = settingsState,
-                isFull = isFull,
-                showCtrl = showCtrl,
-                activeDialog = activeDialog,
-                showPlaybackSheet = showPlaybackSheet,
-                onShowCtrlChange = { showCtrl = it },
-                onShowA = {
-                    showCtrl = true
-                    activeDialog = PlayerDialog.Audio
-                    showPlaybackSheet = false
-                },
-                onShowQ = {
-                    showCtrl = true
-                    activeDialog = PlayerDialog.Quality
-                    showPlaybackSheet = false
-                },
-                onShowSp = {
-                    showCtrl = true
-                    activeDialog = PlayerDialog.Speed
-                    showPlaybackSheet = false
-                },
-                onToggleFull = {
-                    showCtrl = true
-                    onToggleFull()
-                }
-            )
+            if (!state.waitingForPlay) {
+                VideoPlayerOverlay(
+                    viewModel = viewModel,
+                    state = state,
+                    player = player,
+                    settingsState = settingsState,
+                    isFull = isFull,
+                    showCtrl = showCtrl,
+                    activeDialog = activeDialog,
+                    showPlaybackSheet = showPlaybackSheet,
+                    onShowCtrlChange = { showCtrl = it },
+                    onShowA = {
+                        showCtrl = true
+                        activeDialog = PlayerDialog.Audio
+                        showPlaybackSheet = false
+                    },
+                    onShowQ = {
+                        showCtrl = true
+                        activeDialog = PlayerDialog.Quality
+                        showPlaybackSheet = false
+                    },
+                    onShowSp = {
+                        showCtrl = true
+                        activeDialog = PlayerDialog.Speed
+                        showPlaybackSheet = false
+                    },
+                    onToggleFull = {
+                        showCtrl = true
+                        onToggleFull()
+                    }
+                )
+            }
 
-            if (showCtrl) {
+            if (showCtrl && !state.waitingForPlay) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -513,7 +578,7 @@ internal fun VideoPlayerPane(
                 }
             }
 
-            if (useSidebar && showPlaybackSheet) {
+            if (useSidebar && showPlaybackSheet && !state.waitingForPlay) {
                 VideoPlaybackSidebar(
                     embedded = true,
                     state = state,
@@ -525,7 +590,7 @@ internal fun VideoPlayerPane(
                     )
             }
 
-            if (useSidebar) {
+            if (useSidebar && !state.waitingForPlay) {
                 activeOptionPanel?.let { panel ->
                     PlaybackOptionSidebar(
                         embedded = true,
@@ -540,7 +605,7 @@ internal fun VideoPlayerPane(
                 }
             }
 
-            if (state.playbackState == PlaybackState.Ended && state.playerError.isNullOrBlank()) {
+            if (!state.waitingForPlay && state.playbackState == PlaybackState.Ended && state.playerError.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -578,7 +643,7 @@ internal fun VideoPlayerPane(
             }
         }
 
-        if (!useSidebar) {
+        if (!useSidebar && !state.waitingForPlay) {
             activeOptionPanel?.let { panel ->
                 PlaybackOptionBottomSheet(
                     title = panel.title,
@@ -589,7 +654,7 @@ internal fun VideoPlayerPane(
             }
         }
 
-        if (!useSidebar && showPlaybackSheet) {
+        if (!useSidebar && showPlaybackSheet && !state.waitingForPlay) {
             VideoPlaybackSheet(
                 state = state,
                 viewModel = viewModel,

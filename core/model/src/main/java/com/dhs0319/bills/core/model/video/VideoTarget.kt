@@ -37,9 +37,11 @@ sealed interface VideoTarget {
 fun VideoTarget.previewDetail(): VideoDetail? {
     val title = src.titleHint?.takeIf(String::isNotBlank)
     val ownerName = src.ownerNameHint?.takeIf(String::isNotBlank)
-    if (title == null && ownerName == null) return null
+    val cover = src.coverHint?.takeIf(String::isNotBlank)
+    if (title == null && ownerName == null && cover == null) return null
     return VideoDetail(
         title = title ?: "视频详情",
+        cover = cover,
         owner = ownerName?.let { name ->
             VideoOwner(
                 mid = src.ownerMidHint ?: 0L,
@@ -126,7 +128,8 @@ data class VideoSrc(
     val reportFlowData: String? = null,
     val titleHint: String? = null,
     val ownerNameHint: String? = null,
-    val ownerMidHint: Long? = null
+    val ownerMidHint: Long? = null,
+    val coverHint: String? = null
 )
 
 object VideoTargetTool {
@@ -153,7 +156,8 @@ object VideoTargetTool {
         reportFlowData: String? = null,
         titleHint: String? = null,
         ownerNameHint: String? = null,
-        ownerMidHint: Long? = null
+        ownerMidHint: Long? = null,
+        coverHint: String? = null
     ): VideoSrc {
         return VideoSrc(
             from = FROM_FEED,
@@ -162,7 +166,8 @@ object VideoTargetTool {
             reportFlowData = reportFlowData.blankToNull(),
             titleHint = titleHint.blankToNull(),
             ownerNameHint = ownerNameHint.blankToNull(),
-            ownerMidHint = ownerMidHint?.takeIf { it > 0L }
+            ownerMidHint = ownerMidHint?.takeIf { it > 0L },
+            coverHint = coverHint.blankToNull()
         )
     }
 
