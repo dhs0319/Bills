@@ -20,6 +20,9 @@ val hasReleaseSigning: Boolean =
         !signingStorePassword.isNullOrBlank() &&
         !signingKeyAlias.isNullOrBlank() &&
         !signingKeyPassword.isNullOrBlank()
+val localRelease: Boolean = providers.gradleProperty("localRelease")
+    .map { it.toBoolean() }
+    .getOrElse(false)
 
 android {
     namespace = "com.dhs0319.bills"
@@ -65,6 +68,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            if (localRelease) {
+                applicationIdSuffix = ".local"
+                resValue("string", "app_name", "Bills Local")
+            }
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }

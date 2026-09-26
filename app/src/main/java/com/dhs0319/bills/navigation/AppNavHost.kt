@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -34,7 +36,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +59,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -462,9 +464,20 @@ private fun MainTabsScaffold(
     }
     val userViewModel: UserViewModel = hiltViewModel()
     val userState by userViewModel.uiState.collectAsStateWithLifecycle()
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val useStartAlignedBottomToolbar = windowSizeClass.isWidthAtLeastBreakpoint(600)
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val tappableInsets = WindowInsets.tappableElement
+    val hasTappableNavigationBar = tappableInsets.getBottom(density) > 0 ||
+        tappableInsets.getLeft(density, layoutDirection) > 0 ||
+        tappableInsets.getRight(density, layoutDirection) > 0
+    val navigationBarPadding = if (hasTappableNavigationBar) {
+        WindowInsets.navigationBars
+    } else {
+        WindowInsets(0)
+    }
+    val useStartAlignedBottomToolbar = configuration.screenWidthDp >= 600
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
@@ -517,6 +530,11 @@ private fun MainTabsScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .windowInsetsPadding(
+                    navigationBarPadding.only(
+                        WindowInsetsSides.End + WindowInsetsSides.Bottom
+                    )
+                )
         ) {
             TopLevelSideNavigation(
                 currentTab = currentTab,
@@ -536,6 +554,9 @@ private fun MainTabsScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .windowInsetsPadding(
+                    navigationBarPadding.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+                )
                 .nestedScroll(navVisibilityController.connection)
         ) {
             tabContent()
@@ -548,13 +569,10 @@ private fun MainTabsScaffold(
                             Alignment.BottomCenter
                         }
                     )
-                    .padding(
-                        start = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
-                        bottom = topLevelNavEdgePadding
-                    )
                     .zIndex(1f),
                 currentTab = currentTab,
                 visibilityController = navVisibilityController,
+                startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
                 onTabChange = selectTab,
                 onNavigateToSearch = onNavigateToSearch
             )
@@ -585,7 +603,7 @@ private fun TopLevelSideNavigation(
                 .fillMaxSize()
                 .windowInsetsPadding(
                     WindowInsets.safeDrawing.only(
-                        WindowInsetsSides.Start + WindowInsetsSides.Vertical
+                        WindowInsetsSides.Start + WindowInsetsSides.Top
                     )
                 )
                 .padding(horizontal = 8.dp, vertical = 12.dp),
@@ -669,14 +687,14 @@ private fun TopLevelFloatingNavigation(
     modifier: Modifier = Modifier,
     currentTab: TopLevelRoute,
     visibilityController: TopLevelNavVisibilityController,
+    startPadding: Dp,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit
 ) {
     val toolbarShape = MaterialTheme.shapes.extraLarge
-    val edgePaddingPx = with(LocalDensity.current) { topLevelNavEdgePadding.toPx() }
     var hiddenDistancePx by remember { mutableFloatStateOf(0f) }
     val animatedOffsetPx by animateFloatAsState(
-        targetValue = if (visibilityController.hidden) hiddenDistancePx + edgePaddingPx else 0f,
+        targetValue = if (visibilityController.hidden) hiddenDistancePx else 0f,
         animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
         label = "top level nav offset"
     )
@@ -687,6 +705,8 @@ private fun TopLevelFloatingNavigation(
         .graphicsLayer {
             translationY = animatedOffsetPx
         }
+        .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+        .padding(start = startPadding, bottom = topLevelNavEdgePadding)
     val tabs: @Composable () -> Unit = {
         TopLevelRoute.entries.forEach { tab ->
             TopLevelFloatingNavigationItem(

@@ -1,6 +1,6 @@
 package com.dhs0319.bills.feature.dynamic.navigation
 
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
@@ -37,8 +37,7 @@ fun NavGraphBuilder.dynamicDetailScreen(
             }
         )
     ) {
-        val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-        val isExpanded = windowSizeClass.isWidthAtLeastBreakpoint(840)
+        val isExpanded = LocalConfiguration.current.screenWidthDp >= 840
         DynamicDetailScreen(
             onBack = onBack,
             onOpenSpace = onOpenSpace,

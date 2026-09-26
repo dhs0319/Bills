@@ -8,29 +8,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
+import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.StateMessageCard
-import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeleton
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.article.ArticleRecommendItem
 
@@ -40,43 +36,24 @@ fun HomeArticlePage(
     refreshRequest: Int,
     onOpenArticle: (String, Int) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     viewModel: HomeArticleViewModel = hiltViewModel()
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
-    val gridState = rememberLazyStaggeredGridState()
 
-    LaunchedEffect(isActive) {
-        if (isActive) viewModel.ensureLoaded()
-    }
-    LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0) {
+    LaunchedEffect(isActive, refreshRequest) {
+        if (isActive && viewModel.activate(refreshRequest)) {
             gridState.scrollToItem(0)
-            viewModel.refresh()
         }
     }
-    AdaptiveMediaGrid(
-        items = state.items,
-        isRefreshing = state.isRefreshing,
-        isLoadingMore = state.isLoadingMore,
+    HomeMediaGrid(
+        paging = state,
+        isActive = isActive,
+        gridState = gridState,
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
-        modifier = Modifier.fillMaxSize(),
-        state = gridState,
-        errorMessage = state.errorMessage,
-        loadMoreEnabled = isActive,
-        key = { _, item -> item.id },
-        loadingContent = {
-            VideoGridCardSkeleton()
-        },
-        emptyContent = {
-            StateMessageCard(
-                title = "暂无专栏推荐",
-                text = state.errorMessage ?: "下拉试试重新获取",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 48.dp)
-            )
-        }
+        onRetryLoadMore = viewModel::retryLoadMore,
+        key = { _, item -> item.id }
     ) { item ->
         ArticleRecommendCard(
             item = item,
@@ -109,13 +86,7 @@ private fun ArticleRecommendCard(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                val statLine = remember(
-                    item.viewCount,
-                    item.likeCount,
-                    item.replyCount
-                ) {
-                    buildStatLine(item)
-                }
+                val statLine = item.statLine
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.bodyMedium,
@@ -177,14 +148,7 @@ private fun ArticleAuthorRow(
     item: ArticleRecommendItem,
     onOpenSpace: (SpaceRoute) -> Unit
 ) {
-    val route = remember(item.authorMid, item.authorName) {
-        item.authorMid?.let { mid ->
-            SpaceRoute(
-                mid = mid,
-                name = item.authorName
-            )
-        }
-    }
+    val route = item.spaceRoute
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -219,12 +183,4 @@ private fun ArticleAuthorRow(
             )
         }
     }
-}
-
-private fun buildStatLine(item: ArticleRecommendItem): String? {
-    return buildList {
-        if (item.viewCount > 0) add("${item.viewCount} 阅读")
-        if (item.likeCount > 0) add("${item.likeCount} 点赞")
-        if (item.replyCount > 0) add("${item.replyCount} 评论")
-    }.takeIf { it.isNotEmpty() }?.joinToString("  ")
 }

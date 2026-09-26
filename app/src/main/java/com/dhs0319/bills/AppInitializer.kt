@@ -5,6 +5,7 @@ import android.content.Intent
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.auth.CacheManager
+import com.dhs0319.bills.core.feed.FeedRepository
 import com.dhs0319.bills.core.playback.StreamPlaybackSession
 import com.dhs0319.bills.infra.coldstart.ColdStartClient
 import com.dhs0319.bills.infra.grpc.GaiaReporter
@@ -34,6 +35,7 @@ class AppInitializer @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val coldStartClient: ColdStartClient,
     private val ticketGenerator: TicketGenerator,
+    private val feedRepository: FeedRepository,
     private val buvidFetcher: BuvidFetcher,
     private val guestIdGenerator: GuestIdGenerator,
     private val biliDns: BiliDns,
@@ -65,6 +67,7 @@ class AppInitializer @Inject constructor(
                     coldStartClient.getColdStartData()
                 }
             }
+            feedRepository.prefetchInitialFeed(initScope)
             warmupImageConnections()
             launch {
                 runCatching {

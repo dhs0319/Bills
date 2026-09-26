@@ -1,5 +1,6 @@
 package com.dhs0319.bills.core.feed
 
+import android.os.SystemClock
 import com.dhs0319.bills.core.auth.AuthStore
 import com.dhs0319.bills.core.common.BiliConstants
 import com.dhs0319.bills.core.common.media.httpsImageUrl
@@ -23,17 +24,29 @@ import com.dhs0319.bills.core.model.VideoSrc
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoTargetTool
 import com.dhs0319.bills.core.settings.AppSettings
+import com.dhs0319.bills.core.settings.FeedRequestSettings
 import com.dhs0319.bills.infra.network.BiliRestClient
 import com.dhs0319.bills.infra.network.BiliRestParamBuilder
 import com.dhs0319.bills.infra.network.BiliRestProfile
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-data class FeedResult(val items: List<FeedItem>, val toast: FeedToast?, val interestChoose: InterestChoose? = null)
+data class FeedResult(
+    val items: List<FeedItem>,
+    val toast: FeedToast?,
+    val interestChoose: InterestChoose? = null,
+    val nextIdx: Long? = null
+)
 
 @Singleton
 class FeedRepository @Inject constructor(
@@ -45,20 +58,83 @@ class FeedRepository @Inject constructor(
 
     companion object {
         private const val FEED_ENDPOINT = "/x/v2/feed/index"
+        private const val INITIAL_PREFETCH_TTL_MS = 30_000L
     }
 
     private val _toastFlow = MutableSharedFlow<FeedToast>(extraBufferCapacity = 1)
     val toastFlow: SharedFlow<FeedToast> = _toastFlow
 
+    private data class InitialPrefetch(
+        val mid: Long,
+        val guestMode: Boolean,
+        val startedAtMillis: Long,
+        val result: Deferred<FeedResult>
+    )
+
+    private var initialPrefetch: InitialPrefetch? = null
+    private var initialPrefetchStarted = false
+
+    /** Start the default home tab's first request while the activity is being created. */
+    fun prefetchInitialFeed(scope: CoroutineScope) {
+        synchronized(this) {
+            if (initialPrefetchStarted) return
+            initialPrefetchStarted = true
+            initialPrefetch = InitialPrefetch(
+                mid = authStore.mid,
+                guestMode = authStore.guestMode,
+                startedAtMillis = SystemClock.elapsedRealtime(),
+                result = scope.async { fetchFeedDirect(0L, pull = true, flush = 0) }
+            )
+        }
+    }
+
+    fun discardInitialPrefetch() {
+        synchronized(this) {
+            initialPrefetch?.result?.cancel()
+            initialPrefetch = null
+        }
+    }
+
     suspend fun fetchFeed(idx: Long, pull: Boolean, flush: Int): FeedResult {
-        val hdFeed = appSettings.hdFeed.first()
+        if (idx == 0L && pull && flush == 0) {
+            val prefetch = synchronized(this) { initialPrefetch }
+            if (prefetch != null) {
+                if (prefetch.mid == authStore.mid && prefetch.guestMode == authStore.guestMode &&
+                    SystemClock.elapsedRealtime() - prefetch.startedAtMillis < INITIAL_PREFETCH_TTL_MS
+                ) {
+                    try {
+                        return prefetch.result.await().also {
+                            synchronized(this) {
+                                if (initialPrefetch === prefetch) initialPrefetch = null
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // A startup request can fail while the network is still connecting.
+                    }
+                }
+                synchronized(this) {
+                    if (initialPrefetch === prefetch) {
+                        prefetch.result.cancel()
+                        initialPrefetch = null
+                    }
+                }
+            }
+        }
+        return fetchFeedDirect(idx, pull, flush)
+    }
+
+    private suspend fun fetchFeedDirect(idx: Long, pull: Boolean, flush: Int): FeedResult {
+        val settings = appSettings.feedRequestSettings.first()
+        val hdFeed = settings.hdFeed
         val profile = if (hdFeed) BiliRestProfile.HD else BiliRestProfile.APP
         val json = restClient.getSigned(
             url = "${BiliConstants.BASE_URL_APP}$FEED_ENDPOINT",
-            params = buildParams(idx, pull, flush, profile, hdFeed),
+            params = buildParams(idx, pull, flush, profile, settings),
             profile = profile
         )
-        return parseResponse(json, hdFeed)
+        return withContext(Dispatchers.Default) { parseResponse(json, hdFeed) }
     }
 
     suspend fun fetchFeedWithInterest(
@@ -69,24 +145,29 @@ class FeedRepository @Inject constructor(
         interestResult: String,
         interestPosIds: String
     ): FeedResult {
-        val hdFeed = appSettings.hdFeed.first()
+        val settings = appSettings.feedRequestSettings.first()
+        val hdFeed = settings.hdFeed
         val profile = if (hdFeed) BiliRestProfile.HD else BiliRestProfile.APP
         val json = restClient.getSigned(
             url = "${BiliConstants.BASE_URL_APP}$FEED_ENDPOINT",
-            params = buildParams(idx, pull, flush, profile, hdFeed) + mapOf(
+            params = buildParams(idx, pull, flush, profile, settings) + mapOf(
                 "interest_id" to interestId.toString(),
                 "interest_result" to interestResult,
                 "interest_pos_ids" to interestPosIds
             ),
             profile = profile
         )
-        return parseResponse(json, hdFeed)
+        return withContext(Dispatchers.Default) { parseResponse(json, hdFeed) }
     }
 
     private fun parseResponse(json: JSONObject, useHdProfile: Boolean): FeedResult {
-        val data = json.optJSONObject("data")
-        val items = parseItems(data?.optJSONArray("items"), useHdProfile)
-        val toast = data?.optJSONObject("toast")?.let { t ->
+        val data = json.optJSONObject("data") ?: error("推荐数据缺少 data")
+        val rawItems = data.optJSONArray("items")
+        val items = parseItems(rawItems, useHdProfile)
+        // Keep the server cursor even when the last card is filtered out (e.g. an ad).
+        val nextIdx = rawItems?.takeIf { it.length() > 0 }
+            ?.optJSONObject(rawItems.length() - 1)?.optLong("idx")?.takeIf { it != 0L }
+        val toast = data.optJSONObject("toast")?.let { t ->
             if (t.optBoolean("has_toast")) {
                 val msg = FeedToast(true, t.optString("toast_message"))
                 _toastFlow.tryEmit(msg)
@@ -95,23 +176,19 @@ class FeedRepository @Inject constructor(
                 null
             }
         }
-        val interestChoose = data?.optJSONObject("interest_choose")?.let(::parseInterestChoose)
-        return FeedResult(items, toast, interestChoose)
+        val interestChoose = data.optJSONObject("interest_choose")?.let(::parseInterestChoose)
+        return FeedResult(items, toast, interestChoose, nextIdx)
     }
 
-    private suspend fun buildParams(
+    private fun buildParams(
         idx: Long,
         pull: Boolean,
         flush: Int,
         profile: BiliRestProfile,
-        hdFeed: Boolean
+        settings: FeedRequestSettings
     ): Map<String, String> {
-        val personalizedRcmd = appSettings.personalizedRcmd.first()
-        val lessonsMode = appSettings.lessonsMode.first()
-        val teenagersMode = appSettings.teenagersMode.first()
-        val teenagersAge = appSettings.teenagersAge.first()
         val ts = System.currentTimeMillis() / 1000
-        val token = if (hdFeed) authStore.getHdAccessKeyForCurrent() else authStore.accessToken
+        val token = if (settings.hdFeed) authStore.getHdAccessKeyForCurrent() else authStore.accessToken
         val isColdStart = idx == 0L
         return restParamBuilder.app(profile, ts, token) + buildMap {
             put("auto_refresh_state", "1")
@@ -122,7 +199,7 @@ class FeedRepository @Inject constructor(
             put("column_timestamp", "0")
             put("device_name", android.os.Build.MODEL)
             put("device_type", "0")
-            put("disable_rcmd", if (personalizedRcmd) "0" else "1")
+            put("disable_rcmd", if (settings.personalizedRcmd) "0" else "1")
             put("flush", flush.toString())
             put("fnval", "272")
             put("fnver", "0")
@@ -135,7 +212,7 @@ class FeedRepository @Inject constructor(
             put("inline_sound", "1")
             put("inline_sound_cold_state", "2")
             put("interest_id", "0")
-            if (lessonsMode) {
+            if (settings.lessonsMode) {
                 put("lessons_mode", "1")
             }
             put("login_event", when {
@@ -153,8 +230,8 @@ class FeedRepository @Inject constructor(
             put("recsys_mode", "0")
             put("splash_creative_id", "0")
             put("splash_id", "")
-            if (teenagersMode) {
-                put("teenagers_age", teenagersAge.toString())
+            if (settings.teenagersMode) {
+                put("teenagers_age", settings.teenagersAge.toString())
                 put("teenagers_mode", "1")
             }
             put("video_mode", "1")
@@ -163,7 +240,14 @@ class FeedRepository @Inject constructor(
         }
     }
 
-    private val adCardGotos = setOf("banner", "ad_web_s", "ad_inline_egg", "ad_web", "ad_web_gif")
+    private val adCardGotos = setOf(
+        "banner",
+        "ad_web_s",
+        "ad_inline_egg",
+        "ad_inline_eggs",
+        "ad_web",
+        "ad_web_gif"
+    )
 
     private fun parseItems(arr: org.json.JSONArray?, useHdProfile: Boolean): List<FeedItem> {
         if (arr == null) return emptyList()
@@ -180,13 +264,13 @@ class FeedRepository @Inject constructor(
         val item = obj.optJSONObject("item")
         val inline = item?.optJSONObject("inline_pgc")
         val card = inline ?: obj
-        val args = card.optJSONObject("args") ?: obj.optJSONObject("args")
-        val descBtn = card.optJSONObject("desc_button") ?: obj.optJSONObject("desc_button")
-        val rcmd = card.optJSONObject("rcmd_reason_style") ?: obj.optJSONObject("rcmd_reason_style")
+        val args = card.optJSONObject("args") ?: item?.optJSONObject("args") ?: obj.optJSONObject("args")
+        val descBtn = card.optJSONObject("desc_button") ?: item?.optJSONObject("desc_button") ?: obj.optJSONObject("desc_button")
+        val rcmd = card.optJSONObject("rcmd_reason_style") ?: item?.optJSONObject("rcmd_reason_style") ?: obj.optJSONObject("rcmd_reason_style")
         val player = card.optJSONObject("player_args")
             ?: item?.optJSONObject("player_args")
             ?: obj.optJSONObject("player_args")
-        val uri = card.optString("uri").ifBlank { obj.optString("uri") }
+        val uri = card.optString("uri").ifBlank { item?.optString("uri").orEmpty() }.ifBlank { obj.optString("uri") }
         val reportFlowData = card.optString("report_flow_data")
             .takeIf(String::isNotEmpty)
             ?: obj.optString("report_flow_data").takeIf(String::isNotEmpty)
@@ -195,13 +279,15 @@ class FeedRepository @Inject constructor(
             .takeIf(String::isNotEmpty)
             ?: obj.optString("report_data").takeIf(String::isNotEmpty)
             ?: VideoTargetTool.arg(uri, "report_data")
-        val cardGoto = card.optString("card_goto").ifBlank { obj.optString("card_goto") }
-        val goto = card.optString("goto").ifBlank { obj.optString("goto") }
-        val param = card.optString("param").ifBlank { obj.optString("param") }
+        val cardGoto = card.optString("card_goto").ifBlank { item?.optString("card_goto").orEmpty() }.ifBlank { obj.optString("card_goto") }
+        val goto = card.optString("goto").ifBlank { item?.optString("goto").orEmpty() }.ifBlank { obj.optString("goto") }
+        val param = card.optString("param").ifBlank { item?.optString("param").orEmpty() }.ifBlank { obj.optString("param") }
         val title = card.optString("title")
+            .ifBlank { item?.optString("title").orEmpty() }
             .ifBlank { item?.optString("subtitle").orEmpty() }
             .ifBlank { obj.optString("title") }
         val cover = card.optString("cover")
+            .ifBlank { item?.optString("cover").orEmpty() }
             .ifBlank { item?.optString("large_cover").orEmpty() }
             .ifBlank { obj.optString("cover") }
             .httpsImageUrl()

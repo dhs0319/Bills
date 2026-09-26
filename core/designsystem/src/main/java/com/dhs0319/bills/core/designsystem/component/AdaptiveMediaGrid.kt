@@ -18,7 +18,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -38,14 +37,13 @@ fun rememberAdaptiveGridColumnCount(
     expanded: Int = 4
 ): Int {
     val configuration = LocalConfiguration.current
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isPhoneLandscape =
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
             configuration.smallestScreenWidthDp < 600
     return when {
         isPhoneLandscape -> medium
-        windowSizeClass.isWidthAtLeastBreakpoint(840) -> expanded
-        windowSizeClass.isWidthAtLeastBreakpoint(600) -> medium
+        configuration.screenWidthDp >= 840 -> expanded
+        configuration.screenWidthDp >= 600 -> medium
         else -> compact
     }
 }
@@ -62,6 +60,10 @@ fun <T> AdaptiveMediaGrid(
     state: LazyStaggeredGridState? = null,
     errorMessage: String? = null,
     loadMoreEnabled: Boolean = true,
+    prefetchScreens: Int = 0,
+    loadMoreError: String? = null,
+    onRetryLoadMore: () -> Unit = onLoadMore,
+    endReached: Boolean = false,
     columns: Int = rememberAdaptiveGridColumnCount(),
     loadingPlaceholderCount: Int = 10,
     horizontalSpacing: Dp = 6.dp,
@@ -76,6 +78,8 @@ fun <T> AdaptiveMediaGrid(
     contentType: (index: Int, item: T) -> Any? = { _, _ -> null },
     loadingContent: @Composable LazyStaggeredGridItemScope.() -> Unit,
     headerContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
+    separatorIndex: Int? = null,
+    separatorContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     emptyContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     errorContent: @Composable LazyStaggeredGridItemScope.(String) -> Unit = { msg ->
         DefaultGridError(msg)
@@ -87,14 +91,36 @@ fun <T> AdaptiveMediaGrid(
 ) {
     val gridState = state ?: rememberLazyStaggeredGridState()
     val currentItems by rememberUpdatedState(items)
-    val shouldLoadMore by remember(gridState, loadMoreEnabled) {
+    val validSeparatorIndex = separatorIndex?.takeIf {
+        separatorContent != null && it > 0 && it < items.size
+    }
+    val separatorCount = if (validSeparatorIndex != null) 1 else 0
+    val itemIndex = { gridIndex: Int ->
+        if (validSeparatorIndex != null && gridIndex > validSeparatorIndex) gridIndex - 1 else gridIndex
+    }
+    val expectedItemCount by rememberUpdatedState(
+        items.size + separatorCount + (if (headerContent != null) 1 else 0) +
+            (if (!errorMessage.isNullOrBlank()) 1 else 0) +
+            (if (isLoadingMore || loadMoreError != null || endReached) 1 else 0)
+    )
+    val shouldLoadMore by remember(gridState, loadMoreEnabled, prefetchScreens, columns) {
         derivedStateOf {
-            loadMoreEnabled && !gridState.canScrollForward && currentItems.isNotEmpty()
+            val layout = gridState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.maxOfOrNull { it.index }
+            loadMoreEnabled && currentItems.isNotEmpty() &&
+                if (prefetchScreens == 0) {
+                    !gridState.canScrollForward
+                } else {
+                    // Wait for the current data to be measured; stale layout can request twice.
+                    lastVisible != null && layout.totalItemsCount == expectedItemCount &&
+                        layout.totalItemsCount - lastVisible - 1 <=
+                        maxOf(layout.visibleItemsInfo.size * prefetchScreens, columns * 2)
+                }
         }
     }
 
-    LaunchedEffect(shouldLoadMore, loadMoreEnabled, isRefreshing, isLoadingMore) {
-        if (loadMoreEnabled && shouldLoadMore && !isRefreshing && !isLoadingMore) {
+    LaunchedEffect(shouldLoadMore, loadMoreEnabled, isRefreshing, isLoadingMore, loadMoreError) {
+        if (loadMoreEnabled && shouldLoadMore && !isRefreshing && !isLoadingMore && loadMoreError == null) {
             onLoadMore()
         }
     }
@@ -153,6 +179,7 @@ fun <T> AdaptiveMediaGrid(
                         val err = errorMessage.orEmpty()
                         item(
                             key = "error",
+                            span = StaggeredGridItemSpan.FullLine,
                             contentType = "error"
                         ) {
                             errorContent(err)
@@ -170,19 +197,42 @@ fun <T> AdaptiveMediaGrid(
                     }
 
                     items(
-                        count = items.size,
-                        key = { index -> key(index, items[index]) },
-                        contentType = { index -> contentType(index, items[index]) }
+                        count = items.size + separatorCount,
+                        key = { index ->
+                            if (index == validSeparatorIndex) "refresh_separator"
+                            else itemIndex(index).let { key(it, items[it]) }
+                        },
+                        contentType = { index ->
+                            if (index == validSeparatorIndex) "refresh_separator"
+                            else itemIndex(index).let { contentType(it, items[it]) }
+                        }
                     ) { index ->
-                        itemContent(items[index])
+                        if (index == validSeparatorIndex) separatorContent?.invoke(this)
+                        else itemContent(items[itemIndex(index)])
                     }
 
                     if (isLoadingMore) {
                         item(
                             key = "loading_more",
+                            span = StaggeredGridItemSpan.FullLine,
                             contentType = "loading_more"
                         ) {
                             loadMoreContent()
+                        }
+                    } else if (loadMoreError != null) {
+                        item(key = "load_more_error", span = StaggeredGridItemSpan.FullLine) {
+                            StateMessageCard(
+                                text = loadMoreError,
+                                isError = true,
+                                actionText = "重试",
+                                onAction = onRetryLoadMore
+                            )
+                        }
+                    } else if (endReached) {
+                        item(key = "end_reached", span = StaggeredGridItemSpan.FullLine) {
+                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                Text("没有更多内容了", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }

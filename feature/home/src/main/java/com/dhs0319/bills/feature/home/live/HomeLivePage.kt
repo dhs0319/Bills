@@ -8,33 +8,42 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
+import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.UpListRow
-import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeleton
 import com.dhs0319.bills.core.model.LiveRecommendItem
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
+import com.dhs0319.bills.feature.home.component.UploaderBadge
+
+private val liveCoverMetadataBrush = Brush.verticalGradient(
+    0f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.72f)
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,34 +52,24 @@ fun HomeLivePage(
     refreshRequest: Int,
     onOpenLive: (LiveRoute) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     viewModel: HomeLiveViewModel = hiltViewModel()
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
-    val gridState = rememberLazyStaggeredGridState()
 
-    LaunchedEffect(isActive) {
-        if (isActive) viewModel.ensureLoaded()
-    }
-    LaunchedEffect(refreshRequest) {
-        if (refreshRequest > 0) {
+    LaunchedEffect(isActive, refreshRequest) {
+        if (isActive && viewModel.activate(refreshRequest)) {
             gridState.scrollToItem(0)
-            viewModel.refresh()
         }
     }
-    AdaptiveMediaGrid(
-        items = state.items,
-        isRefreshing = state.isRefreshing,
-        isLoadingMore = state.isLoadingMore,
+    HomeMediaGrid(
+        paging = state.paging,
+        isActive = isActive,
+        gridState = gridState,
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
-        modifier = Modifier.fillMaxSize(),
-        state = gridState,
-        errorMessage = state.errorMessage,
-        loadMoreEnabled = isActive,
-        key = { _, item -> item.actionKey() },
-        loadingContent = {
-            VideoGridCardSkeleton()
-        },
+        onRetryLoadMore = viewModel::retryLoadMore,
+        key = { _, item -> item.roomId },
         headerContent = state.upList?.let { upList ->
             {
                 UpListRow(
@@ -84,15 +83,6 @@ fun HomeLivePage(
                     }
                 )
             }
-        },
-        emptyContent = {
-            StateMessageCard(
-                title = "暂无直播推荐",
-                text = state.errorMessage ?: "下拉试试重新获取",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 48.dp)
-            )
         }
     ) { item ->
         LiveRecommendCard(
@@ -101,10 +91,6 @@ fun HomeLivePage(
             onOpenSpace = onOpenSpace
         )
     }
-}
-
-private fun LiveRecommendItem.actionKey(): String {
-    return "${roomId}_${sessionId.orEmpty()}"
 }
 
 @Composable
@@ -126,31 +112,11 @@ private fun LiveRecommendCard(
                     .fillMaxWidth()
                     .aspectRatio(16f / 10f)
             ) {
-                item.onlineText?.let { text ->
-                    val onlineBgColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-                    val onlineBgShape = MaterialTheme.shapes.extraSmall
-                    Text(
-                        text = text,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(4.dp)
-                            .background(color = onlineBgColor, shape = onlineBgShape)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                LiveCoverMetadata(item, Modifier.align(Alignment.BottomCenter))
             }
 
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                val spaceRoute = remember(item.ownerMid, item.ownerName) {
-                    item.ownerMid?.let { mid ->
-                        SpaceRoute(
-                            mid = mid,
-                            name = item.ownerName
-                        )
-                    }
-                }
+                val spaceRoute = item.spaceRoute
                 Text(
                     text = item.title,
                     maxLines = 2,
@@ -158,42 +124,84 @@ private fun LiveRecommendCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                item.ownerName?.let { ownerName ->
+                item.ownerName?.takeIf(String::isNotBlank)?.let { ownerName ->
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = ownerName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (spaceRoute == null) {
-                            Modifier
-                        } else {
-                            Modifier.clickable { onOpenSpace(spaceRoute) }
-                        }
-                    )
-                }
-
-                item.areaName?.let { areaName ->
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val areaBgColor = MaterialTheme.colorScheme.secondaryContainer
-                    val areaBgShape = MaterialTheme.shapes.extraSmall
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (spaceRoute == null) Modifier
+                                else Modifier.clickable { onOpenSpace(spaceRoute) }
+                            ),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        UploaderBadge()
                         Text(
-                            text = areaName,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier
-                                .background(color = areaBgColor, shape = areaBgShape)
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            text = ownerName,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveCoverMetadata(item: LiveRecommendItem, modifier: Modifier = Modifier) {
+    val viewers = item.onlineText?.takeIf(String::isNotBlank)
+    val area = item.areaName?.takeIf(String::isNotBlank)
+    if (viewers == null && area == null) return
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(liveCoverMetadataBrush)
+    ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                viewers?.let { text ->
+                    Icon(
+                        imageVector = Icons.Outlined.Visibility,
+                        contentDescription = "观看",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = text,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            area?.let { text ->
+                Text(
+                    text = text,
+                    modifier = Modifier.weight(1f),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

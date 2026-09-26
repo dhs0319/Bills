@@ -1,5 +1,8 @@
 package com.dhs0319.bills.core.model.listen
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class ListenItem(
     val itemType: Int,
     val oid: Long,
@@ -12,7 +15,15 @@ data class ListenItem(
     val statView: Int,
     val statReply: Int,
     val message: String
-)
+) {
+    val identityKey: String = "${oid}_${itemType}_${subId}"
+    val durationText: String = if (duration > 0L) {
+        val seconds = duration % 60L
+        "${duration / 60L}:${seconds.toString().padStart(2, '0')}"
+    } else {
+        ""
+    }
+}
 
 data class ListenRcmdResult(
     val items: List<ListenItem>,

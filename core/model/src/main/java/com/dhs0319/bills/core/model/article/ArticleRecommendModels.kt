@@ -1,6 +1,7 @@
 package com.dhs0319.bills.core.model.article
 
 import androidx.compose.runtime.Immutable
+import com.dhs0319.bills.core.model.SpaceRoute
 
 @Immutable
 data class ArticleRecommendItem(
@@ -16,7 +17,20 @@ data class ArticleRecommendItem(
     val viewCount: Long,
     val likeCount: Long,
     val replyCount: Long
-)
+) {
+    val spaceRoute: SpaceRoute? = authorMid?.let { SpaceRoute(mid = it, name = authorName) }
+    val statLine: String? = buildString {
+        if (viewCount > 0L) append(viewCount).append(" 阅读")
+        if (likeCount > 0L) {
+            if (isNotEmpty()) append("  ")
+            append(likeCount).append(" 点赞")
+        }
+        if (replyCount > 0L) {
+            if (isNotEmpty()) append("  ")
+            append(replyCount).append(" 评论")
+        }
+    }.takeIf(String::isNotEmpty)
+}
 
 @Immutable
 data class ArticleRecommendPage(

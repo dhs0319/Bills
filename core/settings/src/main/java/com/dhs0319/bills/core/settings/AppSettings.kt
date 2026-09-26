@@ -30,6 +30,14 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class FeedRequestSettings(
+    val hdFeed: Boolean,
+    val personalizedRcmd: Boolean,
+    val lessonsMode: Boolean,
+    val teenagersMode: Boolean,
+    val teenagersAge: Int
+)
+
 @Singleton
 class AppSettings @Inject constructor(
     @param:ApplicationContext private val context: Context
@@ -138,6 +146,17 @@ class AppSettings @Inject constructor(
 
     val teenagersAge: Flow<Int> = context.appSettingsDataStore.data.map {
         (it[teenagersAgeKey] ?: DEFAULT_TEENAGERS_AGE).coerceIn(MIN_TEENAGERS_AGE, MAX_TEENAGERS_AGE)
+    }
+
+    val feedRequestSettings: Flow<FeedRequestSettings> = context.appSettingsDataStore.data.map { prefs ->
+        FeedRequestSettings(
+            hdFeed = prefs[hdFeedKey] ?: false,
+            personalizedRcmd = prefs[personalizedRcmdKey] ?: true,
+            lessonsMode = prefs[lessonsModeKey] ?: false,
+            teenagersMode = prefs[teenagersModeKey] ?: false,
+            teenagersAge = (prefs[teenagersAgeKey] ?: DEFAULT_TEENAGERS_AGE)
+                .coerceIn(MIN_TEENAGERS_AGE, MAX_TEENAGERS_AGE)
+        )
     }
 
     val autoCheckUpdate: Flow<Boolean> = context.appSettingsDataStore.data.map { it[autoCheckUpdateKey] ?: true }

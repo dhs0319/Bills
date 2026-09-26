@@ -10,15 +10,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
@@ -161,14 +165,26 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ApplySystemBarAppearance() {
         val view = LocalView.current
+        val orientation = LocalConfiguration.current.orientation
+        val density = LocalDensity.current
+        val layoutDirection = LocalLayoutDirection.current
+        val tappableInsets = WindowInsets.tappableElement
+        val navigationBarInset = tappableInsets.getBottom(density) +
+            tappableInsets.getLeft(density, layoutDirection) +
+            tappableInsets.getRight(density, layoutDirection)
         val useDarkSystemBarContent = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
         if (!view.isInEditMode) {
-            SideEffect {
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.isAppearanceLightStatusBars = useDarkSystemBarContent
-                insetsController.isAppearanceLightNavigationBars = useDarkSystemBarContent
+            LaunchedEffect(useDarkSystemBarContent, orientation, navigationBarInset) {
+                applySystemBarAppearance(useDarkSystemBarContent)
+                view.post { applySystemBarAppearance(useDarkSystemBarContent) }
             }
         }
+    }
+
+    private fun applySystemBarAppearance(useDarkSystemBarContent: Boolean) {
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = useDarkSystemBarContent
+        insetsController.isAppearanceLightNavigationBars = useDarkSystemBarContent
     }
 }
