@@ -1,10 +1,10 @@
 {
-  "version": "1.1.1",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.1/Bills-1.1.1-arm64-v8a-release.apk",
+  "version": "1.1.2",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.2/Bills-1.1.2-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.1/Bills-1.1.1-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.1/Bills-1.1.1-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.2/Bills-1.1.2-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.2/Bills-1.1.2-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.1",
-  "releaseNotes": "## 更新内容\n\n- 重构我的页面UI\n- 支持横屏时展示侧边菜单\n- 提升视频详情页信息流的加载速度\n- 优化搜索框样式\n- 优化底部导航栏图标\n- 更新头像缺省图"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.2",
+  "releaseNotes": "## 更新内容\n\n- 优化首页tab样式支持吸顶和回滚效果\n- 优化首页卡片样式和页面的加载性能\n- 修复设备开启三键导航时按钮重叠\n- 修复横竖屏切换后布局错乱问题"
 }
