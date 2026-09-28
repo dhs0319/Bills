@@ -64,8 +64,6 @@ import com.dhs0319.bills.feature.video.detail.VideoDetailPage
 import com.dhs0319.bills.feature.video.player.VideoPlayerPane
 import java.util.Locale
 
-internal val speedOps = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
-
 @Suppress("UnsafeOptInUsageError")
 @UnstableApi
 @Composable

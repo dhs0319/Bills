@@ -306,6 +306,34 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { appSettings.setAutoRotateFullscreen(enabled) }
     }
 
+    fun updateLongPressSpeedEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setLongPressSpeedEnabled(enabled) }
+    }
+
+    fun updateBrightnessGestureEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setBrightnessGestureEnabled(enabled) }
+    }
+
+    fun updateVolumeGestureEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setVolumeGestureEnabled(enabled) }
+    }
+
+    fun updateGestureSpeed(speed: Float) {
+        viewModelScope.launch { appSettings.setGestureSpeed(speed) }
+    }
+
+    fun updateDoubleTapPlayPause(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setDoubleTapPlayPause(enabled) }
+    }
+
+    fun updateDoubleTapSeek(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setDoubleTapSeek(enabled) }
+    }
+
+    fun updateDoubleTapSeekSeconds(seconds: Int) {
+        viewModelScope.launch { appSettings.setDoubleTapSeekSeconds(seconds) }
+    }
+
     fun updateUseSystemDns(enabled: Boolean) {
         viewModelScope.launch {
             appSettings.updateUseSystemDns(enabled)

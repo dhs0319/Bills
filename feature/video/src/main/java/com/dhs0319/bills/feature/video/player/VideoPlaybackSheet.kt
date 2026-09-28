@@ -39,6 +39,7 @@ import com.dhs0319.bills.core.designsystem.component.DanmakuSettingsSection
 import com.dhs0319.bills.core.model.PlaybackError
 import com.dhs0319.bills.core.model.PlayerBufferProfile
 import com.dhs0319.bills.core.model.PlayerSettingsState
+import com.dhs0319.bills.core.model.playbackSpeedOptions
 import com.dhs0319.bills.core.model.ResolvedVideoIds
 import com.dhs0319.bills.core.model.VideoPlaybackState
 import com.dhs0319.bills.core.model.VideoCdnMode
@@ -48,7 +49,6 @@ import com.dhs0319.bills.feature.video.formatSpeed
 import com.dhs0319.bills.feature.video.getAudioName
 import com.dhs0319.bills.feature.video.getCodecName
 import com.dhs0319.bills.feature.video.getQualityName
-import com.dhs0319.bills.feature.video.speedOps
 import kotlin.math.roundToInt
 
 private enum class PlaybackSheetSection(
@@ -190,7 +190,7 @@ private fun PlaybackSettingsSection(
         title = "长按倍速",
         subtitle = "长按屏幕时临时切到这个倍速，松手恢复",
         currentValue = settingsState.playback.gestureSpeed,
-        options = speedOps,
+        options = playbackSpeedOptions,
         onSelect = viewModel::updateGestureSpeed
     )
 

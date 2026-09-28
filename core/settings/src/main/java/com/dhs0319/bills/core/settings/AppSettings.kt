@@ -19,6 +19,7 @@ import com.dhs0319.bills.core.designsystem.theme.TransitionStyle
 import com.dhs0319.bills.core.model.DanmakuConfig
 import com.dhs0319.bills.core.model.PlayerBufferProfile
 import com.dhs0319.bills.core.model.PlayerBufferSettings
+import com.dhs0319.bills.core.model.PlayerInteractionPrefs
 import com.dhs0319.bills.core.model.PlayerOverlayPrefs
 import com.dhs0319.bills.core.model.PlayerPlaybackPrefs
 import com.dhs0319.bills.core.model.PlayerSettingsState
@@ -46,6 +47,7 @@ class AppSettings @Inject constructor(
     private val defaultPlayerSettings = PlayerSettingsState()
     private val defaultBufferSettings = defaultPlayerSettings.buffer
     private val defaultPlaybackPrefs = defaultPlayerSettings.playback
+    private val defaultInteractionPrefs = defaultPlayerSettings.interaction
     private val defaultOverlayPrefs = defaultPlayerSettings.overlay
     private val defaultDanmakuConfig = defaultPlayerSettings.danmaku
 
@@ -237,6 +239,12 @@ class AppSettings @Inject constructor(
     private val inAppMiniPlayerKey = booleanPreferencesKey("in_app_mini_player")
     private val autoRotateFullscreenKey = booleanPreferencesKey("auto_rotate_fullscreen")
     private val gestureSpeedKey = floatPreferencesKey("gesture_speed")
+    private val longPressSpeedEnabledKey = booleanPreferencesKey("long_press_speed_enabled")
+    private val brightnessGestureEnabledKey = booleanPreferencesKey("brightness_gesture_enabled")
+    private val volumeGestureEnabledKey = booleanPreferencesKey("volume_gesture_enabled")
+    private val doubleTapPlayPauseKey = booleanPreferencesKey("double_tap_play_pause")
+    private val doubleTapSeekKey = booleanPreferencesKey("double_tap_seek")
+    private val doubleTapSeekSecondsKey = intPreferencesKey("double_tap_seek_seconds")
     private val videoCdnModeKey = stringPreferencesKey("video_cdn_mode")
     private val reportPlaybackKey = booleanPreferencesKey("report_playback")
     private val playerOverlayShowTimeKey = booleanPreferencesKey("player_overlay_show_time")
@@ -284,6 +292,22 @@ class AppSettings @Inject constructor(
                 videoCdnMode = prefs[videoCdnModeKey]
                     ?.let(VideoCdnMode::valueOf)
                     ?: defaultPlaybackPrefs.videoCdnMode
+            ),
+            interaction = PlayerInteractionPrefs(
+                longPressSpeedEnabled = prefs[longPressSpeedEnabledKey]
+                    ?: defaultInteractionPrefs.longPressSpeedEnabled,
+                brightnessGestureEnabled = prefs[brightnessGestureEnabledKey]
+                    ?: defaultInteractionPrefs.brightnessGestureEnabled,
+                volumeGestureEnabled = prefs[volumeGestureEnabledKey]
+                    ?: defaultInteractionPrefs.volumeGestureEnabled,
+                doubleTapPlayPause = prefs[doubleTapPlayPauseKey]
+                    ?: defaultInteractionPrefs.doubleTapPlayPause,
+                doubleTapSeek = prefs[doubleTapSeekKey] ?: defaultInteractionPrefs.doubleTapSeek,
+                doubleTapSeekSeconds = (prefs[doubleTapSeekSecondsKey]
+                    ?: defaultInteractionPrefs.doubleTapSeekSeconds).coerceIn(
+                    PlayerInteractionPrefs.MIN_SEEK_SECONDS,
+                    PlayerInteractionPrefs.MAX_SEEK_SECONDS
+                )
             ),
             overlay = PlayerOverlayPrefs(
                 showTime = prefs[playerOverlayShowTimeKey] ?: defaultOverlayPrefs.showTime,
@@ -384,6 +408,35 @@ class AppSettings @Inject constructor(
 
     suspend fun setGestureSpeed(speed: Float) {
         context.appSettingsDataStore.edit { it[gestureSpeedKey] = speed.coerceIn(0.25f, 3f) }
+    }
+
+    suspend fun setLongPressSpeedEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[longPressSpeedEnabledKey] = enabled }
+    }
+
+    suspend fun setBrightnessGestureEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[brightnessGestureEnabledKey] = enabled }
+    }
+
+    suspend fun setVolumeGestureEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[volumeGestureEnabledKey] = enabled }
+    }
+
+    suspend fun setDoubleTapPlayPause(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[doubleTapPlayPauseKey] = enabled }
+    }
+
+    suspend fun setDoubleTapSeek(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[doubleTapSeekKey] = enabled }
+    }
+
+    suspend fun setDoubleTapSeekSeconds(seconds: Int) {
+        context.appSettingsDataStore.edit {
+            it[doubleTapSeekSecondsKey] = seconds.coerceIn(
+                PlayerInteractionPrefs.MIN_SEEK_SECONDS,
+                PlayerInteractionPrefs.MAX_SEEK_SECONDS
+            )
+        }
     }
 
     suspend fun setVideoCdnMode(mode: VideoCdnMode) {

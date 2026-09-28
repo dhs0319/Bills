@@ -89,7 +89,7 @@ import com.dhs0319.bills.feature.video.formatPlaybackTime
 import com.dhs0319.bills.feature.video.formatSpeed
 import com.dhs0319.bills.feature.video.getAudioName
 import com.dhs0319.bills.feature.video.getQualityName
-import com.dhs0319.bills.feature.video.speedOps
+import com.dhs0319.bills.core.model.playbackSpeedOptions
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -180,7 +180,7 @@ internal fun VideoPlayerPane(
 
         PlayerDialog.Speed -> PlayerOptionPanelState(
             title = "播放速度",
-            options = speedOps.map { speed ->
+            options = playbackSpeedOptions.map { speed ->
                 PlaybackOption(
                     id = speed.toString(),
                     label = formatSpeed(speed),
@@ -744,6 +744,7 @@ private fun VideoPlayerOverlay(
                 .fillMaxSize()
                 .videoGestures(
                     state = gestureState,
+                    interaction = settingsState.interaction,
                     onToggleControls = { onShowCtrlChange(!showCtrl) },
                     onTogglePlay = viewModel::togglePlayPause,
                     onSeekTo = viewModel::seekTo,

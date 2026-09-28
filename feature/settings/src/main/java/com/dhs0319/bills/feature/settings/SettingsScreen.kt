@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -45,6 +46,7 @@ import com.dhs0319.bills.feature.settings.components.SettingCategory
 import com.dhs0319.bills.feature.settings.navigation.APPEARANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.AUDIO_VIDEO_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.FEED_SETTINGS_ROUTE
+import com.dhs0319.bills.feature.settings.navigation.INTERACTION_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.OTHER_SETTINGS_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PERFORMANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PRIVACY_ROUTE
@@ -58,6 +60,7 @@ fun SettingsScreen(
     onNavigateToOther: () -> Unit,
     onNavigateToFeed: () -> Unit,
     onNavigateToAudioVideo: () -> Unit,
+    onNavigateToInteraction: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToAbout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -72,6 +75,7 @@ fun SettingsScreen(
         OTHER_SETTINGS_ROUTE to onNavigateToOther,
         FEED_SETTINGS_ROUTE to onNavigateToFeed,
         AUDIO_VIDEO_ROUTE to onNavigateToAudioVideo,
+        INTERACTION_ROUTE to onNavigateToInteraction,
         PRIVACY_ROUTE to onNavigateToPrivacy,
     )
     val filtered = remember(query) {
@@ -102,6 +106,12 @@ fun SettingsScreen(
                 title = "播放器设置",
                 subtitle = "画质 音质 和编码格式",
                 onClick = onNavigateToAudioVideo
+            ),
+            SettingsHomeItem(
+                icon = Icons.Default.TouchApp,
+                title = "交互设置",
+                subtitle = "双击、长按与快进后退",
+                onClick = onNavigateToInteraction
             ),
             SettingsHomeItem(
                 icon = Icons.Default.AutoAwesome,
