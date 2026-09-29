@@ -1,5 +1,6 @@
 package com.dhs0319.bills.feature.home.paging
 
+import com.dhs0319.bills.core.popular.PopularCursor
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -12,6 +13,63 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomePagerTest {
+    @Test
+    fun cursorPagesStopAtServerEndAndRefreshResetsAllCursorFields() = runTest {
+        val initialCursor = PopularCursor()
+        val nextCursor = PopularCursor(20L, "21", "version-1")
+        val calls = mutableListOf<PopularCursor>()
+        var refreshed = false
+        val pager = HomePager<Int, PopularCursor>(this, { initialCursor }, { it }, { cursor ->
+            calls += cursor
+            when (cursor) {
+                initialCursor -> HomePage(
+                    if (refreshed) (100 until 120).toList() else (0 until 20).toList(),
+                    nextCursor
+                )
+                nextCursor -> HomePage(listOf(19, 20, 21, 21), null)
+                else -> error("Unexpected cursor: $cursor")
+            }
+        })
+
+        pager.activate(0)
+        advanceUntilIdle()
+        pager.loadMore()
+        advanceUntilIdle()
+        repeat(3) { pager.loadMore() }
+        advanceUntilIdle()
+        assertEquals(listOf(initialCursor, nextCursor), calls)
+        assertEquals((0 until 22).toList(), pager.state.value.items)
+        assertFalse(pager.state.value.hasMore)
+
+        refreshed = true
+        pager.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf(initialCursor, nextCursor, initialCursor), calls)
+        assertEquals((100 until 120).toList(), pager.state.value.items)
+        assertTrue(pager.state.value.hasMore)
+        assertNull(pager.state.value.refreshBoundaryIndex)
+    }
+
+    @Test
+    fun filteredEmptyPageAdvancesToTheNextPageWhenServerHasMore() = runTest {
+        val calls = mutableListOf<Int>()
+        val pager = HomePager<Int, Int>(this, { 1 }, { it }, { page ->
+            calls += page
+            when (page) {
+                1 -> HomePage(emptyList(), 2)
+                2 -> HomePage(listOf(42), null)
+                else -> error("Unexpected page: $page")
+            }
+        })
+
+        pager.activate(0)
+        advanceUntilIdle()
+        assertEquals(listOf(1, 2), calls)
+        assertEquals(listOf(42), pager.state.value.items)
+        assertFalse(pager.state.value.hasMore)
+        assertNull(pager.state.value.loadMoreError)
+    }
+
     @Test
     fun smallResponsesFillOneBatchAndPublishTheFirstPageImmediately() = runTest {
         val secondPage = CompletableDeferred<Unit>()

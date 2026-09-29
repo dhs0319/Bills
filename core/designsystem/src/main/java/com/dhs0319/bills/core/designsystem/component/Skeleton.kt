@@ -79,7 +79,12 @@ fun VideoGridCardSkeleton(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun VideoListCardSkeleton(modifier: Modifier = Modifier) {
+fun VideoListCardSkeleton(
+    modifier: Modifier = Modifier,
+    coverWidth: Dp? = null,
+    coverAspectRatio: Float = 16f / 10f,
+    contentPadding: Dp = 10.dp
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -87,17 +92,17 @@ fun VideoListCardSkeleton(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = MaterialTheme.shapes.large
             )
-            .padding(10.dp),
+            .padding(contentPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         SkeletonBlock(
             modifier = Modifier
-                .weight(0.38f)
-                .aspectRatio(16f / 10f),
+                .then(if (coverWidth != null) Modifier.width(coverWidth) else Modifier.weight(0.38f))
+                .aspectRatio(coverAspectRatio),
             shape = MaterialTheme.shapes.medium
         )
         Column(
-            modifier = Modifier.weight(0.62f),
+            modifier = Modifier.weight(if (coverWidth == null) 0.62f else 1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SkeletonBlock(

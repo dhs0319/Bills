@@ -25,6 +25,21 @@ class WatchLaterRepository @Inject constructor(
     private val authStore: AuthStore
 ) {
 
+    suspend fun addVideo(aid: Long) {
+        check(aid > 0L) { "视频信息无效" }
+        val accessToken = authStore.accessToken
+        check(accessToken.isNotBlank()) { "请先登录" }
+        restClient.postSigned(
+            url = "${BiliConstants.BASE_URL_API}$WATCH_LATER_ADD_ENDPOINT",
+            params = restParamBuilder.app(
+                profile = BiliRestProfile.APP,
+                ts = System.currentTimeMillis() / 1000,
+                accessKey = accessToken
+            ) + mapOf("aid" to aid.toString()),
+            profile = BiliRestProfile.APP
+        )
+    }
+
     suspend fun fetchPage(
         tab: WatchLaterTab,
         asc: Boolean,
@@ -154,6 +169,7 @@ class WatchLaterRepository @Inject constructor(
     }
 
     private companion object {
+        const val WATCH_LATER_ADD_ENDPOINT = "/x/v2/history/toview/add"
         const val WATCH_LATER_LIST_ENDPOINT = "/x/v2/history/toview/v2/list"
         const val CARD_TYPE_VIDEO = 0
         val WATCH_LATER_VIDEO_SRC = VideoTargetTool.watchLater()

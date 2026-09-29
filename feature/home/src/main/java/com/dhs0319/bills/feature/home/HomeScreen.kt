@@ -61,17 +61,18 @@ import com.dhs0319.bills.feature.home.article.HomeArticlePage
 import com.dhs0319.bills.feature.home.interest.InterestDialog
 import com.dhs0319.bills.feature.home.listen.ListenHomePage
 import com.dhs0319.bills.feature.home.live.HomeLivePage
+import com.dhs0319.bills.feature.home.popular.HomePopularPage
 import com.dhs0319.bills.feature.home.video.HomeVideoPage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private val homeTabs = listOf("FM", "推荐", "直播", "专栏")
+private val homeTabs = listOf("FM", "热门", "推荐", "直播", "专栏")
 private val homeProfileAvatarSize = 38.dp
 private val homeSearchRowHeight = 48.dp
 private val homeTopContentPadding = 4.dp
-private const val homeDefaultPage = 1
+private const val homeDefaultPage = 2
 private const val homeScrollToTopInstantThresholdViewports = 8f
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -93,12 +94,14 @@ fun HomeScreen(
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
     val pagerState = rememberPagerState(initialPage = homeDefaultPage, pageCount = { homeTabs.size })
     val listenGridState = rememberLazyStaggeredGridState()
+    val popularGridState = rememberLazyStaggeredGridState()
     val videoGridState = rememberLazyStaggeredGridState()
     val liveGridState = rememberLazyStaggeredGridState()
     val articleGridState = rememberLazyStaggeredGridState()
     val scope = rememberCoroutineScope()
     var scrollToTopJob by remember { mutableStateOf<Job?>(null) }
     var listenRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
+    var popularRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
     var videoRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
     var liveRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
     var articleRefreshRequest by rememberSaveable { mutableIntStateOf(0) }
@@ -113,8 +116,9 @@ fun HomeScreen(
             handledRefreshRequest = refreshRequest
             when (pagerState.currentPage) {
                 0 -> listenRefreshRequest++
-                1 -> videoRefreshRequest++
-                2 -> liveRefreshRequest++
+                1 -> popularRefreshRequest++
+                2 -> videoRefreshRequest++
+                3 -> liveRefreshRequest++
                 else -> articleRefreshRequest++
             }
         }
@@ -146,8 +150,9 @@ fun HomeScreen(
                 onReselectTab = { page ->
                     val gridState = when (page) {
                         0 -> listenGridState
-                        1 -> videoGridState
-                        2 -> liveGridState
+                        1 -> popularGridState
+                        2 -> videoGridState
+                        3 -> liveGridState
                         else -> articleGridState
                     }
                     scrollToTopJob?.cancel()
@@ -181,7 +186,15 @@ fun HomeScreen(
                     }
                 )
 
-                1 -> HomeVideoPage(
+                1 -> HomePopularPage(
+                    isActive = pagerState.currentPage == page,
+                    refreshRequest = popularRefreshRequest,
+                    gridState = popularGridState,
+                    onOpenVideo = onOpenVideo,
+                    onOpenSpace = onOpenSpace
+                )
+
+                2 -> HomeVideoPage(
                     paging = state.paging,
                     isActive = pagerState.currentPage == page,
                     onActivate = viewModel::activate,
@@ -201,7 +214,7 @@ fun HomeScreen(
                     onToastShown = viewModel::consumeToast
                 )
 
-                2 -> HomeLivePage(
+                3 -> HomeLivePage(
                     isActive = pagerState.currentPage == page,
                     refreshRequest = liveRefreshRequest,
                     gridState = liveGridState,
@@ -340,7 +353,7 @@ private fun HomeTopBar(
             PagerSlidingTabRow(
                 tabs = homeTabs,
                 pagerState = pagerState,
-                modifier = Modifier.widthIn(max = 288.dp),
+                modifier = Modifier.widthIn(max = 360.dp),
                 onReselect = onReselectTab
             )
         }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
@@ -30,6 +31,9 @@ internal fun <T> HomeMediaGrid(
     onRetryLoadMore: () -> Unit,
     key: (Int, T) -> Any,
     contentType: (Int, T) -> Any? = { _, _ -> null },
+    columns: Int = rememberAdaptiveGridColumnCount(),
+    estimatedRowHeight: Dp? = null,
+    loadingContent: @Composable LazyStaggeredGridItemScope.() -> Unit = { VideoGridCardSkeleton() },
     headerContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     separatorIndex: Int? = null,
     separatorContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
@@ -41,12 +45,11 @@ internal fun <T> HomeMediaGrid(
         scope.launch { gridState.scrollToItem(0) }
         Unit
     }
-    val columns = rememberAdaptiveGridColumnCount()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Match VideoGridCardSkeleton: 16:10 cover, 72 dp text area and 6 dp gap.
         // An extra row covers partial rows and differences in real card heights.
         val cardWidth = ((maxWidth.value - 12f - (columns - 1) * 6f) / columns).coerceAtLeast(1f)
-        val rowHeight = cardWidth * 10f / 16f + 72f + 6f
+        val rowHeight = estimatedRowHeight?.value ?: (cardWidth * 10f / 16f + 72f + 6f)
         val placeholderCount = (ceil(maxHeight.value / rowHeight).toInt() + 1) * columns
         if (paging.items.isEmpty() && (paging.isInitialLoading || (!paging.hasLoaded && paging.errorMessage == null))) {
             // Skeletons must never participate in the real grid's lane assignment
@@ -59,7 +62,7 @@ internal fun <T> HomeMediaGrid(
                 verticalItemSpacing = 6.dp,
                 contentPadding = PaddingValues(start = 6.dp, end = 6.dp, bottom = 4.dp)
             ) {
-                items(placeholderCount) { VideoGridCardSkeleton() }
+                items(placeholderCount) { loadingContent() }
             }
         } else {
             AdaptiveMediaGrid(
@@ -81,7 +84,7 @@ internal fun <T> HomeMediaGrid(
                 endReached = paging.hasLoaded && !paging.hasMore,
                 key = key,
                 contentType = contentType,
-                loadingContent = { VideoGridCardSkeleton() },
+                loadingContent = loadingContent,
                 headerContent = headerContent,
                 separatorIndex = separatorIndex,
                 separatorContent = separatorContent,
