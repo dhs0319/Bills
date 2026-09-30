@@ -1,7 +1,13 @@
 package com.dhs0319.bills.core.video
 
+import com.bapis.bilibili.relation.interfaces.Act
+import com.bapis.bilibili.relation.interfaces.FollowingReq
+import com.bapis.bilibili.relation.interfaces.ModifyRelationReply
 import com.dhs0319.bills.core.auth.AuthStore
 import com.dhs0319.bills.core.common.BiliConstants
+import com.dhs0319.bills.core.model.VideoTargetTool
+import com.dhs0319.bills.infra.crypto.BiliSessionId
+import com.dhs0319.bills.infra.grpc.BiliGrpcClient
 import com.dhs0319.bills.infra.network.BiliRestClient
 import com.dhs0319.bills.infra.network.BiliRestParamBuilder
 import com.dhs0319.bills.infra.network.BiliRestProfile
@@ -19,9 +25,30 @@ data class VideoFavoriteFolder(
 class VideoActionRepository @Inject constructor(
     private val restClient: BiliRestClient,
     private val restParamBuilder: BiliRestParamBuilder,
-    private val authStore: AuthStore
+    private val authStore: AuthStore,
+    private val grpcClient: BiliGrpcClient
 ) {
     fun isLoggedIn(): Boolean = authStore.accessToken.isNotBlank()
+
+    fun currentMid(): Long = authStore.mid
+
+    suspend fun setFollowing(fid: Long, following: Boolean) {
+        check(fid > 0L) { "用户信息无效" }
+        check(authStore.accessToken.isNotBlank()) { "请先登录" }
+        val req = FollowingReq.newBuilder()
+            .setFid(fid)
+            .setAct(if (following) Act.ACT_ADD_FOLLOWING else Act.ACT_DEL_FOLLOWING)
+            .setSource(FOLLOW_SOURCE)
+            .setSpmid(VideoTargetTool.SPMID)
+            .setExtendContent("{\"entity\":\"user\",\"entity_id\":\"$fid\"}")
+            .setActionId(BiliSessionId.polarisAction())
+            .build()
+        grpcClient.call(
+            endpoint = MODIFY_RELATION_ENDPOINT,
+            requestBytes = req.toByteArray(),
+            parser = ModifyRelationReply.parser()
+        )
+    }
 
     suspend fun setLiked(aid: Long, liked: Boolean): String? {
         requireAidAndToken(aid)
@@ -30,6 +57,21 @@ class VideoActionRepository @Inject constructor(
             params = appParams() + mapOf(
                 "aid" to aid.toString(),
                 "like" to if (liked) "0" else "1"
+            ),
+            profile = BiliRestProfile.APP
+        )
+        return json.optJSONObject("data")
+            ?.optString("toast")
+            ?.takeIf(String::isNotBlank)
+    }
+
+    suspend fun setDisliked(aid: Long, disliked: Boolean): String? {
+        requireAidAndToken(aid)
+        val json = restClient.postSigned(
+            url = "${BiliConstants.BASE_URL_APP}$DISLIKE_ENDPOINT",
+            params = appParams() + mapOf(
+                "aid" to aid.toString(),
+                "dislike" to if (disliked) "0" else "1"
             ),
             profile = BiliRestProfile.APP
         )
@@ -120,9 +162,12 @@ class VideoActionRepository @Inject constructor(
 
     private companion object {
         const val LIKE_ENDPOINT = "/x/v2/view/like"
+        const val DISLIKE_ENDPOINT = "/x/v2/view/dislike"
         const val COIN_ENDPOINT = "/x/v2/view/coin/add"
         const val FAVORITE_FOLDERS_ENDPOINT = "/x/v3/fav/folder/created/list-all"
         const val FAVORITE_DEAL_ENDPOINT = "/medialist/gateway/coll/resource/deal"
         const val VIDEO_RESOURCE_TYPE = "2"
+        const val MODIFY_RELATION_ENDPOINT = "bilibili.relation.interface.v1.RelationInterface/ModifyRelation"
+        const val FOLLOW_SOURCE = 31
     }
 }

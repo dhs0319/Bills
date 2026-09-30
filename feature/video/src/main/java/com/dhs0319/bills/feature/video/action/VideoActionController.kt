@@ -15,15 +15,21 @@ internal data class VideoActionUiState(
     val aid: Long = 0L,
     val initialized: Boolean = false,
     val liked: Boolean = false,
+    val disliked: Boolean = false,
     val favorited: Boolean = false,
     val userCoinCount: Int = 0,
+    val ownerMid: Long = 0L,
+    val following: Boolean = false,
     val likeCountDelta: Int = 0,
     val coinCountDelta: Int = 0,
     val favoriteCountDelta: Int = 0,
     val likeBusy: Boolean = false,
+    val dislikeBusy: Boolean = false,
     val coinBusy: Boolean = false,
     val favoriteLoading: Boolean = false,
     val favoriteSaving: Boolean = false,
+    val followBusy: Boolean = false,
+    val dislikeThanksVisible: Boolean = false,
     val message: String? = null
 )
 
@@ -31,8 +37,11 @@ internal data class VideoActionSeed(
     val aid: Long,
     val detailLoaded: Boolean,
     val liked: Boolean,
+    val disliked: Boolean,
     val favorited: Boolean,
-    val userCoinCount: Int
+    val userCoinCount: Int,
+    val ownerMid: Long,
+    val following: Boolean
 )
 
 /**
@@ -53,16 +62,22 @@ internal class VideoActionController(
                 aid = seed.aid,
                 initialized = seed.detailLoaded,
                 liked = seed.liked,
+                disliked = seed.disliked,
                 favorited = seed.favorited,
-                userCoinCount = seed.userCoinCount
+                userCoinCount = seed.userCoinCount,
+                ownerMid = seed.ownerMid,
+                following = seed.following
             )
         } else if (!current.initialized && seed.detailLoaded) {
             mutableState.update {
                 it.copy(
                     initialized = true,
                     liked = seed.liked,
+                    disliked = seed.disliked,
                     favorited = seed.favorited,
-                    userCoinCount = seed.userCoinCount
+                    userCoinCount = seed.userCoinCount,
+                    ownerMid = seed.ownerMid,
+                    following = seed.following
                 )
             }
         }
@@ -99,6 +114,63 @@ internal class VideoActionController(
                             likeCountDelta = current.likeCountDelta,
                             likeBusy = false,
                             message = error.actionMessage("点赞失败")
+                        )
+                    }
+                }
+        }
+    }
+
+    fun toggleDislike() {
+        val current = mutableState.value
+        val aid = current.aid
+        if (aid <= 0L || current.dislikeBusy) return
+        val nextDisliked = !current.disliked
+        mutableState.update { it.copy(dislikeBusy = true, message = null) }
+        scope.launch {
+            runCatching { repository.setDisliked(aid, nextDisliked) }
+                .onSuccess { toast ->
+                    updateForAid(aid) {
+                        it.copy(
+                            disliked = nextDisliked,
+                            dislikeBusy = false,
+                            dislikeThanksVisible = nextDisliked,
+                            message = if (nextDisliked) null else toast ?: "已取消不喜欢"
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    updateForAid(aid) {
+                        it.copy(
+                            dislikeBusy = false,
+                            message = error.actionMessage("操作失败")
+                        )
+                    }
+                }
+        }
+    }
+
+    fun toggleFollow() {
+        val current = mutableState.value
+        val ownerMid = current.ownerMid
+        if (ownerMid <= 0L || !current.initialized || current.followBusy) return
+        val nextFollowing = !current.following
+        mutableState.update { it.copy(followBusy = true, message = null) }
+        scope.launch {
+            runCatching { repository.setFollowing(ownerMid, nextFollowing) }
+                .onSuccess {
+                    updateForAid(current.aid) {
+                        it.copy(
+                            following = nextFollowing,
+                            followBusy = false,
+                            message = if (nextFollowing) "关注成功" else "已取消关注"
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    updateForAid(current.aid) {
+                        it.copy(
+                            followBusy = false,
+                            message = error.actionMessage("操作失败")
                         )
                     }
                 }
@@ -209,6 +281,10 @@ internal class VideoActionController(
 
     fun consumeMessage() {
         mutableState.update { it.copy(message = null) }
+    }
+
+    fun consumeDislikeThanks() {
+        mutableState.update { it.copy(dislikeThanksVisible = false) }
     }
 
     private inline fun updateForAid(

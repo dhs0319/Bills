@@ -28,8 +28,10 @@ android {
 dependencies {
     implementation(project(":core:article"))
     implementation(project(":core:feed"))
+    implementation(project(":core:history"))
     implementation(project(":core:listen"))
     implementation(project(":core:live"))
+    implementation(project(":core:popular"))
     implementation(project(":core:settings"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))

@@ -252,7 +252,8 @@ class SpaceRepository @Inject constructor(
                         ?: VideoTargetTool.bvid(uri),
                     src = VideoTargetTool.space().copy(
                         titleHint = title,
-                        ownerNameHint = author
+                        ownerNameHint = author,
+                        coverHint = cover
                     )
                 )
                 add(

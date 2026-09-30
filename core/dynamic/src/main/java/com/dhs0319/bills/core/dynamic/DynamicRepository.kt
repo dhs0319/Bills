@@ -744,7 +744,7 @@ class DynamicRepository @Inject constructor(
                         epId = ep,
                         seasonId = archive.pgcseasonid.takeIf { id -> id > 0L },
                         subType = archive.subtype.takeIf { subType -> subType > 0 },
-                        src = dynamicVideoSrc(item, archive.title)
+                        src = dynamicVideoSrc(item, archive.title, archive.cover)
                     )
                 }
             }
@@ -757,7 +757,7 @@ class DynamicRepository @Inject constructor(
                         aid = aid,
                         cid = cid,
                         bvid = archive.bvid.blankToNull(),
-                        src = dynamicVideoSrc(item, archive.title)
+                        src = dynamicVideoSrc(item, archive.title, archive.cover)
                     )
                 } else {
                     null
@@ -775,20 +775,22 @@ class DynamicRepository @Inject constructor(
         return VideoTarget.Ugc(
             aid = aid,
             cid = cid,
-            src = dynamicVideoSrc(item, season.title)
+            src = dynamicVideoSrc(item, season.title, season.cover)
         )
     }
 
     private fun dynamicVideoSrc(
         item: DynamicItem,
-        title: String
+        title: String,
+        cover: String
     ) = VideoTargetTool.dynamic(
         trackId = item.extend.trackId.blankToNull(),
         reportFlowData = item.extend.reportMetricData.blankToNull()
     ).copy(
         titleHint = title.blankToNull(),
         ownerNameHint = item.extend.upName.blankToNull(),
-        ownerMidHint = item.extend.uid.takeIf { it > 0L }
+        ownerMidHint = item.extend.uid.takeIf { it > 0L },
+        coverHint = cover.blankToNull().httpsImageUrlOrNull()
     )
 
     private fun localTime(): Int {

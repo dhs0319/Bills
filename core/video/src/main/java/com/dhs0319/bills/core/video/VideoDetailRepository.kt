@@ -177,6 +177,7 @@ class VideoDetailRepository @Inject constructor(
                 pages = parsePages(reply),
                 relates = relates,
                 isLiked = reply.reqUser.like > 0,
+                isDisliked = reply.reqUser.dislike > 0,
                 isFavorited = reply.reqUser.favorite > 0,
                 userCoinCount = reply.reqUser.coin.coerceIn(0, 2)
             ),
@@ -191,12 +192,20 @@ class VideoDetailRepository @Inject constructor(
         val fansText = owner.fans.ifBlank {
             owner.fansNum.takeIf { it > 0L }?.toString().orEmpty()
         }.ifBlank { null }
+        val relation = owner.attentionRelation.number
+        val isFollowing = relation == RELATION_FOLLOW_HIM ||
+            relation == RELATION_BUDDY ||
+            relation == RELATION_SPECIAL ||
+            (relation == RELATION_NONE && owner.attention > 0)
+        val isFollowedBy = relation == RELATION_FOLLOW_ME || relation == RELATION_BUDDY
         return VideoOwner(
             mid = owner.mid,
             name = name,
             fansText = fansText,
             arcCountText = owner.arcCount.ifBlank { null },
-            face = owner.face.httpsImageUrl().ifBlank { null }
+            face = owner.face.httpsImageUrl().ifBlank { null },
+            isFollowing = isFollowing,
+            isFollowedBy = isFollowedBy
         )
     }
 
@@ -222,7 +231,12 @@ class VideoDetailRepository @Inject constructor(
                     cid = ep.cid
                 )
                 VideoSeasonEpisode(
-                    target = ids.toUgcTarget(VideoTargetTool.relate()),
+                    target = ids.toUgcTarget(
+                        VideoTargetTool.relate().copy(
+                            titleHint = epTitle,
+                            coverHint = ep.cover.httpsImageUrl().ifBlank { null }
+                        )
+                    ),
                     cid = ids.cid,
                     title = epTitle,
                     subTitle = ep.coverRightText.ifBlank { null },
@@ -263,7 +277,10 @@ class VideoDetailRepository @Inject constructor(
                     aid = ep.aid,
                     cid = ep.cid,
                     epId = epId,
-                    src = src.copy(titleHint = title)
+                    src = src.copy(
+                        titleHint = title,
+                        coverHint = ep.cover.httpsImageUrl().ifBlank { null }
+                    )
                 ),
                 cid = ep.cid,
                 title = title,
@@ -328,6 +345,10 @@ class VideoDetailRepository @Inject constructor(
                         trackId = basic.trackId,
                         reportFlowData = basic.reportFlowData,
                         fromSpmidSuffix = basic.fromSpmidSuffix
+                    ).copy(
+                        titleHint = title,
+                        ownerNameHint = basic.author.title.ifBlank { null },
+                        coverHint = basic.cover.httpsImageUrl().ifBlank { null }
                     )
                 ),
                 title = title,
@@ -513,6 +534,11 @@ class VideoDetailRepository @Inject constructor(
         const val DEFAULT_CLIENT_ATTR = 0L
         const val SHORT_EDGE = "1080"
         const val LONG_EDGE = "1920"
+        const val RELATION_NONE = 0
+        const val RELATION_FOLLOW_HIM = 2
+        const val RELATION_FOLLOW_ME = 3
+        const val RELATION_BUDDY = 4
+        const val RELATION_SPECIAL = 5
         val EXTRA_CONTENT = mapOf(
             "autoplay" to "0",
             "questionaire_info" to "",

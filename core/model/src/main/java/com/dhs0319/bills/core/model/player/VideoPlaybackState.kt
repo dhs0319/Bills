@@ -20,6 +20,7 @@ data class VideoPlaybackState(
     val playbackSource: PlaybackSource? = null,
     val currentStream: PlaybackStream? = null,
     val currentAudio: PlaybackAudio? = null,
+    val waitingForPlay: Boolean = false,
     val error: PlaybackError? = null,
     val isPlaying: Boolean = false,
     val playWhenReady: Boolean = false,

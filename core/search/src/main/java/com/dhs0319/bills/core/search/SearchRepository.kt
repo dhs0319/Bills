@@ -133,7 +133,8 @@ class SearchRepository @Inject constructor(
             ).copy(
                 titleHint = av.title,
                 ownerNameHint = av.author,
-                ownerMidHint = av.mid.takeIf { it > 0L }
+                ownerMidHint = av.mid.takeIf { it > 0L },
+                coverHint = av.cover.httpsImageUrl().takeIf(String::isNotBlank)
             )
         )
         return SearchVideo(

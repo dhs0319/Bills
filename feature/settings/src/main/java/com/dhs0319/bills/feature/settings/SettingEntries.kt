@@ -3,6 +3,7 @@ package com.dhs0319.bills.feature.settings
 import com.dhs0319.bills.feature.settings.navigation.APPEARANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.AUDIO_VIDEO_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.FEED_SETTINGS_ROUTE
+import com.dhs0319.bills.feature.settings.navigation.INTERACTION_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.OTHER_SETTINGS_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PERFORMANCE_ROUTE
 import com.dhs0319.bills.feature.settings.navigation.PRIVACY_ROUTE
@@ -35,6 +36,17 @@ val audioVideoEntries = listOf(
     SettingEntry("默认画质", "设置默认视频和音频质量", AUDIO_VIDEO_ROUTE),
     SettingEntry("编码格式", "选择优先的编码格式", AUDIO_VIDEO_ROUTE),
     SettingEntry("强制 HTTPS", "使用 HTTPS 播放地址", AUDIO_VIDEO_ROUTE),
+    SettingEntry("自动播放", "进入视频详情页时自动加载并播放视频", AUDIO_VIDEO_ROUTE),
+)
+
+val interactionEntries = listOf(
+    SettingEntry("长按倍速播放", "控制长按屏幕时的临时倍速", INTERACTION_ROUTE),
+    SettingEntry("长按播放倍速", "选择长按时使用的倍速", INTERACTION_ROUTE),
+    SettingEntry("亮度控制手势", "在播放器左侧上下滑动调节亮度", INTERACTION_ROUTE),
+    SettingEntry("音量控制手势", "在播放器右侧上下滑动调节音量", INTERACTION_ROUTE),
+    SettingEntry("双击暂停/继续", "控制播放器中央双击播放和暂停", INTERACTION_ROUTE),
+    SettingEntry("双击快进/后退", "控制播放器两侧双击跳转", INTERACTION_ROUTE),
+    SettingEntry("快进和后退秒数", "设置双击跳转时长，5 到 30 秒", INTERACTION_ROUTE),
 )
 
 val feedEntries = listOf(
@@ -49,4 +61,5 @@ val privacyEntries = listOf(
 )
 
 val allSettingEntries =
-    appearanceEntries + performanceEntries + otherEntries + audioVideoEntries + feedEntries + privacyEntries
+    appearanceEntries + performanceEntries + otherEntries + audioVideoEntries +
+        interactionEntries + feedEntries + privacyEntries

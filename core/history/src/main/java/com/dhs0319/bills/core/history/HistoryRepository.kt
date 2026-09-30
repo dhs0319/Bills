@@ -246,7 +246,8 @@ class HistoryRepository @Inject constructor(
                 src = HISTORY_VIDEO_SRC.copy(
                     titleHint = item.title,
                     ownerNameHint = card.name.blankToNull(),
-                    ownerMidHint = card.mid.takeIf { it > 0L }
+                    ownerMidHint = card.mid.takeIf { it > 0L },
+                    coverHint = card.cover.blankToNull()?.httpsImageUrl()
                 )
             )
         )
@@ -260,7 +261,10 @@ class HistoryRepository @Inject constructor(
             VideoTarget.Pgc(
                 aid = aid,
                 epId = epId,
-                src = HISTORY_VIDEO_SRC.copy(titleHint = item.title)
+                src = HISTORY_VIDEO_SRC.copy(
+                    titleHint = item.title,
+                    coverHint = item.cardOgv.cover.blankToNull()?.httpsImageUrl()
+                )
             )
         )
     }
@@ -276,7 +280,10 @@ class HistoryRepository @Inject constructor(
                 aid = aid,
                 epId = epId,
                 seasonId = card.seasonId.takeIf { it > 0L },
-                src = HISTORY_VIDEO_SRC.copy(titleHint = item.title)
+                src = HISTORY_VIDEO_SRC.copy(
+                    titleHint = item.title,
+                    coverHint = card.cover.blankToNull()?.httpsImageUrl()
+                )
             )
         )
     }

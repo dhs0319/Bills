@@ -16,6 +16,7 @@ data class VideoDetail(
     val pages: List<VideoPagePart> = emptyList(),
     val relates: List<VideoRelate> = emptyList(),
     val isLiked: Boolean = false,
+    val isDisliked: Boolean = false,
     val isFavorited: Boolean = false,
     val userCoinCount: Int = 0
 )
@@ -33,7 +34,9 @@ data class VideoOwner(
     val name: String,
     val fansText: String?,
     val arcCountText: String?,
-    val face: String?
+    val face: String?,
+    val isFollowing: Boolean = false,
+    val isFollowedBy: Boolean = false
 )
 
 @Immutable

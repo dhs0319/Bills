@@ -51,7 +51,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -246,6 +245,16 @@ class StreamPlaybackSessionImpl @Inject constructor(
     override fun play() {
         if (_currentTarget.value is StreamPlaybackTarget.Video) {
             nextPlayWhenReady = true
+            val state = vodSession.value
+            if (state.waitingForPlay) {
+                val request = state.request ?: return
+                val token = openId.get()
+                vodSession.value = state.copy(waitingForPlay = false, isPreparing = true, error = null)
+                refreshVideoState()
+                runtimeScope.launch { loadVideoPlayback(request, token) }
+                return
+            }
+            if (state.playbackSource == null) return
         }
         playerEngine.play()
     }
@@ -311,21 +320,24 @@ class StreamPlaybackSessionImpl @Inject constructor(
         if (
             currentVideoTarget == target &&
             currentState.error == null &&
-            (currentState.playbackSource != null || currentState.isPreparing)
+            (currentState.playbackSource != null || currentState.isPreparing || currentState.waitingForPlay)
         ) {
             _currentTarget.value = StreamPlaybackTarget.Video(target)
             syncSessionState()
             return
         }
         val reuseDetail = currentState.takeIf {
-            currentVideoTarget is VideoTarget.Ugc &&
-                target is VideoTarget.Ugc &&
-                currentVideoTarget.aid > 0L &&
-                currentVideoTarget.aid == target.aid
+            !it.detailLoading && it.detail != null &&
+                (currentVideoTarget == target ||
+                    currentVideoTarget is VideoTarget.Ugc &&
+                    target is VideoTarget.Ugc &&
+                    currentVideoTarget.aid > 0L &&
+                    currentVideoTarget.aid == target.aid)
         }
 
         val token = openId.incrementAndGet()
-        nextPlayWhenReady = true
+        val autoPlay = playerSettings.state.first().playback.autoPlay
+        if (openId.get() != token) return
         reporter.bindOwner(token)
         val initState = PlayerSessionState(
             request = request,
@@ -339,7 +351,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
             ),
             detail = reuseDetail?.detail ?: target.previewDetail(),
             detailLoading = reuseDetail == null,
-            isPreparing = true
+            waitingForPlay = !autoPlay,
+            isPreparing = autoPlay
         )
         finishVideoPlayback(
             invalidateOpen = false,
@@ -348,28 +361,41 @@ class StreamPlaybackSessionImpl @Inject constructor(
             nextState = initState,
             finalizeReportAsync = true
         )
+        if (openId.get() != token) return
+        nextPlayWhenReady = autoPlay
 
+        if (reuseDetail == null) {
+            runtimeScope.launch { loadVideoDetail(request, token) }
+        }
+        if (autoPlay) {
+            loadVideoPlayback(request, token)
+        }
+    }
+
+    private suspend fun loadVideoDetail(request: PlaybackRequest, token: Long) {
+        try {
+            val detailResult = withContext(Dispatchers.IO) {
+                detailRepository.fetchVideoDetail(ids = request.ids, src = request.playable.src)
+            }
+            if (openId.get() != token) return
+            applyDetailResult(detailResult)
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            if (openId.get() != token) return
+            vodSession.value = vodSession.value.copy(
+                detailLoading = false,
+                detailError = t.message ?: "加载视频详情失败"
+            )
+            refreshVideoState()
+        }
+    }
+
+    private suspend fun loadVideoPlayback(request: PlaybackRequest, token: Long) {
+        if (openId.get() != token) return
         try {
             coroutineScope {
                 val prepareJob = async { prepare() }
                 val sourceJob = async { videoRepository.fetchPlaybackSource(request) }
-                val detailJob: Deferred<Result<VideoDetailResult>>? = if (reuseDetail == null) {
-                    async(Dispatchers.IO) {
-                        try {
-                            Result.success(
-                                detailRepository.fetchVideoDetail(
-                                    ids = request.ids,
-                                    src = target.src
-                                )
-                            )
-                        } catch (t: Throwable) {
-                            if (t is CancellationException) throw t
-                            Result.failure(t)
-                        }
-                    }
-                } else {
-                    null
-                }
                 val localResumeJob = async(Dispatchers.IO) { readLocalResumeIfResolvable(request) }
                 val qualityJob = async {
                     request.preferredQuality ?: appSettings.defaultVideoQuality.first()
@@ -381,10 +407,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
                 val preferredQualityValue = qualityJob.await()
                 val preferredAudioId = audioJob.await()
                 val localResume = localResumeJob.await()
-                if (openId.get() != token) {
-                    detailJob?.cancel()
-                    return@coroutineScope
-                }
+                if (openId.get() != token) return@coroutineScope
 
                 val stream = source.streams.firstOrNull { it.quality == preferredQualityValue }
                     ?: source.streams.firstOrNull()
@@ -399,10 +422,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
                 )
                     ?: throw NoPlayableStreamException("暂无可用播放流")
                 val startMs = resolveStartMs(request, source, localResume)
-                if (openId.get() != token) {
-                    detailJob?.cancel()
-                    return@coroutineScope
-                }
+                if (openId.get() != token) return@coroutineScope
 
                 val playbackState = vodSession.value.copy(
                     playbackSource = source,
@@ -414,48 +434,23 @@ class StreamPlaybackSessionImpl @Inject constructor(
                 playerEngine.setSource(
                     source = engineSource,
                     startPositionMs = startMs,
-                    playWhenReady = nextPlayWhenReady
+                    playWhenReady = nextPlayWhenReady,
+                    metadata = vodSession.value.toMediaMetadata()
                 )
-                if (openId.get() != token) {
-                    detailJob?.cancel()
-                    return@coroutineScope
-                }
-
-                vodSession.value = playbackState.copy(isPreparing = false)
-                refreshVideoState()
-                if (reuseDetail != null) {
-                    runtimeScope.launch {
-                        startReportIfReady(vodSession.value)
-                        syncDanmakuSource(vodSession.value)
-                    }
-                    return@coroutineScope
-                }
-
-                if (openId.get() != token) {
-                    detailJob?.cancel()
-                    return@coroutineScope
-                }
-                val currentTarget = (_currentTarget.value as? StreamPlaybackTarget.Video)?.target
-                if (currentTarget != target) {
-                    detailJob?.cancel()
-                    return@coroutineScope
-                }
-                val detailResult = detailJob?.await() ?: return@coroutineScope
                 if (openId.get() != token) return@coroutineScope
-                val completedTarget = (_currentTarget.value as? StreamPlaybackTarget.Video)?.target
-                if (completedTarget != target) return@coroutineScope
-                detailResult.onFailure { error ->
-                    vodSession.value = vodSession.value.copy(
-                        detail = null,
-                        detailLoading = false,
-                        detailError = error.message ?: "加载视频详情失败"
-                    )
-                    refreshVideoState()
-                }.onSuccess(::applyDetailResult)
+
+                vodSession.value = vodSession.value.copy(isPreparing = false)
+                refreshVideoState()
+                runtimeScope.launch {
+                    if (openId.get() != token) return@launch
+                    startReportIfReady(vodSession.value)
+                    syncDanmakuSource(vodSession.value)
+                }
             }
         } catch (t: Throwable) {
             if (t is CancellationException) {
                 if (openId.get() == token && vodSession.value.playbackSource == null) {
+                    openId.incrementAndGet()
                     nextPlayWhenReady = true
                     _currentTarget.value = null
                     vodSession.value = PlayerSessionState(biz = PlayBiz.UGC)
@@ -476,6 +471,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
             }
             vodSession.value = vodSession.value.copy(
                 isPreparing = false,
+                waitingForPlay = true,
                 error = when (t) {
                     is NoPlayableStreamException -> PlaybackError.NoPlayableStream(
                         t.message ?: "暂无可用播放流"
@@ -564,24 +560,29 @@ class StreamPlaybackSessionImpl @Inject constructor(
         vodSession.value = vodSession.value.copy(
             biz = detailResult.biz,
             ids = detailResult.ids,
-            detail = detailResult.detail,
+            detail = detailResult.detail.copy(
+                cover = vodSession.value.request?.playable?.src?.coverHint?.takeIf(String::isNotBlank)
+                    ?: detailResult.detail.cover?.takeIf(String::isNotBlank)
+                    ?: vodSession.value.detail?.cover
+            ),
             detailLoading = false,
             detailError = null
         )
-        playerEngine.setMediaMetadata(
-            MediaMetadata.Builder()
-                .setTitle(detailResult.detail.title.takeIf(String::isNotBlank))
-                .setArtist(detailResult.detail.owner?.name?.takeIf(String::isNotBlank))
-                .setArtworkUri(
-                    detailResult.detail.cover?.takeIf(String::isNotBlank)?.let(android.net.Uri::parse)
-                )
-                .build()
-        )
+        vodSession.value.toMediaMetadata()?.let(playerEngine::setMediaMetadata)
         refreshVideoState()
         runtimeScope.launch {
             startReportIfReady(vodSession.value)
             syncDanmakuSource(vodSession.value)
         }
+    }
+
+    private fun PlayerSessionState.toMediaMetadata(): MediaMetadata? {
+        val videoDetail = detail ?: return null
+        return MediaMetadata.Builder()
+            .setTitle(videoDetail.title.takeIf(String::isNotBlank))
+            .setArtist(videoDetail.owner?.name?.takeIf(String::isNotBlank))
+            .setArtworkUri(videoDetail.cover?.takeIf(String::isNotBlank)?.let(android.net.Uri::parse))
+            .build()
     }
 
     private fun applyVideoSelection(
@@ -732,6 +733,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
     }
 
     private suspend fun startReportIfReady(state: PlayerSessionState) {
+        if (state.isPreparing || state.detailLoading) return
         if (state.detail == null) return
         val request = state.request ?: return
         val ids = state.ids.takeIf { it.danmakuReady } ?: return
@@ -754,6 +756,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
     }
 
     private suspend fun syncDanmakuSource(state: PlayerSessionState) {
+        if (state.isPreparing || state.detailLoading) return
         if (state.detail == null) return
         val ids = state.ids.takeIf { it.danmakuReady } ?: return
         val source = state.playbackSource ?: return
@@ -797,6 +800,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
             playbackSource = playbackSource,
             currentStream = currentStream,
             currentAudio = currentAudio,
+            waitingForPlay = waitingForPlay,
             error = error,
             isPlaying = state.isPlaying,
             playWhenReady = state.playWhenReady,

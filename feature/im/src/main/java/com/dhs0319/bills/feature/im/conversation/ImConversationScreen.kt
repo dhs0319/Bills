@@ -320,7 +320,8 @@ private fun MessageContent(
                                     aid = message.shareAid,
                                     cid = 0L,
                                     src = VideoTargetTool.default().copy(
-                                        titleHint = message.content.takeIf(String::isNotBlank)
+                                        titleHint = message.content.takeIf(String::isNotBlank),
+                                        coverHint = message.shareCoverUrl
                                     )
                                 )
                             )

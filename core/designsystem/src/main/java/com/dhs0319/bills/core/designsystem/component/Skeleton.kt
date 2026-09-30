@@ -79,7 +79,12 @@ fun VideoGridCardSkeleton(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun VideoListCardSkeleton(modifier: Modifier = Modifier) {
+fun VideoListCardSkeleton(
+    modifier: Modifier = Modifier,
+    coverWidth: Dp? = null,
+    coverAspectRatio: Float = 16f / 10f,
+    contentPadding: Dp = 10.dp
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -87,17 +92,17 @@ fun VideoListCardSkeleton(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = MaterialTheme.shapes.large
             )
-            .padding(10.dp),
+            .padding(contentPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         SkeletonBlock(
             modifier = Modifier
-                .weight(0.38f)
-                .aspectRatio(16f / 10f),
+                .then(if (coverWidth != null) Modifier.width(coverWidth) else Modifier.weight(0.38f))
+                .aspectRatio(coverAspectRatio),
             shape = MaterialTheme.shapes.medium
         )
         Column(
-            modifier = Modifier.weight(0.62f),
+            modifier = Modifier.weight(if (coverWidth == null) 0.62f else 1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SkeletonBlock(
@@ -240,92 +245,95 @@ fun CommentCardSkeleton(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun VideoDetailInfoSkeleton(modifier: Modifier = Modifier) {
+fun VideoDetailInfoSkeleton(
+    modifier: Modifier = Modifier,
+    actionRow: @Composable () -> Unit
+) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.extraLarge
-                )
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             SkeletonBlock(
-                modifier = Modifier
-                    .width(72.dp)
-                    .aspectRatio(1f),
+                modifier = Modifier.size(48.dp),
                 shape = CircleShape
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 SkeletonBlock(
                     modifier = Modifier
-                        .fillMaxWidth(0.4f)
-                        .height(20.dp),
+                        .fillMaxWidth(0.34f)
+                        .height(18.dp),
                     shape = MaterialTheme.shapes.extraSmall
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SkeletonChip(width = 76.dp)
-                    SkeletonChip(width = 88.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SkeletonBlock(
+                        modifier = Modifier
+                            .width(56.dp)
+                            .height(14.dp),
+                        shape = MaterialTheme.shapes.extraSmall
+                    )
+                    SkeletonBlock(
+                        modifier = Modifier
+                            .width(48.dp)
+                            .height(14.dp),
+                        shape = MaterialTheme.shapes.extraSmall
+                    )
                 }
             }
         }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.extraLarge
-                )
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SkeletonBlock(
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .height(22.dp),
+                    .fillMaxWidth(0.92f)
+                    .height(24.dp),
                 shape = MaterialTheme.shapes.extraSmall
             )
             SkeletonBlock(
                 modifier = Modifier
-                    .fillMaxWidth(0.58f)
-                    .height(22.dp),
+                    .fillMaxWidth(0.62f)
+                    .height(24.dp),
                 shape = MaterialTheme.shapes.extraSmall
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonChip(width = 64.dp)
-                SkeletonChip(width = 92.dp)
-                SkeletonChip(width = 84.dp)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonChip(width = 78.dp)
-                SkeletonChip(width = 70.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                SkeletonBlock(
+                    modifier = Modifier
+                        .width(48.dp)
+                        .height(14.dp),
+                    shape = MaterialTheme.shapes.extraSmall
+                )
+                SkeletonBlock(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(14.dp),
+                    shape = MaterialTheme.shapes.extraSmall
+                )
+                SkeletonBlock(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(14.dp),
+                    shape = MaterialTheme.shapes.extraSmall
+                )
+                SkeletonBlock(
+                    modifier = Modifier
+                        .width(96.dp)
+                        .height(14.dp),
+                    shape = MaterialTheme.shapes.extraSmall
+                )
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.extraLarge
-                )
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ActionSkeletonChip()
-            ActionSkeletonChip()
-            ActionSkeletonChip()
-        }
+        actionRow()
 
         DetailEntryCardSkeleton()
         DetailEntryCardSkeleton()
@@ -383,16 +391,6 @@ private fun SkeletonChip(width: Dp) {
         modifier = Modifier
             .width(width)
             .height(28.dp),
-        shape = MaterialTheme.shapes.extraLarge
-    )
-}
-
-@Composable
-private fun ActionSkeletonChip() {
-    SkeletonBlock(
-        modifier = Modifier
-            .width(84.dp)
-            .height(34.dp),
         shape = MaterialTheme.shapes.extraLarge
     )
 }

@@ -4,7 +4,6 @@ import android.view.View
 import com.dhs0319.bills.core.model.DanmakuConfig
 import com.dhs0319.bills.core.model.DanmakuItem
 import com.dhs0319.bills.core.model.DanmakuSessionState
-import com.dhs0319.bills.core.model.DanmakuWindow
 import com.dhs0319.bills.core.model.toDanmakuWindowId
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
@@ -59,9 +58,9 @@ class DanmakuOverlayState internal constructor(
         }
         applyConfig(config)
         syncWindow(
-            window = danmakuState.window,
+            danmakuState = danmakuState,
             targetWindowId = requiredWindowId,
-            requireTargetWindow = pendingSeek || hasSeek
+            hasDiscontinuity = hasSeek
         )
         val curReady = appliedWindowId == requiredWindowId
         if (config.enabled && hasSource) {
@@ -78,12 +77,9 @@ class DanmakuOverlayState internal constructor(
             !hasSource ||
             lastPlayState?.isPlaying != true
         if (needStateOverride) {
-            val anchorMs = if (hasSeek) {
-                clampedPositionMs
-            } else {
-                timeProvider.getCurrentTimeMs()
-            }
-            timeProvider.overrideState(anchorMs, canPlay, clampedSpeed)
+            // 关键修复：外部时钟必须锚定真实播放位置，不能用上一次(可能错误的)推算值，
+            // 否则换源/续播等无 seek 事件的位置跳变会让弹幕时间轴停在错误位置。
+            timeProvider.overrideState(clampedPositionMs, canPlay, clampedSpeed)
         }
         syncPlayback(
             enabled = config.enabled,
@@ -220,27 +216,43 @@ class DanmakuOverlayState internal constructor(
     }
 
     private fun syncWindow(
-        window: DanmakuWindow?,
+        danmakuState: DanmakuSessionState,
         targetWindowId: Long,
-        requireTargetWindow: Boolean
+        hasDiscontinuity: Boolean
     ) {
-        val targetWindow = window?.takeIf { it.id == targetWindowId }
+        val targetWindow = danmakuState.window?.takeIf { it.id == targetWindowId }
+            ?: danmakuState.prefetchWindow?.takeIf { it.id == targetWindowId }
         if (targetWindow == null) {
-            if (requireTargetWindow || appliedWindowId != null) {
+            if (hasDiscontinuity) {
                 appliedWindowId = null
                 appliedWindowSignature = null
                 session.clearSegments()
+                pendingSeek = true
+            } else if (appliedWindowId == null) {
+                pendingSeek = true
             }
-            pendingSeek = true
             return
         }
         val nextSignature = targetWindow.items.windowSignature()
         if (appliedWindowId == targetWindow.id && appliedWindowSignature == nextSignature) {
             return
         }
-        session.replaceSegments(
-            listOf(DanmakuSegmentData(targetWindow.id, targetWindow.items))
-        )
+        val previousWindowId = appliedWindowId
+        val isContinuousAdvance = !hasDiscontinuity &&
+            !pendingSeek &&
+            previousWindowId != null &&
+            targetWindow.id == previousWindowId + 1L
+        if (isContinuousAdvance) {
+            // 连续推进到下一分段时只追加新分段，不能清空引擎的弹幕列表：
+            // 引擎每帧都会从主列表重新取可见窗口，主列表被清空后屏上弹幕会立即消失。
+            session.appendSegment(
+                DanmakuSegmentData(targetWindow.id, targetWindow.items)
+            )
+        } else {
+            session.replaceSegments(
+                listOf(DanmakuSegmentData(targetWindow.id, targetWindow.items))
+            )
+        }
         appliedWindowId = targetWindow.id
         appliedWindowSignature = nextSignature
     }

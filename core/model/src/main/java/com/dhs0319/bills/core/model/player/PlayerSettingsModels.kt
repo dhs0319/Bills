@@ -95,6 +95,7 @@ enum class VideoCdnMode(
 
 @Immutable
 data class PlayerPlaybackPrefs(
+    val autoPlay: Boolean = false,
     val backgroundPlayback: Boolean = true,
     val inAppMiniPlayer: Boolean = true,
     val reportPlayback: Boolean = true,
@@ -104,6 +105,24 @@ data class PlayerPlaybackPrefs(
     val gestureSpeed: Float = 2f,
     val videoCdnMode: VideoCdnMode = VideoCdnMode.Backup2
 )
+
+val playbackSpeedOptions = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
+
+@Immutable
+data class PlayerInteractionPrefs(
+    val longPressSpeedEnabled: Boolean = true,
+    val brightnessGestureEnabled: Boolean = true,
+    val volumeGestureEnabled: Boolean = true,
+    val doubleTapPlayPause: Boolean = true,
+    val doubleTapSeek: Boolean = true,
+    val doubleTapSeekSeconds: Int = DEFAULT_SEEK_SECONDS
+) {
+    companion object {
+        const val MIN_SEEK_SECONDS = 5
+        const val MAX_SEEK_SECONDS = 30
+        const val DEFAULT_SEEK_SECONDS = 10
+    }
+}
 
 @Immutable
 data class PlayerOverlayPrefs(
@@ -116,6 +135,7 @@ data class PlayerOverlayPrefs(
 data class PlayerSettingsState(
     val buffer: PlayerBufferSettings = PlayerBufferSettings(),
     val playback: PlayerPlaybackPrefs = PlayerPlaybackPrefs(),
+    val interaction: PlayerInteractionPrefs = PlayerInteractionPrefs(),
     val overlay: PlayerOverlayPrefs = PlayerOverlayPrefs(),
     val danmaku: DanmakuConfig = DanmakuConfig()
 )

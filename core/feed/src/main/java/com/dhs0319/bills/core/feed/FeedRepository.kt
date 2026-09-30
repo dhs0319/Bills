@@ -324,7 +324,8 @@ class FeedRepository @Inject constructor(
                 reportFlowData = reportFlowData,
                 titleHint = title,
                 ownerNameHint = ownerName,
-                ownerMidHint = args?.optLong("up_id")?.takeIf { it > 0L }
+                ownerMidHint = args?.optLong("up_id")?.takeIf { it > 0L },
+                coverHint = cover
             )
             when {
                 isPugv -> {
