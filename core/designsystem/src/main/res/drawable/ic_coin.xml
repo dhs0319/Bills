@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 投币图标的币字部分，底色圆形由 Compose 按主题色绘制。白色只是默认值，实际由 Icon 的 tint 决定。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- 币字：顶部横线 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M31.2,24 L66,24" />
+
+    <!-- 币字：中间竖线 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M49.2,24 L48,73.2" />
+
+    <!-- 币字：两侧弧线 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M26.4,63.6
+                          C27,46.8 34.2,39.6 48,39.6
+                          C61.8,39.6 67.8,46.8 69.6,63.6" />
+</vector>

@@ -9,6 +9,7 @@ import android.content.ActivityNotFoundException
 import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,7 +18,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,9 +44,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.outlined.ThumbDownOffAlt
+import androidx.compose.material.icons.outlined.ThumbUpOffAlt
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +67,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -67,7 +81,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -80,6 +95,7 @@ import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
 import com.dhs0319.bills.core.designsystem.component.VideoRelateCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.copyTextOnLongPress
+import com.dhs0319.bills.core.designsystem.icon.AppIcons
 import com.dhs0319.bills.core.model.CommentSubject
 import com.dhs0319.bills.core.model.QualityOption
 import com.dhs0319.bills.core.model.ResolvedVideoIds
@@ -113,6 +129,9 @@ internal fun VideoDetailPage(
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
+    onToggleFollow: () -> Unit,
+    isSelf: (Long) -> Boolean,
     isLoggedIn: () -> Boolean,
     onSubmitCoins: (Int, () -> Unit) -> Unit,
     onLoadFavoriteFolders: ((List<VideoFavoriteFolder>) -> Unit) -> Unit,
@@ -122,8 +141,7 @@ internal fun VideoDetailPage(
 ) {
     val aidKey = ids.aid.takeIf { it > 0L }
     val curCid = ids.cid.takeIf { it > 0L }
-    var descOn by rememberSaveable(aidKey) { mutableStateOf(false) }
-    var tagOn by rememberSaveable(aidKey) { mutableStateOf(false) }
+    var infoExpanded by rememberSaveable(aidKey) { mutableStateOf(false) }
     var sheet by remember(aidKey) { mutableStateOf<DetailSheet?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val detailListState = remember(aidKey) { LazyListState() }
@@ -138,6 +156,7 @@ internal fun VideoDetailPage(
     var originalFavoriteFolderIds by remember(aidKey) { mutableStateOf(emptySet<Long>()) }
     var selectedFavoriteFolderIds by remember(aidKey) { mutableStateOf(emptySet<Long>()) }
     var shareSheetVisible by remember(aidKey) { mutableStateOf(false) }
+    var unfollowConfirmVisible by remember(aidKey) { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = remember(context) {
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -173,10 +192,8 @@ internal fun VideoDetailPage(
                 actionState = actionState,
                 horizontalPad = contentHorizontalPad,
                 infoListState = detailListState,
-                descOn = descOn,
-                tagOn = tagOn,
-                onToggleDesc = { descOn = !descOn },
-                onToggleTag = { tagOn = !tagOn },
+                infoExpanded = infoExpanded,
+                onToggleInfo = { infoExpanded = !infoExpanded },
                 onSeasonClick = { sheet = detail?.season?.let { DetailSheet.Season(it, curCid) } },
                 onPageClick = {
                     sheet = detail?.pages
@@ -192,6 +209,17 @@ internal fun VideoDetailPage(
                 onOpenSpace = onOpenSpace,
                 onDownloadClick = onDownloadClick,
                 onToggleLike = onToggleLike,
+                onToggleDislike = onToggleDislike,
+                onFollowClick = {
+                    if (!isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                    } else if (actionState.following) {
+                        unfollowConfirmVisible = true
+                    } else {
+                        onToggleFollow()
+                    }
+                },
+                isSelf = isSelf,
                 onOpenCoinPicker = {
                     if (!isLoggedIn()) {
                         Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
@@ -337,6 +365,29 @@ internal fun VideoDetailPage(
             }
         )
     }
+
+    if (unfollowConfirmVisible) {
+        AlertDialog(
+            onDismissRequest = { unfollowConfirmVisible = false },
+            title = { Text("取消关注") },
+            text = { Text("确定要取消关注TA吗？") },
+            dismissButton = {
+                TextButton(onClick = { unfollowConfirmVisible = false }) {
+                    Text("取消")
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        unfollowConfirmVisible = false
+                        onToggleFollow()
+                    }
+                ) {
+                    Text("取消关注")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -349,10 +400,8 @@ private fun DetailPageContent(
     actionState: VideoActionUiState,
     horizontalPad: Dp,
     infoListState: LazyListState,
-    descOn: Boolean,
-    tagOn: Boolean,
-    onToggleDesc: () -> Unit,
-    onToggleTag: () -> Unit,
+    infoExpanded: Boolean,
+    onToggleInfo: () -> Unit,
     onSeasonClick: () -> Unit,
     onPageClick: () -> Unit,
     onOpenComments: () -> Unit,
@@ -360,6 +409,9 @@ private fun DetailPageContent(
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
+    onFollowClick: () -> Unit,
+    isSelf: (Long) -> Boolean,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
     onOpenShare: () -> Unit
@@ -384,16 +436,17 @@ private fun DetailPageContent(
             detailError = detailError,
             actionState = actionState,
             itemMod = itemMod,
-            descOn = descOn,
-            tagOn = tagOn,
-            onToggleDesc = onToggleDesc,
-            onToggleTag = onToggleTag,
+            infoExpanded = infoExpanded,
+            onToggleInfo = onToggleInfo,
             onSeasonClick = onSeasonClick,
             onPageClick = onPageClick,
             onOpenVideo = onOpenVideo,
             onOpenSpace = onOpenSpace,
             onDownloadClick = onDownloadClick,
             onToggleLike = onToggleLike,
+            onToggleDislike = onToggleDislike,
+            onFollowClick = onFollowClick,
+            isSelf = isSelf,
             onOpenCoinPicker = onOpenCoinPicker,
             onOpenFavoritePicker = onOpenFavoritePicker,
             onOpenShare = onOpenShare,
@@ -409,16 +462,17 @@ private fun LazyListScope.detailItems(
     detailError: String?,
     actionState: VideoActionUiState,
     itemMod: Modifier,
-    descOn: Boolean,
-    tagOn: Boolean,
-    onToggleDesc: () -> Unit,
-    onToggleTag: () -> Unit,
+    infoExpanded: Boolean,
+    onToggleInfo: () -> Unit,
     onSeasonClick: () -> Unit,
     onPageClick: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
+    onFollowClick: () -> Unit,
+    isSelf: (Long) -> Boolean,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
     onOpenShare: () -> Unit,
@@ -432,19 +486,51 @@ private fun LazyListScope.detailItems(
                     key = "detail_loading_summary_preview",
                     contentType = "summary_preview"
                 ) {
-                    VideoDetailPreviewSection(
-                        detail = detail,
-                        ids = ids,
-                        onOpenSpace = onOpenSpace,
-                        modifier = itemMod
-                    )
+                    Column(
+                        modifier = itemMod.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        VideoDetailPreviewSection(
+                            detail = detail,
+                            ids = ids,
+                            infoExpanded = infoExpanded,
+                            onToggleInfo = onToggleInfo,
+                            onOpenSpace = onOpenSpace,
+                            onOpenComments = onOpenComments,
+                            following = actionState.following,
+                            followBusy = actionState.followBusy,
+                            onFollowClick = onFollowClick,
+                            isSelf = isSelf
+                        )
+                        ActionCapsule(
+                            stat = detail.stat,
+                            state = actionState,
+                            onToggleLike = onToggleLike,
+                            onToggleDislike = onToggleDislike,
+                            onOpenCoinPicker = onOpenCoinPicker,
+                            onOpenFavoritePicker = onOpenFavoritePicker,
+                            onOpenShare = onOpenShare,
+                            onDownloadClick = onDownloadClick
+                        )
+                    }
                 }
             } else {
                 item(
                     key = "detail_loading_summary",
                     contentType = "skeleton"
                 ) {
-                    VideoDetailInfoSkeleton(modifier = itemMod)
+                    VideoDetailInfoSkeleton(modifier = itemMod) {
+                        ActionCapsule(
+                            stat = null,
+                            state = actionState,
+                            onToggleLike = onToggleLike,
+                            onToggleDislike = onToggleDislike,
+                            onOpenCoinPicker = onOpenCoinPicker,
+                            onOpenFavoritePicker = onOpenFavoritePicker,
+                            onOpenShare = onOpenShare,
+                            onDownloadClick = onDownloadClick
+                        )
+                    }
                 }
             }
             items(
@@ -477,14 +563,15 @@ private fun LazyListScope.detailItems(
                 VideoSummarySection(
                     detail = detail,
                     ids = ids,
-                    descOn = descOn,
-                    tagOn = tagOn,
-                    onToggleDesc = onToggleDesc,
-                    onToggleTag = onToggleTag,
+                    infoExpanded = infoExpanded,
+                    onToggleInfo = onToggleInfo,
                     onOpenSpace = onOpenSpace,
+                    onFollowClick = onFollowClick,
+                    isSelf = isSelf,
                     onDownloadClick = onDownloadClick,
                     actionState = actionState,
                     onToggleLike = onToggleLike,
+                    onToggleDislike = onToggleDislike,
                     onOpenCoinPicker = onOpenCoinPicker,
                     onOpenFavoritePicker = onOpenFavoritePicker,
                     onOpenShare = onOpenShare,
@@ -550,12 +637,18 @@ private fun LazyListScope.detailItems(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VideoDetailPreviewSection(
     detail: VideoDetail,
     ids: ResolvedVideoIds,
+    infoExpanded: Boolean,
+    onToggleInfo: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    onOpenComments: () -> Unit,
+    following: Boolean,
+    followBusy: Boolean,
+    onFollowClick: () -> Unit,
+    isSelf: (Long) -> Boolean,
     modifier: Modifier = Modifier
 ) {
     val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
@@ -564,40 +657,42 @@ private fun VideoDetailPreviewSection(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         detail.owner?.let { owner ->
-            OwnerCapsule(
+            OwnerRow(
                 owner = owner,
                 showStatsSkeleton = true,
                 onClick = spaceRoute?.let { route ->
                     { onOpenSpace(route) }
-                }
+                },
+                following = following,
+                followBusy = followBusy,
+                onFollowClick = if (isSelf(owner.mid)) null else onFollowClick
             )
         }
-        InfoCapsule(
+        VideoInfoBlock(
             detail = detail,
             ids = ids,
-            descOn = false,
-            tagOn = false,
-            onToggleDesc = {},
-            onToggleTag = {},
-            onOpenComments = {}
+            infoExpanded = infoExpanded,
+            onToggleInfo = onToggleInfo,
+            onOpenComments = onOpenComments,
+            showMetaSkeleton = true
         )
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VideoSummarySection(
     detail: VideoDetail,
     ids: ResolvedVideoIds,
     modifier: Modifier = Modifier,
-    descOn: Boolean,
-    tagOn: Boolean,
-    onToggleDesc: () -> Unit,
-    onToggleTag: () -> Unit,
+    infoExpanded: Boolean,
+    onToggleInfo: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    onFollowClick: () -> Unit,
+    isSelf: (Long) -> Boolean,
     onDownloadClick: () -> Unit,
     actionState: VideoActionUiState,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
     onOpenShare: () -> Unit,
@@ -609,26 +704,28 @@ private fun VideoSummarySection(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         detail.owner?.let { owner ->
-            OwnerCapsule(
+            OwnerRow(
                 owner = owner,
                 onClick = spaceRoute?.let { route ->
                     { onOpenSpace(route) }
-                }
+                },
+                following = actionState.following,
+                followBusy = actionState.followBusy,
+                onFollowClick = if (isSelf(owner.mid)) null else onFollowClick
             )
         }
-        InfoCapsule(
+        VideoInfoBlock(
             detail = detail,
             ids = ids,
-            descOn = descOn,
-            tagOn = tagOn,
-            onToggleDesc = onToggleDesc,
-            onToggleTag = onToggleTag,
+            infoExpanded = infoExpanded,
+            onToggleInfo = onToggleInfo,
             onOpenComments = onOpenComments
         )
         ActionCapsule(
             stat = detail.stat,
             state = actionState,
             onToggleLike = onToggleLike,
+            onToggleDislike = onToggleDislike,
             onOpenCoinPicker = onOpenCoinPicker,
             onOpenFavoritePicker = onOpenFavoritePicker,
             onOpenShare = onOpenShare,
@@ -638,55 +735,118 @@ private fun VideoSummarySection(
 }
 
 @Composable
-private fun OwnerCapsule(
+private fun OwnerRow(
     owner: VideoOwner,
     modifier: Modifier = Modifier,
     showStatsSkeleton: Boolean = false,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    following: Boolean = false,
+    followBusy: Boolean = false,
+    onFollowClick: (() -> Unit)? = null
 ) {
-    CapsuleCard(
-        modifier = modifier,
-        onClick = onClick
+    val rowModifier = if (onClick != null) {
+        modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.extraLarge)
+            .clickable(onClick = onClick)
+    } else {
+        modifier.fillMaxWidth()
+    }
+    Row(
+        modifier = rowModifier,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        AvatarImage(
+            url = owner.face,
+            contentDescription = owner.name,
+            modifier = Modifier.size(48.dp)
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            AvatarImage(
-                url = owner.face,
-                contentDescription = owner.name,
-                modifier = Modifier
-                    .width(72.dp)
-                    .aspectRatio(1f)
+            Text(
+                text = owner.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = owner.name,
-                    style = MaterialTheme.typography.titleMedium
+                OwnerStatText(
+                    value = owner.fansText,
+                    showSkeleton = showStatsSkeleton,
+                    skeletonWidth = 52.dp
                 )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val fansText = owner.fansText?.takeIf(String::isNotBlank)
-                    val arcCountText = owner.arcCountText?.takeIf(String::isNotBlank)
-                    if (fansText != null) {
-                        SoftChip(fansText)
-                    } else if (showStatsSkeleton) {
-                        OwnerStatSkeleton(width = 68.dp)
-                    }
-                    if (arcCountText != null) {
-                        SoftChip(arcCountText)
-                    } else if (showStatsSkeleton) {
-                        OwnerStatSkeleton(width = 76.dp)
-                    }
-                }
+                OwnerStatText(
+                    value = owner.arcCountText,
+                    showSkeleton = showStatsSkeleton,
+                    skeletonWidth = 44.dp
+                )
             }
         }
+        if (onFollowClick != null) {
+            FollowButton(
+                following = following,
+                followedBy = owner.isFollowedBy,
+                busy = followBusy,
+                onClick = onFollowClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun FollowButton(
+    following: Boolean,
+    followedBy: Boolean,
+    busy: Boolean,
+    onClick: () -> Unit
+) {
+    val text = when {
+        following && followedBy -> "互相关注"
+        following -> "已关注"
+        followedBy -> "回关"
+        else -> "关注"
+    }
+    val colors = if (following) {
+        ButtonDefaults.buttonColors()
+    } else {
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+    Button(
+        onClick = onClick,
+        enabled = !busy,
+        colors = colors,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+        modifier = Modifier.height(32.dp)
+    ) {
+        Text(text = text, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun OwnerStatText(
+    value: String?,
+    showSkeleton: Boolean,
+    skeletonWidth: Dp
+) {
+    val text = value?.takeIf(String::isNotBlank)
+    if (text != null) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    } else if (showSkeleton) {
+        OwnerStatSkeleton(width = skeletonWidth)
     }
 }
 
@@ -695,207 +855,347 @@ private fun OwnerStatSkeleton(width: Dp) {
     SkeletonBlock(
         modifier = Modifier
             .width(width)
-            .height(28.dp),
-        shape = MaterialTheme.shapes.extraLarge
+            .height(14.dp),
+        shape = MaterialTheme.shapes.extraSmall
+    )
+}
+
+@Composable
+private fun VideoInfoBlock(
+    detail: VideoDetail,
+    ids: ResolvedVideoIds,
+    infoExpanded: Boolean,
+    onToggleInfo: () -> Unit,
+    onOpenComments: () -> Unit,
+    showMetaSkeleton: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = null,
+                    indication = null,
+                    onClick = onToggleInfo
+                )
+        ) {
+            val titleStyle = MaterialTheme.typography.titleLarge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = detail.title,
+                    style = titleStyle.copy(
+                        fontSize = titleStyle.fontSize * 0.9f,
+                        lineHeight = titleStyle.lineHeight * 0.9f
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = if (infoExpanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .copyTextOnLongPress(detail.title, "标题", onTap = onToggleInfo)
+                )
+                Icon(
+                    imageVector = if (infoExpanded) {
+                        Icons.Default.KeyboardArrowUp
+                    } else {
+                        Icons.Default.KeyboardArrowDown
+                    },
+                    contentDescription = if (infoExpanded) "收起视频信息" else "展开视频信息",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onToggleInfo)
+                        .padding(4.dp)
+                )
+            }
+
+            VideoMetaRow(
+                detail = detail,
+                onOpenComments = onOpenComments,
+                showSkeleton = showMetaSkeleton,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        AnimatedVisibility(visible = infoExpanded) {
+            VideoInfoPanel(
+                detail = detail,
+                ids = ids,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun VideoMetaRow(
+    detail: VideoDetail,
+    onOpenComments: () -> Unit,
+    modifier: Modifier = Modifier,
+    showSkeleton: Boolean = false
+) {
+    val stat = detail.stat
+    val pubTs = detail.pubTs
+    if (stat == null && pubTs == null && !showSkeleton) return
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        MetaItem(
+            icon = Icons.Outlined.PlayCircleOutline,
+            text = stat?.view,
+            showSkeleton = showSkeleton,
+            skeletonWidth = 48.dp
+        )
+        MetaItem(
+            icon = Icons.Outlined.Subtitles,
+            text = stat?.danmaku,
+            showSkeleton = showSkeleton,
+            skeletonWidth = 40.dp
+        )
+        MetaItem(
+            icon = Icons.Outlined.ChatBubbleOutline,
+            text = stat?.reply,
+            showSkeleton = showSkeleton,
+            skeletonWidth = 40.dp,
+            onClick = onOpenComments
+        )
+        if (pubTs != null) {
+            Text(
+                text = formatPubTime(pubTs),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else if (showSkeleton) {
+            MetaSkeleton(width = 96.dp)
+        }
+    }
+}
+
+@Composable
+private fun MetaItem(
+    icon: ImageVector,
+    text: String?,
+    modifier: Modifier = Modifier,
+    showSkeleton: Boolean = false,
+    skeletonWidth: Dp = 40.dp,
+    onClick: (() -> Unit)? = null
+) {
+    val value = text?.takeIf(String::isNotBlank)
+    if (value == null) {
+        if (showSkeleton) {
+            MetaSkeleton(width = skeletonWidth)
+        }
+        return
+    }
+    val itemModifier = if (onClick != null) {
+        modifier.clickable(onClick = onClick)
+    } else {
+        modifier
+    }
+    Row(
+        modifier = itemModifier,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun MetaSkeleton(width: Dp) {
+    SkeletonBlock(
+        modifier = Modifier
+            .width(width)
+            .height(14.dp),
+        shape = MaterialTheme.shapes.extraSmall
     )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun InfoCapsule(
+private fun VideoInfoPanel(
     detail: VideoDetail,
     ids: ResolvedVideoIds,
-    descOn: Boolean,
-    tagOn: Boolean,
-    onToggleDesc: () -> Unit,
-    onToggleTag: () -> Unit,
-    onOpenComments: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    CapsuleCard(modifier = modifier) {
-        Text(
-            text = detail.title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.copyTextOnLongPress(detail.title, "标题")
-        )
-
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ids.aid.takeIf { it > 0L }?.let { SoftChip("AV$it", onLongPressLabel = "AV号") }
-            ids.bvid?.takeIf(String::isNotBlank)?.let { SoftChip(it, onLongPressLabel = "BV号") }
-            detail.pubTs?.let { ts ->
-                SoftChip(formatPubTime(ts))
+    val aid = ids.aid.takeIf { it > 0L }
+    val bvid = ids.bvid?.takeIf(String::isNotBlank)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (aid != null || bvid != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                aid?.let { InfoId(value = "AV$it", copyLabel = "AV号") }
+                bvid?.let { InfoId(value = it, copyLabel = "BV号") }
             }
-            detail.stat?.let { stat ->
-                SoftChip("${stat.view} 播放")
-                SoftChip("${stat.danmaku} 弹幕")
-                SoftChip(
-                    text = "${stat.reply} 评论",
-                    onClick = onOpenComments
+        }
+
+        if (detail.desc.isNotBlank()) {
+            InfoSection(label = "简介") {
+                Text(
+                    text = detail.desc,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.copyTextOnLongPress(detail.desc, "简介")
                 )
             }
         }
 
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (detail.desc.isNotBlank()) {
-                ToggleChip(
-                    text = "简介",
-                    expanded = descOn,
-                    onClick = onToggleDesc
-                )
-            }
-            if (detail.tags.isNotEmpty()) {
-                ToggleChip(
-                    text = "标签",
-                    expanded = tagOn,
-                    onClick = onToggleTag
-                )
-            }
-        }
-
-        if (descOn && detail.desc.isNotBlank()) {
-            Text(
-                text = detail.desc,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .padding(top = 12.dp)
-                    .copyTextOnLongPress(detail.desc, "简介")
-            )
-        }
-
-        if (tagOn && detail.tags.isNotEmpty()) {
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                detail.tags.forEach { tag ->
-                    SoftChip(tag)
+        if (detail.tags.isNotEmpty()) {
+            InfoSection(label = "标签") {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    detail.tags.forEach { tag -> SoftChip(tag) }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InfoId(
+    value: String,
+    copyLabel: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.copyTextOnLongPress(value, copyLabel)
+    )
+}
+
+@Composable
+private fun InfoSection(
+    label: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        content()
+    }
+}
+
 @Composable
 private fun ActionCapsule(
     stat: VideoStat?,
     state: VideoActionUiState,
     modifier: Modifier = Modifier,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
     onOpenCoinPicker: () -> Unit,
     onOpenFavoritePicker: () -> Unit,
     onOpenShare: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
-    CapsuleCard(modifier = modifier) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            stat?.let {
-                ActionChip(
-                    label = "点赞",
-                    value = adjustedCount(it.like, state.likeCountDelta),
-                    selected = state.liked,
-                    enabled = state.initialized && !state.likeBusy,
-                    onClick = onToggleLike
-                )
-                ActionChip(
-                    label = "投币",
-                    value = adjustedCount(it.coin, state.coinCountDelta),
-                    selected = state.userCoinCount > 0,
-                    enabled = state.initialized && !state.coinBusy,
-                    onClick = onOpenCoinPicker
-                )
-                ActionChip(
-                    label = "收藏",
-                    value = adjustedCount(it.fav, state.favoriteCountDelta),
-                    selected = state.favorited,
-                    enabled = state.initialized && !state.favoriteLoading && !state.favoriteSaving,
-                    onClick = onOpenFavoritePicker
-                )
-                ActionChip(
-                    label = "分享",
-                    onClick = onOpenShare
-                )
-            }
-            ActionChip(
-                label = "下载",
-                onClick = onDownloadClick
-            )
-        }
-    }
-}
-
-@Composable
-private fun CapsuleCard(
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    content: @Composable () -> Unit
-) {
-    if (onClick != null) {
-        Card(
-            onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                content()
-            }
-        }
+    val coinSelected = state.userCoinCount > 0
+    val coinContainerColor = if (coinSelected) {
+        MaterialTheme.colorScheme.primary
     } else {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                content()
-            }
-        }
+        MaterialTheme.colorScheme.outline
+    }
+    val coinGlyphColor = if (coinSelected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ActionItem(
+            icon = if (state.liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUpOffAlt,
+            label = "点赞",
+            value = stat?.like?.let { compactCount(adjustedCount(it, state.likeCountDelta)) } ?: "-",
+            selected = state.liked,
+            enabled = state.initialized && !state.likeBusy,
+            onClick = onToggleLike,
+            modifier = Modifier.weight(1f)
+        )
+        ActionItem(
+            icon = if (state.disliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDownOffAlt,
+            label = "不喜欢",
+            selected = state.disliked,
+            enabled = state.initialized && !state.dislikeBusy,
+            onClick = onToggleDislike,
+            modifier = Modifier.weight(1f)
+        )
+        ActionItem(
+            icon = AppIcons.Coin,
+            label = "投币",
+            value = stat?.coin?.let { compactCount(adjustedCount(it, state.coinCountDelta)) } ?: "-",
+            selected = coinSelected,
+            enabled = state.initialized && !state.coinBusy,
+            iconContainerColor = coinContainerColor,
+            iconGlyphColor = coinGlyphColor,
+            onClick = onOpenCoinPicker,
+            modifier = Modifier.weight(1f)
+        )
+        ActionItem(
+            icon = if (state.favorited) Icons.Filled.Star else Icons.Outlined.StarBorder,
+            label = "收藏",
+            value = stat?.fav?.let { compactCount(adjustedCount(it, state.favoriteCountDelta)) } ?: "-",
+            selected = state.favorited,
+            enabled = state.initialized && !state.favoriteLoading && !state.favoriteSaving,
+            onClick = onOpenFavoritePicker,
+            modifier = Modifier.weight(1f)
+        )
+        ActionItem(
+            icon = Icons.Outlined.OpenInNew,
+            label = "分享",
+            value = stat?.share?.let(::compactCount) ?: "-",
+            onClick = onOpenShare,
+            modifier = Modifier.weight(1f)
+        )
+        ActionItem(
+            icon = Icons.Outlined.Download,
+            label = "下载",
+            onClick = onDownloadClick,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
 @Composable
-private fun SoftChip(
-    text: String,
-    onClick: (() -> Unit)? = null,
-    onLongPressLabel: String? = null
-) {
-    val modifier = when {
-        onLongPressLabel != null -> Modifier.copyTextOnLongPress(text, onLongPressLabel)
-        onClick != null -> Modifier.clickable(onClick = onClick)
-        else -> Modifier
-    }
+private fun SoftChip(text: String) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = MaterialTheme.shapes.extraLarge,
-        modifier = modifier
+        shape = MaterialTheme.shapes.extraLarge
     ) {
         Text(
             text = text,
@@ -906,108 +1206,79 @@ private fun SoftChip(
 }
 
 @Composable
-private fun ToggleChip(
-    text: String,
-    expanded: Boolean,
+private fun ActionItem(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    value: String? = null,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+    iconContainerColor: Color? = null,
+    iconGlyphColor: Color = Color.White,
     onClick: () -> Unit
 ) {
+    val contentColor by animateColorAsState(
+        targetValue = when {
+            selected -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "actionItemContent"
+    )
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.tertiaryContainer
+        modifier = modifier,
+        enabled = enabled,
+        color = Color.Transparent,
+        contentColor = contentColor
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer
+            ActionItemIcon(
+                icon = icon,
+                label = label,
+                containerColor = iconContainerColor,
+                glyphColor = iconGlyphColor
             )
-            Icon(
-                imageVector = if (expanded) {
-                    Icons.Default.KeyboardArrowUp
-                } else {
-                    Icons.Default.KeyboardArrowDown
-                },
-                contentDescription = if (expanded) "收起" else "展开",
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onTertiaryContainer
+            Text(
+                text = value ?: label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
 @Composable
-private fun ActionChip(
+private fun ActionItemIcon(
+    icon: ImageVector,
     label: String,
-    value: String? = null,
-    selected: Boolean = false,
-    enabled: Boolean = true,
-    onClick: (() -> Unit)? = null
+    containerColor: Color?,
+    glyphColor: Color
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val containerColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        },
-        animationSpec = tween(durationMillis = 150),
-        label = "actionChipContainer"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = tween(durationMillis = 150),
-        label = "actionChipContent"
-    )
-    Surface(
-        modifier = if (onClick != null) {
-            Modifier
-                .alpha(if (enabled) 1f else 0.55f)
-                .clickable(
-                    enabled = enabled,
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick
-                )
-        } else {
-            Modifier
-        },
-        color = containerColor,
-        shape = MaterialTheme.shapes.extraLarge
-    ) {
-        Row(
-            modifier = Modifier
-                .defaultMinSize(minWidth = 76.dp, minHeight = 36.dp)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = if (value == null) {
-                    MaterialTheme.typography.titleSmall
-                } else {
-                    MaterialTheme.typography.labelMedium
-                },
-                color = contentColor
-            )
-            value?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = contentColor
-                )
-            }
-        }
+    if (containerColor == null) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(24.dp)
+        )
+        return
     }
+    Icon(
+        imageVector = icon,
+        contentDescription = label,
+        tint = glyphColor,
+        modifier = Modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(containerColor)
+    )
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -1435,6 +1706,22 @@ private fun adjustedCount(value: String, delta: Int): String {
     return value.toLongOrNull()
         ?.let { (it + delta).coerceAtLeast(0L).toString() }
         ?: value
+}
+
+private fun compactCount(value: String): String {
+    val number = value.toLongOrNull() ?: return value
+    return when {
+        number < 10_000L -> value
+        number < 100_000_000L -> scaledCount(number, 10_000L, "万")
+        else -> scaledCount(number, 100_000_000L, "亿")
+    }
+}
+
+private fun scaledCount(number: Long, unit: Long, suffix: String): String {
+    val tenths = (number * 10L + unit / 2L) / unit
+    val whole = tenths / 10L
+    val decimal = tenths % 10L
+    return if (decimal == 0L) "$whole$suffix" else "$whole.$decimal$suffix"
 }
 
 @Composable

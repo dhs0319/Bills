@@ -43,12 +43,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.media3.common.util.UnstableApi
 import com.dhs0319.bills.core.model.PlaybackSource
@@ -232,6 +234,9 @@ fun VideoScreen(
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
                         onToggleLike = viewModel::toggleLike,
+                        onToggleDislike = viewModel::toggleDislike,
+                        onToggleFollow = viewModel::toggleFollow,
+                        isSelf = viewModel::isSelf,
                         isLoggedIn = viewModel::isLoggedIn,
                         onSubmitCoins = viewModel::submitCoins,
                         onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
@@ -278,6 +283,9 @@ fun VideoScreen(
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
                         onToggleLike = viewModel::toggleLike,
+                        onToggleDislike = viewModel::toggleDislike,
+                        onToggleFollow = viewModel::toggleFollow,
+                        isSelf = viewModel::isSelf,
                         isLoggedIn = viewModel::isLoggedIn,
                         onSubmitCoins = viewModel::submitCoins,
                         onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
@@ -314,6 +322,19 @@ fun VideoScreen(
                 ) ?: error("下载参数无效")
                 onStartDownload(request)
             }
+        )
+    }
+
+    if (actionUiState.dislikeThanksVisible) {
+        AlertDialog(
+            onDismissRequest = viewModel::consumeDislikeThanks,
+            confirmButton = {
+                TextButton(onClick = viewModel::consumeDislikeThanks) {
+                    Text("知道了")
+                }
+            },
+            title = { Text("感谢反馈") },
+            text = { Text("我们会减少类似内容的推荐") }
         )
     }
 }

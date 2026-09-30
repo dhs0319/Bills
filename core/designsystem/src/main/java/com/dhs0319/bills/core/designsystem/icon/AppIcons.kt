@@ -1,10 +1,13 @@
 package com.dhs0319.bills.core.designsystem.icon
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.designsystem.R
 
 object AppIcons {
     private val blackFill = SolidColor(Color.Black)
@@ -41,4 +44,7 @@ object AppIcons {
         }
     }
 
+    /** 投币图标的币字部分，需要配合圆形底色使用。 */
+    val Coin: ImageVector
+        @Composable get() = ImageVector.vectorResource(R.drawable.ic_coin)
 }

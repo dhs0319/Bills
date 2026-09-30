@@ -56,8 +56,11 @@ class VideoViewModel @Inject constructor(
                         aid = state.ids.aid,
                         detailLoaded = state.detail != null && !state.detailLoading,
                         liked = state.detail?.isLiked == true,
+                        disliked = state.detail?.isDisliked == true,
                         favorited = state.detail?.isFavorited == true,
-                        userCoinCount = state.detail?.userCoinCount ?: 0
+                        userCoinCount = state.detail?.userCoinCount ?: 0,
+                        ownerMid = state.detail?.owner?.mid ?: 0L,
+                        following = state.detail?.owner?.isFollowing == true
                     )
                 }
                 .distinctUntilChanged()
@@ -119,7 +122,17 @@ class VideoViewModel @Inject constructor(
         videoActions.toggleLike()
     }
 
+    fun toggleDislike() {
+        videoActions.toggleDislike()
+    }
+
+    fun toggleFollow() {
+        videoActions.toggleFollow()
+    }
+
     fun isLoggedIn(): Boolean = videoActionRepository.isLoggedIn()
+
+    fun isSelf(mid: Long): Boolean = mid > 0L && videoActionRepository.currentMid() == mid
 
     fun submitCoins(amount: Int, onSuccess: () -> Unit) {
         videoActions.submitCoins(amount, onSuccess)
@@ -139,6 +152,10 @@ class VideoViewModel @Inject constructor(
 
     fun consumeActionMessage() {
         videoActions.consumeMessage()
+    }
+
+    fun consumeDislikeThanks() {
+        videoActions.consumeDislikeThanks()
     }
 
     fun pause(): Boolean {
