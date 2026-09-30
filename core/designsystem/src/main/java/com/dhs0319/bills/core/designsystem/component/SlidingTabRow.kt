@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -52,7 +53,9 @@ fun SlidingTabRow(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    position: Float? = null
+    position: Float? = null,
+    tabTextStyle: TextStyle = MaterialTheme.typography.titleMedium,
+    tabHorizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally
 ) {
     if (tabs.isEmpty()) return
 
@@ -81,6 +84,12 @@ fun SlidingTabRow(
         animatedTail
     }
     val indicatorColor = MaterialTheme.colorScheme.primary
+    val startAligned = tabHorizontalAlignment == Alignment.Start
+    val tabContentAlignment = when (tabHorizontalAlignment) {
+        Alignment.Start -> Alignment.CenterStart
+        Alignment.End -> Alignment.CenterEnd
+        else -> Alignment.Center
+    }
 
     Box(modifier = modifier.fillMaxWidth().height(44.dp)) {
         Canvas(Modifier.matchParentSize()) {
@@ -91,8 +100,18 @@ fun SlidingTabRow(
             val tail = trailingPosition.coerceIn(0f, tabs.lastIndex.toFloat())
             val fraction = head - floor(head)
             val stretch = (0.24 * sin(PI * fraction).let { it * it }).toFloat()
-            val left = (min(head - stretch, tail) + 0.5f) * tabWidth - indicatorWidth / 2f
-            val right = (max(head + stretch, tail) + 0.5f) * tabWidth + indicatorWidth / 2f
+            val leading = max(head + stretch, tail)
+            val trailing = min(head - stretch, tail)
+            val left = if (startAligned) {
+                trailing * tabWidth
+            } else {
+                (trailing + 0.5f) * tabWidth - indicatorWidth / 2f
+            }
+            val right = if (startAligned) {
+                leading * tabWidth + indicatorWidth
+            } else {
+                (leading + 0.5f) * tabWidth + indicatorWidth / 2f
+            }
             val drawLeft = if (layoutDirection == LayoutDirection.Rtl) size.width - right else left
 
             drawRoundRect(
@@ -114,14 +133,14 @@ fun SlidingTabRow(
                             role = Role.Tab,
                             onClick = { onSelect(index) }
                         ),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = tabContentAlignment
                 ) {
                     Text(
                         text = title,
                         modifier = Modifier.padding(bottom = 8.dp),
                         color = if (index == selectedIndex) indicatorColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
+                        style = tabTextStyle,
+                        textAlign = if (startAligned) TextAlign.Start else TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -137,7 +156,9 @@ fun PagerSlidingTabRow(
     tabs: List<String>,
     pagerState: PagerState,
     modifier: Modifier = Modifier,
-    onReselect: (Int) -> Unit = {}
+    onReselect: (Int) -> Unit = {},
+    tabTextStyle: TextStyle = MaterialTheme.typography.titleMedium,
+    tabHorizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally
 ) {
     val scope = rememberCoroutineScope()
     val baseDurationMillis = LocalAnimations.current.medium
@@ -154,6 +175,8 @@ fun PagerSlidingTabRow(
                 scope.launch { pagerState.animateScrollContinuouslyToPage(page, baseDurationMillis) }
             }
         },
+        tabTextStyle = tabTextStyle,
+        tabHorizontalAlignment = tabHorizontalAlignment,
         modifier = modifier
     )
 }

@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -92,6 +93,7 @@ fun CommentPanel(
     threadListState: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     header: (@Composable () -> Unit)? = null,
+    showCommentCount: Boolean = true,
     viewModel: CommentViewModel = hiltViewModel()
 ) {
     LaunchedEffect(isActive, subject, detailRecord?.key) {
@@ -251,6 +253,7 @@ fun CommentPanel(
                 ) {
                     CommentHeader(
                         state = uiState,
+                        showCount = showCommentCount,
                         onSelectSort = viewModel::selectSort
                     )
                 }
@@ -438,18 +441,20 @@ private fun BoxScope.CommentEditorLayer(
 @Composable
 private fun CommentHeader(
     state: CommentUiState,
+    showCount: Boolean,
     onSelectSort: (CommentSort) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = headerCount(state.count),
+            text = if (showCount) headerCount(state.count) else sortTitle(state.sort),
             style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
         if (state.canSwitchSort) {
@@ -497,7 +502,7 @@ private fun CommentSortSelector(
                         interactionSource = remember(option) { MutableInteractionSource() },
                         indication = null
                     )
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
             )
         }
     }
@@ -507,6 +512,13 @@ private fun sortText(sort: CommentSort): String {
     return when (sort) {
         CommentSort.HOT -> "按热度"
         CommentSort.TIME -> "按时间"
+    }
+}
+
+private fun sortTitle(sort: CommentSort): String {
+    return when (sort) {
+        CommentSort.HOT -> "热门评论"
+        CommentSort.TIME -> "最新评论"
     }
 }
 

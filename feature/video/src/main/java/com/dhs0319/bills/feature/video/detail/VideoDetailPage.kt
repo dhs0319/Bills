@@ -96,6 +96,7 @@ import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
+import com.dhs0319.bills.core.designsystem.component.PagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.SkeletonBlock
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
@@ -119,6 +120,7 @@ import com.dhs0319.bills.feature.comment.CommentPanel
 import com.dhs0319.bills.feature.video.formatDuration
 import com.dhs0319.bills.core.video.VideoFavoriteFolder
 import com.dhs0319.bills.feature.video.action.VideoActionUiState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -155,6 +157,7 @@ internal fun VideoDetailPage(
     val commentThreadListState = remember(aidKey) { LazyListState() }
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    var tabScrollJob by remember(aidKey) { mutableStateOf<Job?>(null) }
     var coinSheetVisible by remember(aidKey) { mutableStateOf(false) }
     var selectedCoinAmount by remember(aidKey) { mutableStateOf(1) }
     var favoriteSheetVisible by remember(aidKey) { mutableStateOf(false) }
@@ -183,98 +186,130 @@ internal fun VideoDetailPage(
         }
     }
 
-    HorizontalPager(
-        state = pagerState,
-        beyondViewportPageCount = 0,
-        modifier = modifier.fillMaxSize()
-    ) { page ->
-        when (page) {
-            0 -> DetailPageContent(
-                modifier = Modifier.fillMaxSize(),
-                detail = detail,
-                ids = ids,
-                detailLoading = detailLoading,
-                detailError = detailError,
-                actionState = actionState,
-                horizontalPad = contentHorizontalPad,
-                infoListState = detailListState,
-                infoExpanded = infoExpanded,
-                onToggleInfo = { infoExpanded = !infoExpanded },
-                onSeasonClick = { sheet = detail?.season?.let { DetailSheet.Season(it, curCid) } },
-                onPageClick = {
-                    sheet = detail?.pages
-                        ?.takeIf { it.size > 1 }
-                        ?.let { DetailSheet.Page(it, curCid) }
-                },
-                onOpenComments = {
-                    scope.launch {
-                        pagerState.animateScrollToPage(1)
-                    }
-                },
-                onOpenVideo = onOpenVideo,
-                onOpenSpace = onOpenSpace,
-                onDownloadClick = onDownloadClick,
-                onToggleLike = onToggleLike,
-                onToggleDislike = onToggleDislike,
-                onFollowClick = {
-                    if (!isLoggedIn()) {
-                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                    } else if (actionState.following) {
-                        unfollowConfirmVisible = true
-                    } else {
-                        onToggleFollow()
-                    }
-                },
-                isSelf = isSelf,
-                onOpenCoinPicker = {
-                    if (!isLoggedIn()) {
-                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                    } else if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
-                        selectedCoinAmount = 1
-                        coinSheetVisible = true
-                    }
-                },
-                onOpenFavoritePicker = {
-                    if (
-                        actionState.initialized &&
-                        actionState.aid > 0L &&
-                        !actionState.favoriteLoading &&
-                        !actionState.favoriteSaving
-                    ) {
-                        onLoadFavoriteFolders { folders ->
-                            val selectedIds = folders.filter(VideoFavoriteFolder::selected)
-                                .mapTo(linkedSetOf(), VideoFavoriteFolder::id)
-                            favoriteFolders = folders
-                            originalFavoriteFolderIds = selectedIds
-                            selectedFavoriteFolderIds = selectedIds
-                            favoriteSheetVisible = true
+    val detailTabs = remember(detail?.stat?.reply) {
+        listOf(
+            "简介",
+            detail?.stat?.reply
+                ?.takeIf(String::isNotBlank)
+                ?.let { "评论 ${compactCount(it)}" }
+                ?: "评论"
+        )
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        PagerSlidingTabRow(
+            tabs = detailTabs,
+            pagerState = pagerState,
+            tabTextStyle = MaterialTheme.typography.titleSmall,
+            tabHorizontalAlignment = Alignment.Start,
+            onReselect = { page ->
+                val listState = if (page == 0) detailListState else commentListState
+                tabScrollJob?.cancel()
+                tabScrollJob = scope.launch {
+                    listState.animateScrollToItem(0)
+                }
+            },
+            modifier = Modifier
+                .padding(horizontal = contentHorizontalPad)
+                .width(detailTabWidth * detailTabs.size)
+        )
+
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 0,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) { page ->
+            when (page) {
+                0 -> DetailPageContent(
+                    modifier = Modifier.fillMaxSize(),
+                    detail = detail,
+                    ids = ids,
+                    detailLoading = detailLoading,
+                    detailError = detailError,
+                    actionState = actionState,
+                    horizontalPad = contentHorizontalPad,
+                    infoListState = detailListState,
+                    infoExpanded = infoExpanded,
+                    onToggleInfo = { infoExpanded = !infoExpanded },
+                    onSeasonClick = { sheet = detail?.season?.let { DetailSheet.Season(it, curCid) } },
+                    onPageClick = {
+                        sheet = detail?.pages
+                            ?.takeIf { it.size > 1 }
+                            ?.let { DetailSheet.Page(it, curCid) }
+                    },
+                    onOpenComments = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(1)
+                        }
+                    },
+                    onOpenVideo = onOpenVideo,
+                    onOpenSpace = onOpenSpace,
+                    onDownloadClick = onDownloadClick,
+                    onToggleLike = onToggleLike,
+                    onToggleDislike = onToggleDislike,
+                    onFollowClick = {
+                        if (!isLoggedIn()) {
+                            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        } else if (actionState.following) {
+                            unfollowConfirmVisible = true
+                        } else {
+                            onToggleFollow()
+                        }
+                    },
+                    isSelf = isSelf,
+                    onOpenCoinPicker = {
+                        if (!isLoggedIn()) {
+                            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        } else if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
+                            selectedCoinAmount = 1
+                            coinSheetVisible = true
+                        }
+                    },
+                    onOpenFavoritePicker = {
+                        if (
+                            actionState.initialized &&
+                            actionState.aid > 0L &&
+                            !actionState.favoriteLoading &&
+                            !actionState.favoriteSaving
+                        ) {
+                            onLoadFavoriteFolders { folders ->
+                                val selectedIds = folders.filter(VideoFavoriteFolder::selected)
+                                    .mapTo(linkedSetOf(), VideoFavoriteFolder::id)
+                                favoriteFolders = folders
+                                originalFavoriteFolderIds = selectedIds
+                                selectedFavoriteFolderIds = selectedIds
+                                favoriteSheetVisible = true
+                            }
+                        }
+                    },
+                    onOpenShare = {
+                        if (shareUrl == null) {
+                            Toast.makeText(context, "视频链接无效", Toast.LENGTH_SHORT).show()
+                        } else {
+                            shareSheetVisible = true
                         }
                     }
-                },
-                onOpenShare = {
-                    if (shareUrl == null) {
-                        Toast.makeText(context, "视频链接无效", Toast.LENGTH_SHORT).show()
-                    } else {
-                        shareSheetVisible = true
-                    }
-                }
-            )
-
-            else -> {
-                CommentPanel(
-                    subject = commentSubject,
-                    isActive = pagerState.currentPage == page,
-                    onOpenSpace = onOpenSpace,
-                    modifier = Modifier.fillMaxSize(),
-                    listState = commentListState,
-                    threadListState = commentThreadListState,
-                    contentPadding = PaddingValues(
-                        start = contentHorizontalPad,
-                        top = 12.dp,
-                        end = contentHorizontalPad,
-                        bottom = 20.dp
-                    )
                 )
+
+                else -> {
+                    CommentPanel(
+                        subject = commentSubject,
+                        isActive = pagerState.currentPage == page,
+                        onOpenSpace = onOpenSpace,
+                        modifier = Modifier.fillMaxSize(),
+                        listState = commentListState,
+                        threadListState = commentThreadListState,
+                        showCommentCount = false,
+                        contentPadding = PaddingValues(
+                            start = contentHorizontalPad,
+                            top = 0.dp,
+                            end = contentHorizontalPad,
+                            bottom = 20.dp
+                        )
+                    )
+                }
             }
         }
     }
@@ -2297,6 +2332,8 @@ private fun VideoDetail.toSpaceRouteOrNull(fromViewAid: Long?): SpaceRoute? {
         fromViewAid = fromViewAid
     )
 }
+
+private val detailTabWidth = 70.dp
 
 private const val DETAIL_RELATE_SKELETON_COUNT = 2
 private sealed interface DetailSheet {
