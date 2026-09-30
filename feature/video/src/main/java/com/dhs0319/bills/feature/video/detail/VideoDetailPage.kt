@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.ThumbDownOffAlt
 import androidx.compose.material.icons.outlined.ThumbUpOffAlt
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -81,9 +83,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -971,7 +977,7 @@ private fun VideoMetaRow(
         if (pubTs != null) {
             Text(
                 text = formatPubTime(pubTs),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else if (showSkeleton) {
@@ -1014,7 +1020,7 @@ private fun MetaItem(
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -1731,38 +1737,14 @@ private fun SeasonEntryCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val (title, subTitle, countText) = seasonEntryText(season, curCid)
+    val (title, progressText) = remember(season, curCid) { seasonEntryText(season, curCid) }
 
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "合集列表",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            if (subTitle.isNotBlank()) {
-                Text(
-                    text = subTitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                text = countText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
+    DetailEntryRow(
+        title = title,
+        progressText = progressText,
+        modifier = modifier,
+        onClick = onClick
+    )
 }
 
 @Composable
@@ -1772,37 +1754,86 @@ private fun PageEntryCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val (title, subTitle, countText) = remember(pages, curCid) {
-        pageEntryText(pages, curCid)
-    }
+    val (title, progressText) = remember(pages, curCid) { pageEntryText(pages, curCid) }
 
-    Card(
+    DetailEntryRow(
+        title = title,
+        progressText = progressText,
+        modifier = modifier,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun DetailEntryRow(
+    title: String,
+    progressText: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "分P列表",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
-            if (subTitle.isNotBlank()) {
-                Text(
-                    text = subTitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            CollectionBarsIcon(
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .size(13.dp)
+            )
             Text(
-                text = countText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                text = progressText,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(start = 6.dp)
+                    .size(22.dp)
+            )
+        }
+    }
+}
+
+/** 合集 / 分P 条目前的装饰图标，由几根高低递减的竖条组成。 */
+@Composable
+private fun CollectionBarsIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val barFraction = listOf(1f, 0.68f, 0.44f)
+        val gap = size.width * 0.16f
+        val barWidth = (size.width - gap * (barFraction.size - 1)) / barFraction.size
+        barFraction.forEachIndexed { index, fraction ->
+            val barHeight = size.height * fraction
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(index * (barWidth + gap), size.height - barHeight),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
             )
         }
     }
@@ -2188,29 +2219,26 @@ internal fun QualityOptionItem(
 private fun seasonEntryText(
     season: VideoSeason,
     curCid: Long?
-): Triple<String, String, String> {
-    val curEp = season.sections
-        .asSequence()
-        .flatMap { it.eps.asSequence() }
-        .firstOrNull { it.cid == curCid }
-    return Triple(
-        curEp?.title ?: season.title,
-        curEp?.subTitle.orEmpty().ifBlank { season.subTitle.orEmpty() },
-        "${season.sections.sumOf { it.eps.size }} 个视频"
-    )
+): Pair<String, String> {
+    val eps = season.sections.flatMap { it.eps }
+    val curIdx = eps.indexOfFirst { it.cid == curCid }
+    return "合集 · ${season.title}" to if (curIdx >= 0) {
+        "${curIdx + 1}/${eps.size}"
+    } else {
+        "共 ${eps.size} 个"
+    }
 }
 
 private fun pageEntryText(
     pages: List<VideoPagePart>,
     curCid: Long?
-): Triple<String, String, String> {
-    val curIdx = curCid?.let { pages.indexOfFirst { it.cid == curCid } } ?: -1
+): Pair<String, String> {
+    val curIdx = pages.indexOfFirst { it.cid == curCid }
     val curPage = pages.getOrNull(curIdx)
-    return Triple(
-        if (curPage != null) buildPageTitle(curIdx, curPage.part) else "查看分P列表",
-        curPage?.durationSec?.takeIf { it > 0L }?.let { formatDuration(it * 1000) }.orEmpty(),
-        "${pages.size} 个分 P"
-    )
+    val title = curPage?.part?.takeIf(String::isNotBlank)
+        ?.let { "分P · $it" }
+        ?: "分P列表"
+    return title to if (curIdx >= 0) "${curIdx + 1}/${pages.size}" else "共 ${pages.size} 个"
 }
 
 private fun seasonSheetIndex(season: VideoSeason, curCid: Long?): Int {
