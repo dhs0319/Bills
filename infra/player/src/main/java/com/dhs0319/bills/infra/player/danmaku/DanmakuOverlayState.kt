@@ -77,9 +77,21 @@ class DanmakuOverlayState internal constructor(
             !hasSource ||
             lastPlayState?.isPlaying != true
         if (needStateOverride) {
-            // 关键修复：外部时钟必须锚定真实播放位置，不能用上一次(可能错误的)推算值，
-            // 否则换源/续播等无 seek 事件的位置跳变会让弹幕时间轴停在错误位置。
-            timeProvider.overrideState(clampedPositionMs, canPlay, clampedSpeed)
+            // 变速只改变时间轴推进速率，此时保持时钟连续；positionMs 是秒级轮询采样值，
+            // 用它重新锚定会让弹幕时间轴倒退(屏幕上弹幕整体向右跳/被挤出屏幕)。
+            // 其余情况(seek/换源/起播/暂停)仍需锚定真实播放位置，否则换源、续播等
+            // 无 seek 事件的位置跳变会让弹幕时间轴停在错误位置。
+            val keepClockContinuous = hasSpeedChange &&
+                !hasSeek &&
+                canPlay &&
+                hasSource &&
+                lastPlayState?.isPlaying == true
+            val anchorMs = if (keepClockContinuous) {
+                timeProvider.getCurrentTimeMs()
+            } else {
+                clampedPositionMs
+            }
+            timeProvider.overrideState(anchorMs, canPlay, clampedSpeed)
         }
         syncPlayback(
             enabled = config.enabled,

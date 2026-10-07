@@ -16,6 +16,7 @@ data class ImUiState(
     val isLoadingMore: Boolean = false,
     val errorMessage: String? = null,
     val loadMoreError: String? = null,
+    val actionError: String? = null,
     val isLoggedIn: Boolean = true
 ) {
     val canLoadMore: Boolean

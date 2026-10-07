@@ -3,9 +3,12 @@ package com.dhs0319.bills.feature.im.conversation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dhs0319.bills.core.auth.AuthRepository
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.im.ImRepository
+import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.ImConversationPage
+import com.dhs0319.bills.core.model.ImMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,13 +20,16 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ImConversationViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val imRepo: ImRepository
+    private val imRepo: ImRepository,
+    private val authRepo: AuthRepository
 ) : ViewModel() {
 
     private val talkerId = savedStateHandle.get<Long>("talkerId") ?: 0L
     private val sessionType = savedStateHandle.get<Int>("sessionType") ?: 0
     private val routeTitle = savedStateHandle.get<String>("title").orEmpty()
     private val routeAvatar = savedStateHandle.get<String>("avatar")?.takeIf(String::isNotBlank)
+    private val latestMessageIsAutoReply = savedStateHandle.get<Boolean>("autoReply") ?: false
+    private var autoReplyMessageKey: Long? = null
 
     private val _uiState = MutableStateFlow(ImConversationUiState())
     val uiState: StateFlow<ImConversationUiState> = _uiState.asStateFlow()
@@ -31,7 +37,8 @@ class ImConversationViewModel @Inject constructor(
     init {
         _uiState.value = ImConversationUiState(
             title = routeTitle,
-            avatar = routeAvatar
+            avatar = routeAvatar,
+            selfAvatar = authRepo.getUserInfo()?.avatar?.takeIf(String::isNotBlank)
         )
         refresh()
     }
@@ -147,13 +154,17 @@ class ImConversationViewModel @Inject constructor(
     private fun applyConversation(
         page: ImConversationPage
     ) {
+        if (autoReplyMessageKey == null && latestMessageIsAutoReply) {
+            autoReplyMessageKey = page.messages.firstOrNull()?.key
+        }
         _uiState.update { state ->
-            val messages = page.messages
+            val messages = page.messages.withAutoReplyMark()
             state.copy(
                 title = state.title.ifBlank { routeTitle },
                 avatar = state.avatar ?: routeAvatar,
                 hasMoreHistory = page.hasMoreHistory,
                 messages = messages,
+                emotes = mergeEmotes(state.emotes, page.emotes),
                 isLoading = false,
                 isRefreshing = false,
                 isLoadingMore = false
@@ -167,8 +178,29 @@ class ImConversationViewModel @Inject constructor(
             state.copy(
                 hasMoreHistory = page.hasMoreHistory,
                 messages = messages,
+                emotes = mergeEmotes(state.emotes, page.emotes),
                 isLoadingMore = false
             )
+        }
+    }
+
+    private fun mergeEmotes(
+        current: List<CommentEmote>,
+        incoming: List<CommentEmote>
+    ): List<CommentEmote> {
+        if (incoming.isEmpty()) return current
+        if (current.isEmpty()) return incoming
+        return (current + incoming).distinctBy(CommentEmote::text)
+    }
+
+    private fun List<ImMessage>.withAutoReplyMark(): List<ImMessage> {
+        val key = autoReplyMessageKey ?: return this
+        return map { message ->
+            if (message.key == key && !message.isAutoReply) {
+                message.copy(isAutoReply = true)
+            } else {
+                message
+            }
         }
     }
 

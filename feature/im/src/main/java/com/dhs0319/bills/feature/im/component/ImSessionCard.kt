@@ -35,6 +35,7 @@ internal fun ImSessionCard(
         onClick = { onClick?.invoke() },
         enabled = onClick != null,
         modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
