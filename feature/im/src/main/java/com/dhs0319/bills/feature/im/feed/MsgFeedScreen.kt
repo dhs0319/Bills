@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,17 +22,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.model.MsgFeedFilter
-import com.dhs0319.bills.core.designsystem.component.FilledTabRow
+import com.dhs0319.bills.core.designsystem.component.SlidingTabRow
 import com.dhs0319.bills.core.model.PublishedRecord
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.comment.CommentPanel
+
+private val msgFeedTabs = listOf("全部", "关注的人")
+private val msgFeedTabWidth = 88.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,8 +73,8 @@ fun MsgFeedScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                FilledTabRow(
-                    tabs = listOf("全部", "关注的人"),
+                SlidingTabRow(
+                    tabs = msgFeedTabs,
                     selectedIndex = state.filterType.index,
                     onSelect = { index ->
                         when (index) {
@@ -77,7 +82,10 @@ fun MsgFeedScreen(
                             1 -> vm.changeFilter(MsgFeedFilter.FOLLOWING)
                         }
                     },
+                    tabHorizontalAlignment = Alignment.Start,
                     modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .width(msgFeedTabWidth * msgFeedTabs.size)
                 )
                 MsgFeedPane(
                     onOpenCommentDetail = { record ->

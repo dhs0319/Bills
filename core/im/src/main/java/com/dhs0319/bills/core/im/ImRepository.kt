@@ -2,9 +2,17 @@ package com.dhs0319.bills.core.im
 
 import android.content.Context
 import androidx.core.content.edit
+import com.bapis.bilibili.app.im.v1.CustomerId
+import com.bapis.bilibili.app.im.v1.DeleteSessionReply
+import com.bapis.bilibili.app.im.v1.DeleteSessionReq
+import com.bapis.bilibili.app.im.v1.FoldId
+import com.bapis.bilibili.app.im.v1.GroupId
 import com.bapis.bilibili.app.im.v1.MsgSummary
 import com.bapis.bilibili.app.im.v1.Offset
 import com.bapis.bilibili.app.im.v1.PaginationParams
+import com.bapis.bilibili.app.im.v1.PinSessionReply
+import com.bapis.bilibili.app.im.v1.PinSessionReq
+import com.bapis.bilibili.app.im.v1.PrivateId
 import com.bapis.bilibili.app.im.v1.Session
 import com.bapis.bilibili.app.im.v1.SessionFilterType
 import com.bapis.bilibili.app.im.v1.SessionMainReply
@@ -12,11 +20,16 @@ import com.bapis.bilibili.app.im.v1.SessionMainReq
 import com.bapis.bilibili.app.im.v1.SessionPageType
 import com.bapis.bilibili.app.im.v1.SessionSecondaryReply
 import com.bapis.bilibili.app.im.v1.SessionSecondaryReq
+import com.bapis.bilibili.app.im.v1.SessionId
 import com.bapis.bilibili.app.im.v1.SessionType
+import com.bapis.bilibili.app.im.v1.SystemId
+import com.bapis.bilibili.app.im.v1.UnPinSessionReply
+import com.bapis.bilibili.app.im.v1.UnPinSessionReq
 import com.bapis.bilibili.app.im.v1.Unread
 import com.bapis.bilibili.app.im.v1.UnreadStyle
 import com.bapis.bilibili.dagw.component.avatar.common.ResourceSource
 import com.bapis.bilibili.dagw.component.avatar.v1.AvatarItem
+import com.bapis.bilibili.im.interfaces.v1.EmotionInfo
 import com.bapis.bilibili.im.interfaces.v1.ReqSendMsg
 import com.bapis.bilibili.im.interfaces.v1.ReqSessionMsg
 import com.bapis.bilibili.im.interfaces.v1.ReqUpdateAck
@@ -36,12 +49,14 @@ import com.dhs0319.bills.core.model.im.MsgFeedItem
 import com.dhs0319.bills.core.model.im.MsgFeedPage
 import com.dhs0319.bills.core.common.AuthProvider
 import com.dhs0319.bills.core.common.media.httpsImageUrlOrNull
+import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.ImConversationPage
 import com.dhs0319.bills.core.model.ImMessage
 import com.dhs0319.bills.core.model.ImPage
 import com.dhs0319.bills.core.model.ImPaginationOffset
 import com.dhs0319.bills.core.model.ImPaginationParams
 import com.dhs0319.bills.core.model.ImMsgType
+import com.dhs0319.bills.core.model.ImSessionId
 import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.ImSessionTab
 import com.dhs0319.bills.infra.grpc.BiliGrpcClient
@@ -50,6 +65,10 @@ import javax.inject.Singleton
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Random
@@ -61,6 +80,13 @@ class ImRepository @Inject constructor(
     private val grpcClient: BiliGrpcClient,
     private val authProvider: AuthProvider
 ) {
+
+    private val _sessionListVersion = MutableStateFlow(0L)
+    val sessionListVersion: StateFlow<Long> = _sessionListVersion.asStateFlow()
+
+    fun notifySessionListChanged() {
+        _sessionListVersion.update { it + 1L }
+    }
 
     suspend fun fetchSessions(
         tab: ImSessionTab = ImSessionTab.DEFAULT,
@@ -165,6 +191,7 @@ class ImRepository @Inject constructor(
             requestBytes = req.toByteArray(),
             parser = RspSendMsg.parser()
         )
+        notifySessionListChanged()
         return withContext(Dispatchers.Default) {
             reply.toSentMessage(
                 talkerId = talkerId,
@@ -190,6 +217,43 @@ class ImRepository @Inject constructor(
                 .toByteArray(),
             parser = com.bapis.bilibili.im.interfaces.v1.DummyRsp.parser()
         )
+        notifySessionListChanged()
+    }
+
+    suspend fun setSessionPinned(sessionId: ImSessionId, pinned: Boolean) {
+        if (pinned) {
+            val req = PinSessionReq.newBuilder()
+                .setSessionId(sessionId.toSessionIdProto())
+                .setTopTimeMicros(System.currentTimeMillis() * 1000L)
+                .build()
+            grpcClient.call(
+                endpoint = PIN_SESSION_ENDPOINT,
+                requestBytes = req.toByteArray(),
+                parser = PinSessionReply.parser()
+            )
+        } else {
+            val req = UnPinSessionReq.newBuilder()
+                .setSessionId(sessionId.toSessionIdProto())
+                .build()
+            grpcClient.call(
+                endpoint = UNPIN_SESSION_ENDPOINT,
+                requestBytes = req.toByteArray(),
+                parser = UnPinSessionReply.parser()
+            )
+        }
+        notifySessionListChanged()
+    }
+
+    suspend fun deleteSession(sessionId: ImSessionId) {
+        val req = DeleteSessionReq.newBuilder()
+            .setSessionId(sessionId.toSessionIdProto())
+            .build()
+        grpcClient.call(
+            endpoint = DELETE_SESSION_ENDPOINT,
+            requestBytes = req.toByteArray(),
+            parser = DeleteSessionReply.parser()
+        )
+        notifySessionListChanged()
     }
 
     suspend fun fetchMsgFeedList(
@@ -333,12 +397,53 @@ class ImRepository @Inject constructor(
             name = session.sessionInfo.sessionName.ifBlank { "未命名会话" },
             avatar = session.sessionInfo.avatar.avatarUrl(),
             summary = session.msgSummary.summaryText(),
+            latestMessageIsAutoReply = session.msgSummary.isAutoReplySummary(),
             unreadText = session.unread.unreadText(),
             unreadCount = session.unread.number,
             timeMicros = session.timestamp,
             isPinned = session.isPinned,
-            isMuted = session.isMuted
+            isMuted = session.isMuted,
+            sessionId = session.toModelSessionId(),
+            canPin = session.canPin(),
+            canUnpin = session.canUnpin(),
+            canDelete = session.canDelete()
         )
+    }
+
+    private fun Session.toModelSessionId(): ImSessionId? = when (id.idCase) {
+        SessionId.IdCase.PRIVATE_ID -> ImSessionId.Private(id.privateId.talkerUid)
+        SessionId.IdCase.GROUP_ID -> ImSessionId.Group(id.groupId.groupId)
+        SessionId.IdCase.FOLD_ID -> ImSessionId.Fold(id.foldId.typeValue)
+        SessionId.IdCase.SYSTEM_ID -> ImSessionId.System(id.systemId.typeValue)
+        SessionId.IdCase.CUSTOMER_ID -> ImSessionId.Customer(
+            shopId = id.customerId.shopId,
+            shopType = id.customerId.shopType
+        )
+        else -> null
+    }
+
+    private fun Session.canPin(): Boolean = !hasOperation() || operation.pin.show
+
+    private fun Session.canUnpin(): Boolean = !hasOperation() || operation.unpin.show
+
+    private fun Session.canDelete(): Boolean = !hasOperation() || operation.delete.show
+
+    private fun ImSessionId.toSessionIdProto(): SessionId = when (this) {
+        is ImSessionId.Private -> SessionId.newBuilder()
+            .setPrivateId(PrivateId.newBuilder().setTalkerUid(talkerUid))
+            .build()
+        is ImSessionId.Group -> SessionId.newBuilder()
+            .setGroupId(GroupId.newBuilder().setGroupId(groupId))
+            .build()
+        is ImSessionId.Fold -> SessionId.newBuilder()
+            .setFoldId(FoldId.newBuilder().setTypeValue(type))
+            .build()
+        is ImSessionId.System -> SessionId.newBuilder()
+            .setSystemId(SystemId.newBuilder().setTypeValue(type))
+            .build()
+        is ImSessionId.Customer -> SessionId.newBuilder()
+            .setCustomerId(CustomerId.newBuilder().setShopId(shopId).setShopType(shopType))
+            .build()
     }
 
     private fun mapMessage(msg: Msg): ImMessage {
@@ -362,6 +467,7 @@ class ImRepository @Inject constructor(
             timestampSec = msg.timestamp,
             isSelf = senderUid == authProvider.mid,
             isRecalled = msg.sysCancel || msg.msgStatus == RECALL_MSG_STATUS,
+            isAutoReply = msg.hasKeyHitInfos(),
             shareCoverUrl = content.shareCoverUrl,
             shareViewCount = content.shareViewCount,
             shareAid = content.shareAid,
@@ -502,7 +608,20 @@ class ImRepository @Inject constructor(
     private fun RspSessionMsg.toConversationPage(): ImConversationPage {
         return ImConversationPage(
             messages = toMessages(),
-            hasMoreHistory = hasMore == 1
+            hasMoreHistory = hasMore == 1,
+            emotes = eInfosList.mapNotNull { it.toEmote() }
+        )
+    }
+
+    private fun EmotionInfo.toEmote(): CommentEmote? {
+        val token = text.takeIf(String::isNotBlank) ?: return null
+        val rawUrl = url.takeIf(String::isNotBlank)
+            ?: gifUrl.takeIf(String::isNotBlank)
+            ?: return null
+        return CommentEmote(
+            text = token,
+            url = rawUrl.httpsImageUrlOrNull() ?: return null,
+            size = size.toLong().coerceAtLeast(1L)
         )
     }
 
@@ -588,6 +707,10 @@ class ImRepository @Inject constructor(
         return if (prefix.isBlank()) body else "$prefix $body"
     }
 
+    private fun MsgSummary.isAutoReplySummary(): Boolean {
+        return summaryText().startsWith(AUTO_REPLY_MARKER)
+    }
+
     private fun Unread.unreadText(): String? {
         if (style == UnreadStyle.UNREAD_STYLE_DOT) return "•"
         if (number <= 0L) return null
@@ -664,6 +787,9 @@ class ImRepository @Inject constructor(
     private companion object {
         const val MAIN_ENDPOINT = "bilibili.app.im.v1.im/SessionMain"
         const val SECONDARY_ENDPOINT = "bilibili.app.im.v1.im/SessionSecondary"
+        const val PIN_SESSION_ENDPOINT = "bilibili.app.im.v1.im/PinSession"
+        const val UNPIN_SESSION_ENDPOINT = "bilibili.app.im.v1.im/UnpinSession"
+        const val DELETE_SESSION_ENDPOINT = "bilibili.app.im.v1.im/DeleteSession"
         const val FETCH_SESSION_MSGS_ENDPOINT = "bilibili.im.interface.v1.ImInterface/SyncFetchSessionMsgs"
         const val SEND_MSG_ENDPOINT = "bilibili.im.interface.v1.ImInterface/SendMsg"
         const val UPDATE_ACK_ENDPOINT = "bilibili.im.interface.v1.ImInterface/UpdateAck"
@@ -680,6 +806,7 @@ class ImRepository @Inject constructor(
         const val CONVERSATION_TYPE_STRANGER = 108
         const val RECALL_MSG_STATUS = 1
         const val RECALL_MSG_TYPE = 5
+        const val AUTO_REPLY_MARKER = "[自动回复]"
 
         val IM_TABS = listOf(
             ImSessionTab.DEFAULT,

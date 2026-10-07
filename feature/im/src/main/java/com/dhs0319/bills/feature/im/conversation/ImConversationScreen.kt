@@ -1,15 +1,16 @@
 package com.dhs0319.bills.feature.im.conversation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,11 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,13 +46,15 @@ import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.designsystem.component.copyTextOnLongPress
+import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.ImMessage
 import com.dhs0319.bills.core.model.ImMsgType
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoTargetTool
+import com.dhs0319.bills.feature.comment.component.CommentRichText
 import java.time.Instant
-import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,16 +67,18 @@ fun ImConversationScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val messageItems = remember(state.messages) { state.messages.toConversationMessageItems() }
+    val rows = remember(state.messages) {
+        state.messages.toConversationRows(now = ZonedDateTime.now())
+    }
     val shouldLoadMore by remember(
         state.hasMoreHistory,
         state.isLoadingMore,
-        messageItems.size,
+        rows.size,
         listState
     ) {
         androidx.compose.runtime.derivedStateOf {
             state.hasMoreHistory &&
-                messageItems.isNotEmpty() &&
+                rows.isNotEmpty() &&
                 !state.isLoadingMore &&
                 listState.isScrollInProgress &&
                 (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >=
@@ -121,11 +124,11 @@ fun ImConversationScreen(
                 .padding(padding)
         ) {
             when {
-                state.isLoading && messageItems.isEmpty() -> {
+                state.isLoading && rows.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize())
                 }
 
-                messageItems.isEmpty() -> {
+                rows.isEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -148,17 +151,22 @@ fun ImConversationScreen(
                         reverseLayout = true
                     ) {
                         items(
-                            items = messageItems,
-                            key = { it.message.key },
+                            items = rows,
+                            key = { it.key },
                             contentType = { it.contentType }
-                        ) { item ->
-                            ImMessageBubble(
-                                item = item,
-                                avatar = state.avatar,
-                                title = state.title,
-                                onOpenSpace = onOpenSpace,
-                                onOpenVideo = onOpenVideo
-                            )
+                        ) { row ->
+                            when (row) {
+                                is TimeDividerRow -> MessageTimeDivider(text = row.text)
+                                is MessageRow -> ImMessageBubble(
+                                    item = row.item,
+                                    emotes = state.emotes,
+                                    avatar = state.avatar,
+                                    selfAvatar = state.selfAvatar,
+                                    title = state.title,
+                                    onOpenSpace = onOpenSpace,
+                                    onOpenVideo = onOpenVideo
+                                )
+                            }
                         }
                     }
                 }
@@ -170,7 +178,9 @@ fun ImConversationScreen(
 @Composable
 private fun ImMessageBubble(
     item: ConversationMessageItem,
+    emotes: List<CommentEmote>,
     avatar: String?,
+    selfAvatar: String?,
     title: String?,
     onOpenSpace: ((SpaceRoute) -> Unit)?,
     onOpenVideo: ((VideoTarget) -> Unit)?
@@ -189,39 +199,68 @@ private fun ImMessageBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (message.isSelf) Alignment.End else Alignment.Start
     ) {
+        val onOpenSenderSpace: (() -> Unit)? = if (onOpenSpace != null && message.senderUid > 0L) {
+            { onOpenSpace(SpaceRoute(mid = message.senderUid)) }
+        } else {
+            null
+        }
         if (message.isSelf) {
-            MessageContent(item = item, onOpenVideo = onOpenVideo)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                MessageContent(item = item, emotes = emotes, onOpenVideo = onOpenVideo)
+                SenderAvatar(
+                    url = selfAvatar,
+                    contentDescription = "我的头像",
+                    onClick = onOpenSenderSpace
+                )
+            }
         } else {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .then(
-                            if (item.showAvatar && onOpenSpace != null && message.senderUid > 0L) {
-                                Modifier.clickable { onOpenSpace(SpaceRoute(mid = message.senderUid)) }
-                            } else Modifier
-                        )
-                ) {
-                    if (item.showAvatar) {
-                        AvatarImage(
-                            url = avatar,
-                            contentDescription = title ?: "头像",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-                MessageContent(item = item, onOpenVideo = onOpenVideo)
+                SenderAvatar(
+                    url = avatar,
+                    contentDescription = title ?: "头像",
+                    onClick = onOpenSenderSpace
+                )
+                MessageContent(item = item, emotes = emotes, onOpenVideo = onOpenVideo)
             }
         }
     }
 }
 
 @Composable
+private fun SenderAvatar(
+    url: String?,
+    contentDescription: String,
+    onClick: (() -> Unit)?
+) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            )
+    ) {
+        AvatarImage(
+            url = url,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
 private fun MessageContent(
     item: ConversationMessageItem,
+    emotes: List<CommentEmote>,
     onOpenVideo: ((VideoTarget) -> Unit)?
 ) {
     val message = item.message
@@ -232,29 +271,23 @@ private fun MessageContent(
             message.msgType == ImMsgType.NOTICE -> {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.widthIn(max = 220.dp)
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.widthIn(max = 260.dp)
                 ) {
                     Column {
                         if (!message.noticeCoverUrl.isNullOrBlank()) {
                             CoverImage(
                                 url = message.noticeCoverUrl,
                                 contentDescription = message.noticeTitle ?: "通知",
+                                shape = MaterialTheme.shapes.large,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(16f / 9f)
-                            ) {
-                                MessageTimeChip(
-                                    text = item.timeText,
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(end = 6.dp, bottom = 4.dp)
-                                )
-                            }
+                            )
                         }
                         Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = message.noticeTitle ?: message.content.ifBlank { "通知" },
@@ -262,7 +295,7 @@ private fun MessageContent(
                                     message.noticeTitle ?: message.content.ifBlank { "通知" },
                                     "消息"
                                 ),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
@@ -271,9 +304,9 @@ private fun MessageContent(
                                 Text(
                                     text = notice,
                                     modifier = Modifier.copyTextOnLongPress(notice, "消息"),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
+                                    maxLines = 3,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
@@ -288,18 +321,14 @@ private fun MessageContent(
                                 )
                             }
                             message.noticeActionText?.takeIf(String::isNotBlank)?.let { action ->
+                                HorizontalDivider(modifier = Modifier.padding(top = 2.dp))
                                 Text(
                                     text = action,
-                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.copyTextOnLongPress(action, "消息"),
+                                    style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (message.noticeCoverUrl.isNullOrBlank()) {
-                                MessageTimeChip(
-                                    text = item.timeText,
-                                    modifier = Modifier.align(Alignment.End)
                                 )
                             }
                         }
@@ -311,9 +340,9 @@ private fun MessageContent(
                 val clickable = onOpenVideo != null && message.shareAid > 0L
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.medium,
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier
-                        .widthIn(max = 220.dp)
+                        .widthIn(max = 240.dp)
                         .then(if (clickable) Modifier.clickable {
                             onOpenVideo!!(
                                 VideoTarget.Ugc(
@@ -328,25 +357,19 @@ private fun MessageContent(
                         } else Modifier)
                 ) {
                     val bodyColor = MaterialTheme.colorScheme.onSurface
-                    val timeColor = bodyColor.copy(alpha = 0.58f)
+                    val metaColor = bodyColor.copy(alpha = 0.58f)
                     Column {
                         CoverImage(
                             url = message.shareCoverUrl,
                             contentDescription = message.content.ifBlank { "视频卡片" },
+                            shape = MaterialTheme.shapes.large,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(16f / 9f)
-                        ) {
-                            MessageTimeChip(
-                                text = item.timeText,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(end = 6.dp, bottom = 4.dp)
-                            )
-                        }
+                        )
                         Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = message.content.ifBlank { "视频卡片" },
@@ -362,7 +385,7 @@ private fun MessageContent(
                             Text(
                                 text = "${message.shareViewCount} 播放",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = timeColor,
+                                color = metaColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -375,7 +398,7 @@ private fun MessageContent(
             !message.imageUrl.isNullOrBlank() -> {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = MaterialTheme.shapes.medium,
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier
                         .widthIn(max = 220.dp)
                 ) {
@@ -386,12 +409,6 @@ private fun MessageContent(
                             modifier = Modifier.fillMaxSize(),
                             variant = BiliImageVariant.PreviewThumb,
                             contentScale = ContentScale.Fit
-                        )
-                        MessageTimeChip(
-                            text = item.timeText,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 6.dp, bottom = 4.dp)
                         )
                     }
                 }
@@ -409,34 +426,37 @@ private fun MessageContent(
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 }
-                val timeColor = bodyColor.copy(alpha = 0.58f)
+                val bubbleModifier = if (message.isAutoReply) {
+                    Modifier.width(IntrinsicSize.Max)
+                } else {
+                    Modifier
+                }
                 Surface(
                     color = surfaceColor,
-                    shape = MaterialTheme.shapes.medium
+                    shape = MaterialTheme.shapes.large
                 ) {
-                    val timeFontSize = MaterialTheme.typography.labelSmall.fontSize
-                    val text = remember(item.displayText, item.timeText, timeColor, timeFontSize) {
-                        buildAnnotatedString {
-                            append(item.displayText)
-                            append(" ")
-                            withStyle(
-                                SpanStyle(
-                                    color = timeColor,
-                                    fontSize = timeFontSize
-                                )
-                            ) {
-                                append(item.timeText)
-                            }
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 260.dp)
+                            .then(bubbleModifier)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        CommentRichText(
+                            text = item.displayText,
+                            emotes = emotes,
+                            style = MaterialTheme.typography.bodyLarge.copy(color = bodyColor),
+                            copyLabel = "消息"
+                        )
+                        if (message.isAutoReply) {
+                            HorizontalDivider(modifier = Modifier.padding(top = 2.dp))
+                            Text(
+                                text = "此条消息为自动回复",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                    Text(
-                        text = text,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .copyTextOnLongPress(item.displayText, "消息"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = bodyColor
-                    )
                 }
                 RecallFlag(message.isRecalled)
             }
@@ -445,23 +465,21 @@ private fun MessageContent(
 }
 
 @Composable
-private fun MessageTimeChip(
-    text: String,
-    modifier: Modifier = Modifier
-) {
+private fun MessageTimeDivider(text: String) {
     if (text.isEmpty()) return
-    val chipBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-    Text(
-        text = text,
-        modifier = modifier
-            .background(
-                color = chipBg,
-                shape = MaterialTheme.shapes.small
-            )
-            .padding(horizontal = 5.dp, vertical = 1.dp),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.primary
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable
@@ -499,23 +517,51 @@ private fun RecallFlag(
 }
 
 @Immutable
+private sealed interface ConversationRow {
+    val key: Any
+    val contentType: String
+}
+
+@Immutable
+private data class MessageRow(val item: ConversationMessageItem) : ConversationRow {
+    override val key: Any get() = item.message.key
+    override val contentType: String get() = item.contentType
+}
+
+@Immutable
+private data class TimeDividerRow(val messageKey: Long, val text: String) : ConversationRow {
+    override val key: Any get() = "$CONTENT_TYPE_TIME$messageKey"
+    override val contentType: String get() = CONTENT_TYPE_TIME
+}
+
+@Immutable
 private data class ConversationMessageItem(
     val message: ImMessage,
-    val showAvatar: Boolean,
     val displayText: String,
     val timeText: String,
     val imageRatio: Float,
     val contentType: String
 )
 
-private fun List<ImMessage>.toConversationMessageItems(): List<ConversationMessageItem> {
-    return mapIndexed { index, message ->
-        val newerMessage = getOrNull(index - 1)
+private fun List<ImMessage>.toConversationRows(now: ZonedDateTime): List<ConversationRow> {
+    val items = toConversationMessageItems(now)
+    val rows = ArrayList<ConversationRow>(items.size + 4)
+    items.forEachIndexed { index, item ->
+        rows += MessageRow(item)
+        val olderTimeText = items.getOrNull(index + 1)?.timeText
+        if (item.timeText.isNotEmpty() && item.timeText != olderTimeText) {
+            rows += TimeDividerRow(messageKey = item.message.key, text = item.timeText)
+        }
+    }
+    return rows
+}
+
+private fun List<ImMessage>.toConversationMessageItems(now: ZonedDateTime): List<ConversationMessageItem> {
+    return map { message ->
         ConversationMessageItem(
             message = message,
-            showAvatar = !message.isSelf && newerMessage?.senderUid != message.senderUid,
             displayText = message.displayText(),
-            timeText = formatMessageTime(message.timestampSec),
+            timeText = formatMessageTime(message.timestampSec, now),
             imageRatio = message.imageRatio(),
             contentType = when {
                 message.msgType == ImMsgType.SYSTEM_NOTICE -> CONTENT_TYPE_SYSTEM_NOTICE
@@ -542,19 +588,26 @@ private fun ImMessage.imageRatio(): Float {
     return (imageWidth.toFloat() / imageHeight).coerceIn(0.45f, 1.8f)
 }
 
-private fun formatMessageTime(timestampSec: Long): String {
+private fun formatMessageTime(timestampSec: Long, now: ZonedDateTime): String {
     if (timestampSec <= 0L) return ""
-    return MESSAGE_TIME_FORMAT.format(
-        Instant.ofEpochSecond(timestampSec).atZone(ZoneId.systemDefault())
-    )
+    val time = Instant.ofEpochSecond(timestampSec).atZone(now.zone)
+    val date = time.toLocalDate()
+    return when {
+        date == now.toLocalDate() -> time.format(TIME_FORMAT_HM)
+        date == now.toLocalDate().minusDays(1L) -> "昨天 ${time.format(TIME_FORMAT_HM)}"
+        date.year == now.year -> time.format(TIME_FORMAT_MD_HM)
+        else -> time.format(TIME_FORMAT_YMD_HM)
+    }
 }
 
-private val MESSAGE_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-
+private val TIME_FORMAT_HM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val TIME_FORMAT_MD_HM: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 HH:mm")
+private val TIME_FORMAT_YMD_HM: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm")
 
 private const val CONTENT_TYPE_SYSTEM_NOTICE = "system_notice"
 private const val CONTENT_TYPE_NOTICE = "notice"
 private const val CONTENT_TYPE_SHARE = "share"
 private const val CONTENT_TYPE_TEXT = "text"
 private const val CONTENT_TYPE_IMAGE = "image"
+private const val CONTENT_TYPE_TIME = "time"
 

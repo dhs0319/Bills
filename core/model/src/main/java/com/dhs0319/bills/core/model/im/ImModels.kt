@@ -39,17 +39,32 @@ data class ImSessionItem(
     val name: String,
     val avatar: String? = null,
     val summary: String = "",
+    val latestMessageIsAutoReply: Boolean = false,
     val unreadText: String? = null,
     val unreadCount: Long = 0,
     val timeMicros: Long = 0,
     val isPinned: Boolean = false,
-    val isMuted: Boolean = false
+    val isMuted: Boolean = false,
+    val sessionId: ImSessionId? = null,
+    val canPin: Boolean = false,
+    val canUnpin: Boolean = false,
+    val canDelete: Boolean = false
 )
+
+@Immutable
+sealed interface ImSessionId {
+    data class Private(val talkerUid: Long) : ImSessionId
+    data class Group(val groupId: Long) : ImSessionId
+    data class Fold(val type: Int) : ImSessionId
+    data class System(val type: Int) : ImSessionId
+    data class Customer(val shopId: Long, val shopType: Long) : ImSessionId
+}
 
 @Immutable
 data class ImConversationPage(
     val messages: List<ImMessage>,
-    val hasMoreHistory: Boolean
+    val hasMoreHistory: Boolean,
+    val emotes: List<CommentEmote> = emptyList()
 )
 
 @Immutable
@@ -74,6 +89,7 @@ data class ImMessage(
     val timestampSec: Long,
     val isSelf: Boolean,
     val isRecalled: Boolean,
+    val isAutoReply: Boolean = false,
     val shareCoverUrl: String? = null,
     val shareViewCount: Long = 0L,
     val shareAid: Long = 0L,

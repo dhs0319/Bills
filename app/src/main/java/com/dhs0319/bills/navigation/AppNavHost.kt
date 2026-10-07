@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,6 +59,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -481,6 +483,7 @@ private fun MainTabsScaffold(
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
+    var topLevelNavSpace by remember { mutableStateOf(0.dp) }
 
     val tabContent: @Composable () -> Unit = {
         TopLevelRoute.entries.forEach { tab ->
@@ -559,7 +562,9 @@ private fun MainTabsScaffold(
                 )
                 .nestedScroll(navVisibilityController.connection)
         ) {
-            tabContent()
+            CompositionLocalProvider(LocalTopLevelNavSpace provides topLevelNavSpace) {
+                tabContent()
+            }
             TopLevelFloatingNavigation(
                 modifier = Modifier
                     .align(
@@ -574,7 +579,8 @@ private fun MainTabsScaffold(
                 visibilityController = navVisibilityController,
                 startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
                 onTabChange = selectTab,
-                onNavigateToSearch = onNavigateToSearch
+                onNavigateToSearch = onNavigateToSearch,
+                onHeightChanged = { topLevelNavSpace = it }
             )
         }
     }
@@ -689,9 +695,11 @@ private fun TopLevelFloatingNavigation(
     visibilityController: TopLevelNavVisibilityController,
     startPadding: Dp,
     onTabChange: (TopLevelRoute) -> Unit,
-    onNavigateToSearch: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onHeightChanged: (Dp) -> Unit = {}
 ) {
     val toolbarShape = MaterialTheme.shapes.extraLarge
+    val density = LocalDensity.current
     var hiddenDistancePx by remember { mutableFloatStateOf(0f) }
     val animatedOffsetPx by animateFloatAsState(
         targetValue = if (visibilityController.hidden) hiddenDistancePx else 0f,
@@ -701,6 +709,7 @@ private fun TopLevelFloatingNavigation(
     val animatedModifier = modifier
         .onSizeChanged { size ->
             hiddenDistancePx = size.height.toFloat()
+            onHeightChanged(with(density) { size.height.toDp() })
         }
         .graphicsLayer {
             translationY = animatedOffsetPx

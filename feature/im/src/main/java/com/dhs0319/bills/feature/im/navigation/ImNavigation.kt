@@ -19,8 +19,9 @@ private const val TALKER_ID_ARG = "talkerId"
 private const val SESSION_TYPE_ARG = "sessionType"
 private const val TITLE_ARG = "title"
 private const val AVATAR_ARG = "avatar"
+private const val AUTO_REPLY_ARG = "autoReply"
 private const val IM_CONVERSATION_ROUTE =
-    "im/conversation/{$TALKER_ID_ARG}/{$SESSION_TYPE_ARG}?$TITLE_ARG={$TITLE_ARG}&$AVATAR_ARG={$AVATAR_ARG}"
+    "im/conversation/{$TALKER_ID_ARG}/{$SESSION_TYPE_ARG}?$TITLE_ARG={$TITLE_ARG}&$AVATAR_ARG={$AVATAR_ARG}&$AUTO_REPLY_ARG={$AUTO_REPLY_ARG}"
 
 const val IM_MSG_FEED_ROUTE = "im/msg_feed"
 
@@ -30,7 +31,9 @@ fun NavController.navigateToImConversation(
     val talkerId = item.talkerId ?: return
     val sessionType = item.sessionType ?: return
     navigate(
-        "im/conversation/$talkerId/$sessionType?title=${Uri.encode(item.name)}&avatar=${Uri.encode(item.avatar.orEmpty())}"
+        "im/conversation/$talkerId/$sessionType?title=${Uri.encode(item.name)}" +
+            "&avatar=${Uri.encode(item.avatar.orEmpty())}" +
+            "&$AUTO_REPLY_ARG=${item.latestMessageIsAutoReply}"
     )
 }
 
@@ -51,6 +54,10 @@ fun NavGraphBuilder.imConversationScreen(
             navArgument(AVATAR_ARG) {
                 type = NavType.StringType
                 defaultValue = ""
+            },
+            navArgument(AUTO_REPLY_ARG) {
+                type = NavType.BoolType
+                defaultValue = false
             }
         )
     ) {

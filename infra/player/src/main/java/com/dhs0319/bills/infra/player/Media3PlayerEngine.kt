@@ -247,17 +247,22 @@ class Media3PlayerEngine @Inject constructor(
     override fun play() {
         val player = ensurePlayer()
         player.play()
+        updatePlaybackProgress()
     }
 
     override fun pause() {
         val player = exoPlayer ?: return
         player.pause()
+        updatePlaybackProgress()
     }
 
     override fun setSpeed(speed: Float) {
         val player = ensurePlayer()
         player.playbackParameters = PlaybackParameters(speed.coerceIn(0.25f, 3f))
         updatePlaybackState()
+        // 立即刷新进度采样：弹幕外部时钟在变速/暂停时会以 positionMs 重新锚定，
+        // 若沿用 1 秒轮询的旧采样值会让弹幕时间轴倒退。
+        updatePlaybackProgress()
     }
 
     override fun seekTo(positionMs: Long) {
