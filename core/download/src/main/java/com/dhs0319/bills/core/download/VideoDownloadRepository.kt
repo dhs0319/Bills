@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.bapis.bilibili.app.playerunite.v1.PlayViewUniteReply
 import com.bapis.bilibili.app.playerunite.v1.PlayViewUniteReq
-import com.bapis.bilibili.community.service.dm.v1.DanmakuElem
 import com.bapis.bilibili.community.service.dm.v1.DmSegCacheReq
 import com.bapis.bilibili.community.service.dm.v1.DmSegMobileReply
 import com.bapis.bilibili.playershared.CodeType
@@ -17,7 +16,7 @@ import com.bapis.bilibili.playershared.VideoVod
 import com.dhs0319.bills.core.common.UserAgentBuilder
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.settings.AppSettings
-import com.dhs0319.bills.core.model.DanmakuItem
+import com.dhs0319.bills.core.danmaku.toDanmakuItem
 import com.dhs0319.bills.core.model.DownloadDanmakuCache
 import com.dhs0319.bills.core.model.PlayBiz
 import com.dhs0319.bills.core.model.VideoDownloadEnqueueResult
@@ -162,7 +161,7 @@ suspend fun loadDanmaku(taskId: Long): DownloadDanmakuCache? {
         val items = withContext(Dispatchers.Default) {
             reply.elemsList.asSequence()
                 .filter { elem -> elem.weight >= weightFilterLevel }
-                .map(::mapDanmakuItem)
+                .map { it.toDanmakuItem() }
                 .toList()
         }
         return DownloadDanmakuCache(
@@ -459,31 +458,6 @@ suspend fun loadDanmaku(taskId: Long): DownloadDanmakuCache? {
         if (!part.renameTo(file)) {
             error("保存弹幕缓存失败")
         }
-    }
-
-    private fun mapDanmakuItem(elem: DanmakuElem): DanmakuItem {
-        return DanmakuItem(
-            id = elem.id,
-            idStr = elem.idStr,
-            progressMs = elem.progress,
-            mode = elem.mode,
-            fontSize = elem.fontsize,
-            color = elem.color,
-            midHash = elem.midHash,
-            content = elem.content,
-            createdAtEpochSecond = elem.ctime,
-            weight = elem.weight,
-            action = elem.action,
-            pool = elem.pool,
-            attr = elem.attr,
-            likeCount = elem.likeCount,
-            animation = elem.animation,
-            extra = elem.extra,
-            colorfulType = elem.colorfulValue,
-            type = elem.type,
-            oid = elem.oid,
-            dmFromType = elem.dmFromValue
-        )
     }
 
     private suspend fun downloadFile(

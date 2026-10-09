@@ -23,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,9 +68,7 @@ import com.dhs0319.bills.infra.player.danmaku.DanmakuRenderMode
 import com.dhs0319.bills.infra.player.danmaku.rememberDanmakuOverlayState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 
 @Suppress("UnsafeOptInUsageError")
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -371,39 +368,27 @@ private fun LiveDanmakuEffect(
     playbackRoomId: Long,
     danmakuOn: Boolean
 ) {
-    var lastHandledMessageId by remember(playbackRoomId) {
-        mutableLongStateOf(0L)
-    }
-
-    LaunchedEffect(playbackRoomId, danmakuOn) {
+    LaunchedEffect(overlayState, roomSessionState, playbackRoomId, danmakuOn) {
         overlayState.clearLiveDanmakus()
-        lastHandledMessageId = 0L
-    }
-
-    LaunchedEffect(roomSessionState, playbackRoomId, danmakuOn) {
+        var lastHandledMessageId = 0L
         if (!danmakuOn || playbackRoomId <= 0L) {
             return@LaunchedEffect
         }
         roomSessionState
-            .map { session ->
-                Triple(
-                    session.roomId,
-                    session.messages.lastOrNull()?.localId ?: 0L,
-                    session.messages
-                )
-            }
-            .distinctUntilChanged()
-            .collectLatest { (roomId, _, messages) ->
-                if (roomId != playbackRoomId) {
+            .distinctUntilChangedBy { it.roomId to it.messages.lastOrNull()?.localId }
+            .collect { session ->
+                if (session.roomId != playbackRoomId) {
                     lastHandledMessageId = 0L
-                    return@collectLatest
+                    return@collect
                 }
+                val messages = session.messages
                 if (messages.isEmpty()) {
-                    return@collectLatest
+                    return@collect
                 }
-                val startIndex = messages.indexOfFirst { it.localId > lastHandledMessageId }
-                if (startIndex < 0) {
-                    return@collectLatest
+                // 消息按递增 localId 追加；从尾部扫描本次新增消息即可。
+                val startIndex = messages.indexOfLast { it.localId <= lastHandledMessageId } + 1
+                if (startIndex == messages.size) {
+                    return@collect
                 }
                 val newItems = messages.subList(startIndex, messages.size)
                 newItems.asSequence()
@@ -411,7 +396,7 @@ private fun LiveDanmakuEffect(
                     .forEach { msg ->
                         overlayState.appendDanmaku(msg.toLiveDanmakuItem())
                     }
-                lastHandledMessageId = newItems.last().localId
+                lastHandledMessageId = messages.last().localId
             }
     }
 }

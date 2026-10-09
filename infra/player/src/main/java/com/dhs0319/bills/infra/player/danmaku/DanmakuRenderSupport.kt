@@ -52,56 +52,55 @@ internal class DefaultDanmakuItemMapper : DanmakuItemMapper<DanmakuItem> {
 internal class DanmakuPlayerTimeProvider(
     positionMs: Long = 0L,
     isPlaying: Boolean = false,
-    speed: Float = 1f
+    speed: Float = 1f,
+    private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime
 ) : PlayerTimeProvider {
+    // 绘制线程一次读取完整快照，避免混用新位置、旧时间或旧速度。
     @Volatile
-    private var anchorPosMs = positionMs.coerceAtLeast(0L)
-
-    @Volatile
-    private var playing = isPlaying
-
-    @Volatile
-    private var playSpd = speed.coerceAtLeast(0f)
-
-    @Volatile
-    private var anchorElapsedMs = SystemClock.elapsedRealtime()
+    private var clock = ClockState(
+        positionMs = positionMs.coerceAtLeast(0L),
+        isPlaying = isPlaying,
+        speed = speed.coerceAtLeast(0f),
+        elapsedMs = elapsedRealtime()
+    )
 
     fun overrideState(
         positionMs: Long,
         isPlaying: Boolean,
         speed: Float
     ) {
-        setAnchor(positionMs, isPlaying, speed)
+        clock = ClockState(
+            positionMs = positionMs.coerceAtLeast(0L),
+            isPlaying = isPlaying,
+            speed = speed.coerceAtLeast(0f),
+            elapsedMs = elapsedRealtime()
+        )
     }
 
     fun release() {
     }
 
     override fun getCurrentTimeMs(): Long {
-        val posMs = anchorPosMs
-        if (!playing) return posMs
-        val deltaMs = (SystemClock.elapsedRealtime() - anchorElapsedMs).coerceAtLeast(0L)
-        return posMs + (deltaMs * playSpd).toLong()
+        val current = clock
+        if (!current.isPlaying) return current.positionMs
+        val deltaMs = (elapsedRealtime() - current.elapsedMs).coerceAtLeast(0L)
+        return current.positionMs + (deltaMs * current.speed).toLong()
     }
 
     override fun isPlaying(): Boolean {
-        return playing
+        return clock.isPlaying
     }
 
     override fun getSyncThresholdTimeMs(): Long {
         return DANMAKU_SEEK_SYNC_THRESHOLD_MS
     }
 
-    private fun setAnchor(
-        positionMs: Long,
-        isPlaying: Boolean,
-        speed: Float
-    ) {
-        anchorPosMs = positionMs.coerceAtLeast(0L)
-        playing = isPlaying
-        playSpd = speed.coerceAtLeast(0f)
-        anchorElapsedMs = SystemClock.elapsedRealtime()
-    }
+    private data class ClockState(
+        val positionMs: Long,
+        val isPlaying: Boolean,
+        val speed: Float,
+        val elapsedMs: Long
+    )
 }
 
 private fun mapDanmakuType(mode: Int): Int {
@@ -128,18 +127,26 @@ private fun resolveDanmakuTextSize(
     return fontSize.coerceIn(18, 36).toFloat() * (density - 0.6f).coerceAtLeast(1f)
 }
 
-internal fun DanmakuContext.applyConfig(config: DanmakuConfig) {
-    setDanmakuTransparency(config.opacity)
-    setScaleTextSize(config.textScale.coerceIn(0.5f, 2f) * 0.6f)
-    setScrollSpeedFactor(2f / config.speed.coerceIn(0.5f, 2f))
-    setDuplicateMergingEnabled(config.mergeDuplicates)
-    setMaximumVisibleSizeInScreen(config.maximumVisibleSize)
-    setMaximumLines(config.maximumLines)
-    preventOverlapping(config.overlappingRules)
-    setR2LDanmakuVisibility(config.showScrollRl)
-    setL2RDanmakuVisibility(true)
-    setFTDanmakuVisibility(config.showTop)
-    setFBDanmakuVisibility(config.showBottom)
+internal fun DanmakuContext.applyConfig(config: DanmakuConfig, previous: DanmakuConfig? = null) {
+    if (previous?.opacity != config.opacity) setDanmakuTransparency(config.opacity)
+    if (previous?.textScale != config.textScale) {
+        setScaleTextSize(config.textScale.coerceIn(0.5f, 2f) * 0.6f)
+    }
+    if (previous?.speed != config.speed) {
+        setScrollSpeedFactor(2f / config.speed.coerceIn(0.5f, 2f))
+    }
+    if (previous?.mergeDuplicates != config.mergeDuplicates) {
+        setDuplicateMergingEnabled(config.mergeDuplicates)
+    }
+    if (previous?.densityLevel != config.densityLevel) {
+        setMaximumVisibleSizeInScreen(config.maximumVisibleSize)
+        preventOverlapping(config.overlappingRules)
+    }
+    if (previous?.areaPercent != config.areaPercent) setMaximumLines(config.maximumLines)
+    if (previous?.showScrollRl != config.showScrollRl) setR2LDanmakuVisibility(config.showScrollRl)
+    if (previous == null) setL2RDanmakuVisibility(true)
+    if (previous?.showTop != config.showTop) setFTDanmakuVisibility(config.showTop)
+    if (previous?.showBottom != config.showBottom) setFBDanmakuVisibility(config.showBottom)
 }
 
 private val DanmakuConfig.maximumVisibleSize: Int
@@ -166,14 +173,7 @@ private val DanmakuConfig.maximumLines: Map<Int, Int>
 
 private val DanmakuConfig.overlappingRules: Map<Int, Boolean>?
     get() = when (densityLevel) {
-        0 -> hashMapOf(
-            BaseDanmaku.TYPE_SCROLL_RL to true,
-            BaseDanmaku.TYPE_SCROLL_LR to true,
-            BaseDanmaku.TYPE_FIX_TOP to true,
-            BaseDanmaku.TYPE_FIX_BOTTOM to true
-        )
-
-        1 -> hashMapOf(
+        0, 1 -> hashMapOf(
             BaseDanmaku.TYPE_SCROLL_RL to true,
             BaseDanmaku.TYPE_SCROLL_LR to true,
             BaseDanmaku.TYPE_FIX_TOP to true,

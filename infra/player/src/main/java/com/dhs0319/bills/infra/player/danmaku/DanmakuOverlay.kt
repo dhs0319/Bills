@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import com.dhs0319.bills.core.model.DanmakuConfig
 import com.dhs0319.bills.core.model.DanmakuSessionState
+import com.dhs0319.bills.core.model.toDanmakuWindowId
 import master.flame.danmaku.api.SegmentDanmakuSession
 import master.flame.danmaku.controller.IDanmakuView
 import master.flame.danmaku.ui.widget.DanmakuSurfaceView
@@ -121,9 +122,12 @@ fun DanmakuLayer(
 
     when (renderMode) {
         DanmakuRenderMode.Segmented -> {
+            val targetWindowId = positionMs.toDanmakuWindowId()
             LaunchedEffect(
+                overlayState,
                 danmakuState.sourceKey,
-                danmakuState.window?.id,
+                targetWindowId,
+                danmakuState.windowAt(targetWindowId),
                 danmakuConfig,
                 isPlaying,
                 speed,
@@ -143,7 +147,7 @@ fun DanmakuLayer(
         }
 
         DanmakuRenderMode.LiveAppend -> {
-            LaunchedEffect(danmakuConfig, isPlaying, speed, hasSource) {
+            LaunchedEffect(overlayState, danmakuConfig, isPlaying, speed, hasSource) {
                 overlayState.syncLive(
                     config = danmakuConfig,
                     isPlaying = isPlaying,

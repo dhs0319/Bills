@@ -4,7 +4,6 @@ import com.bapis.bilibili.community.service.dm.v1.DmSegMobileReply
 import com.bapis.bilibili.community.service.dm.v1.DmSegMobileReq
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.settings.AppSettings
-import com.dhs0319.bills.core.model.DanmakuItem
 import com.dhs0319.bills.core.model.VodDanmakuRequest
 import com.dhs0319.bills.core.model.VodDanmakuSegment
 import com.dhs0319.bills.infra.grpc.BiliGrpcClient
@@ -57,30 +56,8 @@ class VodDanmakuRepository @Inject constructor(
     ): VodDanmakuSegment {
         val elems = reply.elemsList.asSequence()
             .filter { elem -> elem.weight >= weightFilterLevel }
-            .map { elem ->
-            DanmakuItem(
-                id = elem.id,
-                idStr = elem.idStr,
-                progressMs = elem.progress,
-                mode = elem.mode,
-                fontSize = elem.fontsize,
-                color = elem.color,
-                midHash = elem.midHash,
-                content = elem.content,
-                createdAtEpochSecond = elem.ctime,
-                weight = elem.weight,
-                action = elem.action,
-                pool = elem.pool,
-                attr = elem.attr,
-                likeCount = elem.likeCount,
-                animation = elem.animation,
-                extra = elem.extra,
-                colorfulType = elem.colorfulValue,
-                type = elem.type,
-                oid = elem.oid,
-                dmFromType = elem.dmFromValue
-            )
-        }.toList()
+            .map { it.toDanmakuItem() }
+            .toList()
 
         Logger.d(TAG) {
             "Loaded danmaku segment aid=${request.ids.aid}, cid=${request.ids.cid}, segment=${request.segmentIndex}, elems=${elems.size}"

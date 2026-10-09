@@ -5,11 +5,15 @@ import com.dhs0319.bills.core.model.DanmakuSessionState
 import com.dhs0319.bills.core.model.DanmakuWindow
 import com.dhs0319.bills.core.model.ResolvedVideoIds
 import com.dhs0319.bills.core.model.VodDanmakuRequest
+import com.dhs0319.bills.core.model.VodDanmakuSegment
 import com.dhs0319.bills.core.model.danmakuWindowStartMs
 import com.dhs0319.bills.core.model.toDanmakuWindowId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,35 +22,30 @@ import kotlinx.coroutines.launch
 
 internal class VodDanmakuSession(
     private val scope: CoroutineScope,
-    private val repository: VodDanmakuRepository
+    private val fetchSegment: suspend (VodDanmakuRequest) -> VodDanmakuSegment,
+    private val nanoTime: () -> Long = System::nanoTime
 ) {
+    constructor(scope: CoroutineScope, repository: VodDanmakuRepository) :
+        this(scope, repository::fetchSegment)
+
     private val _state = MutableStateFlow(DanmakuSessionState())
     val state: StateFlow<DanmakuSessionState> = _state.asStateFlow()
 
-    private var loadingJob: Job? = null
-    private var loadingWindowId: Long? = null
-    private var prefetchJob: Job? = null
-    private var prefetchWindowId: Long? = null
+    // 当前分段和下一分段共用请求表；播放到边界时复用尚未完成的预取。
+    private val loads = mutableMapOf<Long, Job>()
     private var currentIds: ResolvedVideoIds? = null
     private var currentDurationMs = 0L
     private var currentWindowId: Long? = null
+    private var lastFailureNanos: Long? = null
 
-    fun setSource(
-        ids: ResolvedVideoIds?,
-        durationMs: Long
-    ) {
-        if (ids == null || !ids.danmakuReady) {
-            reset()
-            return
+    fun setSource(ids: ResolvedVideoIds?, durationMs: Long) {
+        val validIds = ids?.takeIf { it.danmakuReady }
+        if (currentIds != validIds) {
+            clear()
+            currentIds = validIds
+            _state.value = DanmakuSessionState(sourceKey = validIds?.toDanmakuSourceKey())
         }
-
-        if (currentIds != ids) {
-            resetSource(ids, durationMs)
-        } else {
-            currentIds = ids
-            currentDurationMs = durationMs.coerceAtLeast(0L)
-            updateSourceKey(ids.toDanmakuSourceKey())
-        }
+        currentDurationMs = if (validIds != null) durationMs.coerceAtLeast(0L) else 0L
     }
 
     fun seekTo(positionMs: Long) {
@@ -59,167 +58,108 @@ internal class VodDanmakuSession(
     }
 
     private fun ensureWindowAt(positionMs: Long) {
-        val ids = currentIds ?: return
-        val windowId = positionMs.coerceAtLeast(0L).toDanmakuWindowId()
-        if (windowId == currentWindowId) return
+        if (currentIds == null) return
+        val position = if (currentDurationMs > 0L) {
+            positionMs.coerceIn(0L, currentDurationMs - 1L)
+        } else {
+            positionMs.coerceAtLeast(0L)
+        }
+        val windowId = position.toDanmakuWindowId()
+        if (windowId == currentWindowId) {
+            val failedAt = lastFailureNanos ?: return
+            if (nanoTime() - failedAt < RETRY_INTERVAL_NANOS) return
+        }
         currentWindowId = windowId
-        updateSourceKey(ids.toDanmakuSourceKey())
+        lastFailureNanos = null
         usePrefetchedWindow(windowId)
+        cancelObsoleteLoads(windowId)
         ensureWindowLoaded(windowId)
-        prefetchNextWindow()
+        ensureWindowLoaded(windowId + 1L)
     }
 
-    /** 命中预取分段时直接切换，避免在分段边界等待网络。 */
     private fun usePrefetchedWindow(windowId: Long) {
-        val prefetched = _state.value.prefetchWindow ?: return
-        if (prefetched.id != windowId) return
-        _state.update { it.copy(window = prefetched, prefetchWindow = null) }
-    }
-
-    /** 预取下一分段，播放到边界时数据已就绪。 */
-    private fun prefetchNextWindow() {
-        val current = currentWindowId ?: return
-        val windowId = current + 1L
-        val state = _state.value
-        if (state.window?.id == windowId || state.prefetchWindow?.id == windowId) return
-        if (prefetchWindowId == windowId && prefetchJob?.isActive == true) return
-        if (state.prefetchWindow != null) {
-            _state.update { it.copy(prefetchWindow = null) }
-        }
-        if (!isWindowWithinDuration(windowId)) return
-        val request = buildRequest(windowId) ?: return
-        prefetchJob?.cancel()
-        prefetchWindowId = windowId
-        prefetchJob = scope.launch {
-            runCatching {
-                repository.fetchSegment(request)
-            }.onSuccess { segment ->
-                if (segment.request.ids != currentIds || currentWindowId != windowId - 1L) {
-                    return@onSuccess
-                }
-                _state.update { currentState ->
-                    if (currentState.window?.id == windowId) {
-                        currentState
-                    } else {
-                        currentState.copy(
-                            prefetchWindow = DanmakuWindow(windowId, segment.items)
-                        )
-                    }
-                }
-            }
-            if (prefetchWindowId == windowId) {
-                prefetchWindowId = null
-                prefetchJob = null
+        _state.update { state ->
+            val prefetched = state.prefetchWindow
+            when {
+                prefetched?.id == windowId -> state.copy(window = prefetched, prefetchWindow = null, lastError = null)
+                prefetched != null && prefetched.id != windowId + 1L -> state.copy(prefetchWindow = null)
+                else -> state
             }
         }
     }
 
-    private fun isWindowWithinDuration(windowId: Long): Boolean {
-        if (windowId <= 0L) return false
-        if (currentDurationMs <= 0L) return true
-        return danmakuWindowStartMs(windowId) < currentDurationMs
+    private fun cancelObsoleteLoads(windowId: Long) {
+        val obsoleteIds = loads.keys.filter { it != windowId && it != windowId + 1L }
+        // 先移除再取消，避免旧协程的 finally 清理新请求。
+        for (obsoleteId in obsoleteIds) {
+            loads.remove(obsoleteId)?.cancel()
+        }
     }
 
     private fun ensureWindowLoaded(windowId: Long) {
-        if (_state.value.window?.id == windowId) return
-        if (loadingWindowId == windowId && loadingJob?.isActive == true) return
-        buildRequest(windowId)?.let(::loadWindow)
+        if (_state.value.windowAt(windowId) != null || loads.containsKey(windowId)) return
+        val request = buildRequest(windowId) ?: return
+        if (windowId == currentWindowId) {
+            _state.update { if (it.lastError == null) it else it.copy(lastError = null) }
+        }
+        // 先登记再启动，兼容 Main.immediate 上立即返回的缓存结果。
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val segment = fetchSegment(request)
+                currentCoroutineContext().ensureActive()
+                publishWindow(request, segment)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                if (request.ids == currentIds && windowId == currentWindowId) {
+                    lastFailureNanos = nanoTime()
+                    _state.update { it.copy(lastError = error.message ?: "Failed to load danmaku segment") }
+                }
+            } finally {
+                if (loads[windowId] === currentCoroutineContext()[Job]) {
+                    loads.remove(windowId)
+                }
+            }
+        }
+        loads[windowId] = job
+        job.start()
     }
 
     private fun buildRequest(windowId: Long): VodDanmakuRequest? {
         val ids = currentIds ?: return null
         val startMs = danmakuWindowStartMs(windowId)
-        val positionMs = if (currentDurationMs > 0L) {
-            startMs.coerceAtMost((currentDurationMs - 1L).coerceAtLeast(0L))
-        } else {
-            startMs
-        }
-        return VodDanmakuRequest(
-            ids = ids,
-            positionMs = positionMs,
-            durationMs = currentDurationMs
-        )
+        if (currentDurationMs > 0L && startMs >= currentDurationMs) return null
+        return VodDanmakuRequest(ids = ids, positionMs = startMs, durationMs = currentDurationMs)
     }
 
-    private fun loadWindow(request: VodDanmakuRequest) {
+    private fun publishWindow(request: VodDanmakuRequest, segment: VodDanmakuSegment) {
+        if (request.ids != currentIds) return
         val windowId = request.segmentIndex
-        if (loadingWindowId != windowId) {
-            loadingJob?.cancel()
-        }
-        loadingWindowId = windowId
-        clearError()
-
-        loadingJob = scope.launch {
-            runCatching {
-                repository.fetchSegment(request)
-            }.onSuccess { segment ->
-                if (segment.request.ids != currentIds || windowId != currentWindowId) {
-                    return@onSuccess
-                }
-                _state.update { state ->
-                    state.copy(
-                        window = DanmakuWindow(
-                            id = windowId,
-                            items = segment.items
-                        ),
-                        lastError = null
-                    )
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) return@onFailure
-                if (request.ids != currentIds || windowId != currentWindowId) {
-                    return@onFailure
-                }
-                _state.update { it.copy(lastError = error.message ?: "Failed to load danmaku segment") }
-            }
-            if (loadingWindowId == windowId) {
-                loadingWindowId = null
-                loadingJob = null
+        val current = currentWindowId ?: return
+        val window = DanmakuWindow(windowId, segment.items)
+        _state.update { state ->
+            when (windowId) {
+                current -> state.copy(window = window, lastError = null)
+                current + 1L -> state.copy(prefetchWindow = window)
+                else -> state
             }
         }
     }
 
     fun clear() {
-        reset()
-    }
-
-    private fun resetSource(
-        ids: ResolvedVideoIds,
-        durationMs: Long
-    ) {
-        loadingJob?.cancel()
-        loadingJob = null
-        loadingWindowId = null
-        prefetchJob?.cancel()
-        prefetchJob = null
-        prefetchWindowId = null
-        currentIds = ids
-        currentDurationMs = durationMs.coerceAtLeast(0L)
-        currentWindowId = null
-        _state.value = DanmakuSessionState(sourceKey = ids.toDanmakuSourceKey())
-    }
-
-    private fun clearError() {
-        _state.update { if (it.lastError != null) it.copy(lastError = null) else it }
-    }
-
-    private fun updateSourceKey(sourceKey: String) {
-        _state.update { state ->
-            if (state.sourceKey == sourceKey) state else state.copy(sourceKey = sourceKey)
-        }
-    }
-
-    private fun reset() {
+        val obsoleteLoads = loads.values.toList()
+        loads.clear()
+        obsoleteLoads.forEach { it.cancel() }
         currentIds = null
         currentDurationMs = 0L
         currentWindowId = null
-        loadingJob?.cancel()
-        loadingJob = null
-        loadingWindowId = null
-        prefetchJob?.cancel()
-        prefetchJob = null
-        prefetchWindowId = null
+        lastFailureNanos = null
         _state.value = DanmakuSessionState()
+    }
+
+    private companion object {
+        const val RETRY_INTERVAL_NANOS = 5_000_000_000L
     }
 }
 

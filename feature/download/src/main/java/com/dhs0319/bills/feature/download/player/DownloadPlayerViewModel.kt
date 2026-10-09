@@ -9,6 +9,8 @@ import com.dhs0319.bills.core.playback.DownloadPlaybackController
 import com.dhs0319.bills.core.model.DanmakuConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -32,7 +34,15 @@ class DownloadPlayerViewModel @Inject constructor(
     private var closed = false
 
     init {
-        danmakuSession.bind(taskId)
+        viewModelScope.launch {
+            playerSettings.state.map { it.danmaku.weightFilterLevel }
+                .distinctUntilChanged()
+                .collect {
+                    if (closed) return@collect
+                    danmakuSession.bind(taskId, forceReload = true)
+                    danmakuSession.onTick(state.value.positionMs)
+                }
+        }
         viewModelScope.launch {
             state.collect { playback ->
                 danmakuSession.onTick(playback.positionMs)

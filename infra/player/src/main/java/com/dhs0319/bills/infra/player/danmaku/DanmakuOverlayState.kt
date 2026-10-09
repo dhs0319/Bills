@@ -22,14 +22,13 @@ class DanmakuOverlayState internal constructor(
     private val released = AtomicBoolean(false)
     private var lastSourceKey: String? = null
     private var pendingSeek = true
-    private var lastCfgState: DanmakuCfgState? = null
+    private var lastConfig: DanmakuConfig? = null
     private var lastPlayState: DanmakuPlayState? = null
     private var lastPlaybackSpeed = 1f
     private var lastSeekEventId = 0L
     private var appliedWindowId: Long? = null
-    private var appliedWindowSignature: Int? = null
+    private var appliedWindowItems: List<DanmakuItem>? = null
     private val itemMapper = DefaultDanmakuItemMapper()
-
 
     fun prepare() {
         if (released.get()) return
@@ -49,50 +48,35 @@ class DanmakuOverlayState internal constructor(
         val clampedPositionMs = positionMs.coerceAtLeast(0L)
         val clampedSpeed = speed.coerceIn(0.25f, 3f)
         val requiredWindowId = clampedPositionMs.toDanmakuWindowId()
+
         syncSource(danmakuState.sourceKey)
         val hasSeek = consumeSeekEvent(seekEventId)
-        val hasSpeedChange = lastPlaybackSpeed != clampedSpeed
-        lastPlaybackSpeed = clampedSpeed
         if (hasSeek) {
             pendingSeek = true
         }
+        val hasSpeedChange = updatePlaybackSpeed(clampedSpeed)
+
         applyConfig(config)
         syncWindow(
             danmakuState = danmakuState,
             targetWindowId = requiredWindowId,
             hasDiscontinuity = hasSeek
         )
-        val curReady = appliedWindowId == requiredWindowId
-        if (config.enabled && hasSource) {
+        val positionSynced = config.enabled && hasSource &&
             syncPosition(
                 positionMs = clampedPositionMs,
-                hasDiscontinuity = hasSeek,
-                curReady = curReady
+                windowReady = appliedWindowId == requiredWindowId
             )
-        }
+
         val canPlay = isPlaying && !pendingSeek
-        val needStateOverride = hasSeek ||
-            hasSpeedChange ||
-            !canPlay ||
-            !hasSource ||
-            lastPlayState?.isPlaying != true
-        if (needStateOverride) {
-            // 变速只改变时间轴推进速率，此时保持时钟连续；positionMs 是秒级轮询采样值，
-            // 用它重新锚定会让弹幕时间轴倒退(屏幕上弹幕整体向右跳/被挤出屏幕)。
-            // 其余情况(seek/换源/起播/暂停)仍需锚定真实播放位置，否则换源、续播等
-            // 无 seek 事件的位置跳变会让弹幕时间轴停在错误位置。
-            val keepClockContinuous = hasSpeedChange &&
-                !hasSeek &&
-                canPlay &&
-                hasSource &&
-                lastPlayState?.isPlaying == true
-            val anchorMs = if (keepClockContinuous) {
-                timeProvider.getCurrentTimeMs()
-            } else {
-                clampedPositionMs
-            }
-            timeProvider.overrideState(anchorMs, canPlay, clampedSpeed)
-        }
+        syncClock(
+            positionMs = clampedPositionMs,
+            isPlaying = canPlay,
+            speed = clampedSpeed,
+            hasDiscontinuity = hasSeek || positionSynced,
+            hasSpeedChange = hasSpeedChange,
+            hasSource = hasSource
+        )
         syncPlayback(
             enabled = config.enabled,
             hasSource = hasSource,
@@ -108,8 +92,7 @@ class DanmakuOverlayState internal constructor(
     ) {
         if (released.get()) return
         val clampedSpeed = speed.coerceIn(0.25f, 3f)
-        val hasSpeedChange = lastPlaybackSpeed != clampedSpeed
-        lastPlaybackSpeed = clampedSpeed
+        val hasSpeedChange = updatePlaybackSpeed(clampedSpeed)
         applyConfig(config)
         val needStateOverride = hasSpeedChange ||
             !isPlaying ||
@@ -127,6 +110,34 @@ class DanmakuOverlayState internal constructor(
             hasSource = hasSource,
             isPlaying = isPlaying
         )
+    }
+
+    private fun updatePlaybackSpeed(speed: Float): Boolean {
+        val hasChanged = lastPlaybackSpeed != speed
+        lastPlaybackSpeed = speed
+        return hasChanged
+    }
+
+    private fun syncClock(
+        positionMs: Long,
+        isPlaying: Boolean,
+        speed: Float,
+        hasDiscontinuity: Boolean,
+        hasSpeedChange: Boolean,
+        hasSource: Boolean
+    ) {
+        val needsPositionAnchor = hasDiscontinuity ||
+            !isPlaying ||
+            !hasSource ||
+            lastPlayState?.isPlaying != true
+        val anchorMs = when {
+            // Seek、起播和暂停优先使用实际位置，避免换源或续播时沿用旧时钟。
+            needsPositionAnchor -> positionMs
+            // 持续播放时仅变速：沿用推算位置，避免秒级采样使弹幕时间轴倒退。
+            hasSpeedChange -> timeProvider.getCurrentTimeMs()
+            else -> return
+        }
+        timeProvider.overrideState(anchorMs, isPlaying, speed)
     }
 
     private fun syncPlayback(
@@ -159,23 +170,19 @@ class DanmakuOverlayState internal constructor(
 
     private fun syncPosition(
         positionMs: Long,
-        hasDiscontinuity: Boolean,
-        curReady: Boolean
-    ) {
-        val shouldSeek = pendingSeek || hasDiscontinuity
-        if (!shouldSeek) return
-
-        if (!curReady) {
-            pendingSeek = true
-            return
-        }
+        windowReady: Boolean
+    ): Boolean {
+        // Seek 事件和换源都会先设置 pendingSeek；等待目标分段就绪后再定位。
+        if (!pendingSeek || !windowReady) return false
         session.seekTo(positionMs)
         pendingSeek = false
+        return true
     }
 
     fun release() {
         if (!released.compareAndSet(false, true)) return
         appliedWindowId = null
+        appliedWindowItems = null
         session.setPlayerTimeProvider(null)
         session.pause()
         timeProvider.release()
@@ -192,10 +199,7 @@ class DanmakuOverlayState internal constructor(
         if (released.get()) return
         lastSourceKey = null
         lastSeekEventId = 0L
-        pendingSeek = true
-        appliedWindowId = null
-        appliedWindowSignature = null
-        session.clearSegments()
+        resetWindow()
     }
 
     fun appendDanmaku(item: DanmakuItem) {
@@ -211,20 +215,23 @@ class DanmakuOverlayState internal constructor(
 
         lastSourceKey = sourceKey
         lastSeekEventId = 0L
+        resetWindow()
+    }
+
+    private fun resetWindow() {
         pendingSeek = true
         appliedWindowId = null
-        appliedWindowSignature = null
+        appliedWindowItems = null
         session.clearSegments()
     }
 
     private fun applyConfig(
         config: DanmakuConfig
     ) {
-        val nextState = DanmakuCfgState(config)
-        if (lastCfgState == nextState) return
+        if (lastConfig == config) return
 
-        danmakuContext.applyConfig(config)
-        lastCfgState = nextState
+        danmakuContext.applyConfig(config, lastConfig)
+        lastConfig = config
     }
 
     private fun syncWindow(
@@ -232,21 +239,20 @@ class DanmakuOverlayState internal constructor(
         targetWindowId: Long,
         hasDiscontinuity: Boolean
     ) {
-        val targetWindow = danmakuState.window?.takeIf { it.id == targetWindowId }
-            ?: danmakuState.prefetchWindow?.takeIf { it.id == targetWindowId }
+        val targetWindow = danmakuState.windowAt(targetWindowId)
         if (targetWindow == null) {
             if (hasDiscontinuity) {
-                appliedWindowId = null
-                appliedWindowSignature = null
-                session.clearSegments()
-                pendingSeek = true
+                resetWindow()
             } else if (appliedWindowId == null) {
                 pendingSeek = true
             }
             return
         }
-        val nextSignature = targetWindow.items.windowSignature()
-        if (appliedWindowId == targetWindow.id && appliedWindowSignature == nextSignature) {
+        // 常规同步先比较引用；新列表比较完整内容，避免漏掉文字、颜色等变化。
+        if (appliedWindowId == targetWindow.id &&
+            (appliedWindowItems === targetWindow.items || appliedWindowItems == targetWindow.items)
+        ) {
+            appliedWindowItems = targetWindow.items
             return
         }
         val previousWindowId = appliedWindowId
@@ -266,7 +272,7 @@ class DanmakuOverlayState internal constructor(
             )
         }
         appliedWindowId = targetWindow.id
-        appliedWindowSignature = nextSignature
+        appliedWindowItems = targetWindow.items
     }
 
     private fun consumeSeekEvent(seekEventId: Long): Boolean {
@@ -277,19 +283,6 @@ class DanmakuOverlayState internal constructor(
         return true
     }
 }
-
-private fun List<DanmakuItem>.windowSignature(): Int {
-    var result = size
-    for (item in this) {
-        result = 31 * result + item.id.hashCode()
-        result = 31 * result + item.progressMs
-    }
-    return result
-}
-
-private data class DanmakuCfgState(
-    val config: DanmakuConfig
-)
 
 private data class DanmakuPlayState(
     val enabled: Boolean,

@@ -58,6 +58,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -134,14 +135,18 @@ class StreamPlaybackSessionImpl @Inject constructor(
             }
         }
         runtimeScope.launch {
-            playerSettings.state.map { it.danmaku.enabled }.collect { enabled ->
-                if (_currentTarget.value !is StreamPlaybackTarget.Video) return@collect
-                if (!enabled) {
+            playerSettings.state
+                .map { it.danmaku.enabled to it.danmaku.weightFilterLevel }
+                .distinctUntilChanged()
+                .collect { (enabled, _) ->
+                    if (_currentTarget.value !is StreamPlaybackTarget.Video) return@collect
+                    // 屏蔽等级在加载时过滤；变化后重新加载当前段及预取段。
                     danmakuSession.clear()
-                    return@collect
+                    if (enabled) {
+                        syncDanmakuSource(vodSession.value)
+                        danmakuSession.onProgress(currentPlaybackProgress().positionMs)
+                    }
                 }
-                syncDanmakuSource(vodSession.value)
-            }
         }
         runtimeScope.launch {
             playerSettings.state.map { it.playback.videoCdnMode }.collect { mode ->
