@@ -130,6 +130,8 @@ fun SlidingTabRow(
                         .fillMaxHeight()
                         .selectable(
                             selected = index == selectedIndex,
+                            interactionSource = null,
+                            indication = null,
                             role = Role.Tab,
                             onClick = { onSelect(index) }
                         ),

@@ -268,7 +268,7 @@ class ImRepository @Inject constructor(
             .setFilterType(
                 when (filterType) {
                     com.dhs0319.bills.core.model.MsgFeedFilter.ALL -> MsgFeedFilterType.MsgFeed_All
-                    com.dhs0319.bills.core.model.MsgFeedFilter.FOLLOWING -> MsgFeedFilterType.MsgFeed_Following
+                    com.dhs0319.bills.core.model.MsgFeedFilter.AT_ME -> MsgFeedFilterType.MsgFeed_AtMe
                 }
             )
             .setPagesize(pageSize)
@@ -316,6 +316,30 @@ class ImRepository @Inject constructor(
                         sourceContent = biz.sourceContent,
                         rootReplyContent = biz.rootReplyContent,
                         targetReplyContent = biz.targetReplyContent
+                    )
+                } else if (item.hasAtCard()) {
+                    val atCard = item.atCard
+                    val msg = atCard.atMsg
+                    val biz = atCard.atBiz
+                    MsgFeedItem(
+                        msgId = id,
+                        msgTime = time,
+                        msgType = type,
+                        users = msg.usersList.map { u ->
+                            User(
+                                mid = u.mid,
+                                name = u.nickname,
+                                avatar = u.avatar.httpsImageUrlOrNull() ?: ""
+                            )
+                        },
+                        coverImage = msg.coverImage.httpsImageUrlOrNull(),
+                        subjectId = biz.subjectId,
+                        rootId = biz.rootId,
+                        sourceId = biz.sourceId,
+                        businessId = msg.businessId,
+                        sourceContent = biz.sourceContent,
+                        rootReplyContent = "",
+                        targetReplyContent = ""
                     )
                 } else null
             }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,7 +36,7 @@ import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.comment.CommentPanel
 
-private val msgFeedTabs = listOf("全部", "关注的人")
+private val msgFeedTabs = listOf("全部", "@我")
 private val msgFeedTabWidth = 88.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,7 +60,7 @@ fun MsgFeedScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("通知评论") },
+                    title = { Text("回复与@") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -68,31 +69,38 @@ fun MsgFeedScreen(
                 )
             }
         ) { padding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                SlidingTabRow(
-                    tabs = msgFeedTabs,
-                    selectedIndex = state.filterType.index,
-                    onSelect = { index ->
-                        when (index) {
-                            0 -> vm.changeFilter(MsgFeedFilter.ALL)
-                            1 -> vm.changeFilter(MsgFeedFilter.FOLLOWING)
-                        }
-                    },
-                    tabHorizontalAlignment = Alignment.Start,
+                Column(
                     modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .width(msgFeedTabWidth * msgFeedTabs.size)
-                )
-                MsgFeedPane(
-                    onOpenCommentDetail = { record ->
-                        detailRecord = record
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+                        .widthIn(max = 600.dp)
+                        .fillMaxSize()
+                ) {
+                    SlidingTabRow(
+                        tabs = msgFeedTabs,
+                        selectedIndex = state.filterType.index,
+                        onSelect = { index ->
+                            when (index) {
+                                0 -> vm.changeFilter(MsgFeedFilter.ALL)
+                                1 -> vm.changeFilter(MsgFeedFilter.AT_ME)
+                            }
+                        },
+                        tabHorizontalAlignment = Alignment.Start,
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .width(msgFeedTabWidth * msgFeedTabs.size)
+                    )
+                    MsgFeedPane(
+                        onOpenCommentDetail = { record ->
+                            detailRecord = record
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
 
