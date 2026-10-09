@@ -8,6 +8,7 @@ import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.im.ImRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,9 +27,7 @@ class MsgFeedViewModel @Inject constructor(
 
     fun changeFilter(filterType: MsgFeedFilter) {
         if (_uiState.value.filterType == filterType) return
-        _uiState.update {
-            it.copy(filterType = filterType, items = emptyList(), cursor = null)
-        }
+        _uiState.value = MsgFeedUiState(filterType = filterType)
         refresh(forceLoading = true)
     }
 
@@ -40,7 +39,7 @@ class MsgFeedViewModel @Inject constructor(
     fun refresh(forceLoading: Boolean = false) {
         val state = _uiState.value
         if (state.isLoading || state.isRefreshing || state.isLoadingMore) return
-        reqId += 1L
+        val callId = ++reqId
         _uiState.update {
             it.copy(
                 isLoading = forceLoading || it.items.isEmpty(),
@@ -51,14 +50,14 @@ class MsgFeedViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            load(reset = true)
+            load(reset = true, callId = callId, state = state)
         }
     }
 
     fun loadMore() {
         val state = _uiState.value
         if (!state.canLoadMore || state.isLoading || state.isRefreshing || state.isLoadingMore) return
-        reqId += 1L
+        val callId = ++reqId
         _uiState.update {
             it.copy(
                 isLoadingMore = true,
@@ -66,13 +65,12 @@ class MsgFeedViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            load(reset = false)
+            load(reset = false, callId = callId, state = state)
         }
     }
 
-    private suspend fun load(reset: Boolean) {
-        val callId = reqId
-        val state = _uiState.value
+    private suspend fun load(reset: Boolean, callId: Long, state: MsgFeedUiState) {
+        if (callId != reqId) return
         try {
             val page = imRepo.fetchMsgFeedList(
                 filterType = state.filterType,
@@ -97,6 +95,8 @@ class MsgFeedViewModel @Inject constructor(
                     loadMoreError = null
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (callId != reqId) return
             val msg = e.message.takeIf { !it.isNullOrBlank() } ?: if (reset) "加载失败" else "加载更多失败"

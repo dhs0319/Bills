@@ -102,5 +102,5 @@ data class ImMessage(
 
 enum class MsgFeedFilter(val index: Int) {
     ALL(0),
-    FOLLOWING(1)
+    AT_ME(1)
 }

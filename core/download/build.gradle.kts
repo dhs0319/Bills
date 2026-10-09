@@ -24,6 +24,7 @@ dependencies {
     api(project(":core:model"))
     implementation(project(":core:common"))
     implementation(project(":core:settings"))
+    implementation(project(":core:danmaku"))
     implementation(project(":infra:network-grpc"))
     implementation(project(":infra:player"))
 

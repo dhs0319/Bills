@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,27 +18,28 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
-import com.dhs0319.bills.core.designsystem.component.SlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
 import com.dhs0319.bills.core.model.ImSessionItem
+import com.dhs0319.bills.core.model.ImSessionTab
+import com.dhs0319.bills.feature.im.component.ImNotificationEntries
+import com.dhs0319.bills.feature.im.component.ImSessionDropdown
 import com.dhs0319.bills.feature.im.component.ImSessionSwipeItem
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -53,7 +53,10 @@ fun ImScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val topLevelNavSpace = LocalTopLevelNavSpace.current
-    val listState = rememberLazyListState()
+    val listStates = ImSessionTab.entries.associateWith { tab ->
+        key(tab) { rememberLazyListState() }
+    }
+    val listState = listStates.getValue(state.currentTab)
     var openedSessionKey by remember { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<ImSessionItem?>(null) }
 
@@ -78,9 +81,17 @@ fun ImScreen(
             TopAppBar(
                 title = { Text("消息") },
                 actions = {
-                    IconButton(onClick = onOpenMsgFeed) {
-                        Icon(Icons.Default.Notifications, contentDescription = "通知评论")
-                    }
+                    ImSessionDropdown(
+                        tabs = state.tabs,
+                        selectedTab = state.currentTab,
+                        onSelect = {
+                            openedSessionKey = null
+                            vm.selectTab(it)
+                        },
+                        modifier = Modifier.padding(end = 4.dp),
+                        enabled = state.isLoggedIn &&
+                            !state.isLoading && !state.isRefreshing && !state.isLoadingMore
+                    )
                 }
             )
         }
@@ -101,89 +112,88 @@ fun ImScreen(
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
-                    contentAlignment = Alignment.Center
+                LaunchedEffect(
+                    state.currentTab,
+                    listState,
+                    state.sessions.size,
+                    state.canLoadMore,
+                    state.isLoadingMore,
+                    state.loadMoreError
                 ) {
-                    SlidingTabRow(
-                        tabs = state.tabs.map { it.title },
-                        selectedIndex = state.tabs.indexOf(state.currentTab).coerceAtLeast(0),
-                        onSelect = { index -> state.tabs.getOrNull(index)?.let(vm::selectTab) },
-                        modifier = Modifier.widthIn(max = 300.dp)
-                    )
-                }
-
-                if (!state.actionError.isNullOrBlank()) {
-                    StateMessageCard(
-                        text = state.actionError.orEmpty(),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        isError = true,
-                        actionText = "知道了",
-                        onAction = vm::clearActionError
-                    )
-                }
-
-                if (state.sessions.isEmpty()) {
-                    when {
-                        state.isLoading -> {
-                            Box(
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
-
-                        !state.errorMessage.isNullOrBlank() -> {
-                            StateMessageCard(
-                                text = state.errorMessage.orEmpty(),
-                                modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
-                                isError = true
-                            )
-                        }
-
-                        else -> {
-                            StateMessageCard(
-                                text = "暂无消息",
-                                modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp)
-                            )
-                        }
-                    }
-                } else {
-                    LaunchedEffect(
-                        listState,
-                        state.sessions.size,
-                        state.canLoadMore,
-                        state.isLoadingMore,
-                        state.loadMoreError
-                    ) {
-                        snapshotFlow {
-                            val total = listState.layoutInfo.totalItemsCount
-                            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    snapshotFlow {
+                        val total = listState.layoutInfo.totalItemsCount
+                        val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                        state.sessions.isNotEmpty() &&
                             state.canLoadMore &&
-                                state.loadMoreError.isNullOrBlank() &&
-                                total > 0 &&
-                                last >= total - 4
-                        }
-                            .distinctUntilChanged()
-                            .collect { shouldLoadMore ->
-                                if (shouldLoadMore) vm.loadMore()
-                            }
+                            state.loadMoreError.isNullOrBlank() &&
+                            total > 0 &&
+                            last >= total - 4
                     }
+                        .distinctUntilChanged()
+                        .collect { shouldLoadMore ->
+                            if (shouldLoadMore) vm.loadMore()
+                        }
+                }
 
+                // Dispose the previous category's item animations when switching lists.
+                key(state.currentTab) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         contentPadding = PaddingValues(
                             start = 12.dp,
-                            top = 12.dp,
+                            top = 8.dp,
                             end = 12.dp,
                             bottom = topLevelNavSpace + 24.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        item(key = "im_notification_entries") {
+                            ImNotificationEntries(onOpenReplyAndMentions = onOpenMsgFeed)
+                        }
+
+                        if (!state.actionError.isNullOrBlank()) {
+                            item(key = "im_action_error") {
+                                StateMessageCard(
+                                    text = state.actionError.orEmpty(),
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    isError = true,
+                                    actionText = "知道了",
+                                    onAction = vm::clearActionError
+                                )
+                            }
+                        }
+
+                        if (state.sessions.isEmpty()) {
+                            item(key = "im_empty_state") {
+                                when {
+                                    state.isLoading -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator()
+                                        }
+                                    }
+
+                                    !state.errorMessage.isNullOrBlank() -> {
+                                        StateMessageCard(
+                                            text = state.errorMessage.orEmpty(),
+                                            modifier = Modifier.padding(vertical = 16.dp),
+                                            isError = true
+                                        )
+                                    }
+
+                                    else -> {
+                                        StateMessageCard(
+                                            text = "暂无消息",
+                                            modifier = Modifier.padding(vertical = 16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         items(
                             items = state.sessions,
                             key = { it.key }
@@ -209,7 +219,7 @@ fun ImScreen(
                             )
                         }
 
-                        if (!state.errorMessage.isNullOrBlank()) {
+                        if (state.sessions.isNotEmpty() && !state.errorMessage.isNullOrBlank()) {
                             item(key = "im_error_footer") {
                                 StateMessageCard(
                                     text = state.errorMessage.orEmpty(),
@@ -231,6 +241,22 @@ fun ImScreen(
                                     isError = true,
                                     actionText = "重试",
                                     onAction = vm::loadMore
+                                )
+                            }
+                        } else if (
+                            state.sessions.isNotEmpty() &&
+                            state.paginationParams?.hasMore != true &&
+                            !state.isLoading &&
+                            !state.isRefreshing &&
+                            state.errorMessage.isNullOrBlank()
+                        ) {
+                            item(key = "im_no_more") {
+                                Text(
+                                    text = "没有更多啦~",
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }

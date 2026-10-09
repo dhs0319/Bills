@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -114,7 +113,7 @@ fun MsgFeedPane(
         ) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.widthIn(max = 600.dp).fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -181,14 +180,14 @@ private fun MsgFeedCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "回复了你的评论",
+                            text = if (item.msgType == "AtMsg") "@了你" else "回复了你的评论",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
                     Text(
-                        text = "未知用户回复了你",
+                        text = if (item.msgType == "AtMsg") "未知用户@了你" else "未知用户回复了你",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
