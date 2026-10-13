@@ -9,6 +9,8 @@ import androidx.navigation.navArgument
 import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.feature.im.conversation.ImConversationScreen
 import com.dhs0319.bills.feature.im.feed.MsgFeedScreen
+import com.dhs0319.bills.feature.im.followers.NewFollowersScreen
+import com.dhs0319.bills.feature.im.likes.ReceivedLikesScreen
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
@@ -24,6 +26,46 @@ private const val IM_CONVERSATION_ROUTE =
     "im/conversation/{$TALKER_ID_ARG}/{$SESSION_TYPE_ARG}?$TITLE_ARG={$TITLE_ARG}&$AVATAR_ARG={$AVATAR_ARG}&$AUTO_REPLY_ARG={$AUTO_REPLY_ARG}"
 
 const val IM_MSG_FEED_ROUTE = "im/msg_feed"
+const val IM_RECEIVED_LIKES_ROUTE = "im/received_likes"
+const val IM_NEW_FOLLOWERS_ROUTE = "im/new_followers"
+
+fun NavController.navigateToNewFollowers() {
+    navigate(IM_NEW_FOLLOWERS_ROUTE) { launchSingleTop = true }
+}
+
+fun NavGraphBuilder.imNewFollowersScreen(
+    onBack: () -> Unit,
+    onOpenSpace: (SpaceRoute) -> Unit
+) {
+    composable(route = IM_NEW_FOLLOWERS_ROUTE) {
+        NewFollowersScreen(
+            onBack = onBack,
+            onOpenSpace = onOpenSpace
+        )
+    }
+}
+
+fun NavController.navigateToReceivedLikes() {
+    navigate(IM_RECEIVED_LIKES_ROUTE) { launchSingleTop = true }
+}
+
+fun NavGraphBuilder.imReceivedLikesScreen(
+    onBack: () -> Unit,
+    onOpenSpace: (SpaceRoute) -> Unit,
+    onOpenVideoDetail: (VideoTarget) -> Unit,
+    onOpenDynamicDetail: (String) -> Unit,
+    onOpenLiveDetail: (LiveRoute) -> Unit
+) {
+    composable(route = IM_RECEIVED_LIKES_ROUTE) {
+        ReceivedLikesScreen(
+            onBack = onBack,
+            onOpenSpace = onOpenSpace,
+            onOpenVideoDetail = onOpenVideoDetail,
+            onOpenDynamicDetail = onOpenDynamicDetail,
+            onOpenLiveDetail = onOpenLiveDetail
+        )
+    }
+}
 
 fun NavController.navigateToImConversation(
     item: ImSessionItem

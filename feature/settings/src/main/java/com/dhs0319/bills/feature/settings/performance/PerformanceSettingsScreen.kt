@@ -39,6 +39,7 @@ fun PerformanceSettingsScreen(
 ) {
     val config by viewModel.themeConfig.collectAsStateWithLifecycle()
     val fixBottomBar by viewModel.fixBottomBar.collectAsStateWithLifecycle()
+    val useBottomMenu by viewModel.useBottomMenu.collectAsStateWithLifecycle()
     val playerSettings by viewModel.playerSettings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val frameRateOptions = remember(context) { context.availableFrameRateModes() }
@@ -72,9 +73,18 @@ fun PerformanceSettingsScreen(
                 )
             }
             item {
+                SettingDropdown(
+                    title = "菜单样式",
+                    selected = useBottomMenu,
+                    options = listOf(false, true),
+                    optionLabel = { if (it) "底栏菜单" else "悬浮菜单" },
+                    onSelect = viewModel::updateUseBottomMenu
+                )
+            }
+            item {
                 SettingSwitch(
-                    title = "固定底栏",
-                    subtitle = "主页底栏不再随滚动自动收起",
+                    title = "固定菜单",
+                    subtitle = "关闭后菜单随滚动自动收起",
                     checked = fixBottomBar,
                     onCheckedChange = viewModel::updateFixBottomBar
                 )

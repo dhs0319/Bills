@@ -48,6 +48,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun ImScreen(
     onOpenConversation: (ImSessionItem) -> Unit,
     onOpenMsgFeed: () -> Unit = {},
+    onOpenReceivedLikes: () -> Unit = {},
+    onOpenNewFollowers: () -> Unit = {},
     refreshRequest: Int = 0,
     vm: ImViewModel = hiltViewModel()
 ) {
@@ -149,7 +151,11 @@ fun ImScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         item(key = "im_notification_entries") {
-                            ImNotificationEntries(onOpenReplyAndMentions = onOpenMsgFeed)
+                            ImNotificationEntries(
+                                onOpenReplyAndMentions = onOpenMsgFeed,
+                                onOpenReceivedLikes = onOpenReceivedLikes,
+                                onOpenNewFollowers = onOpenNewFollowers
+                            )
                         }
 
                         if (!state.actionError.isNullOrBlank()) {

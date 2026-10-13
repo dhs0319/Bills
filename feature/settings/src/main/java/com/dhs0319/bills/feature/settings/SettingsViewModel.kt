@@ -123,6 +123,12 @@ class SettingsViewModel @Inject constructor(
         true
     )
 
+    val useBottomMenu = appSettings.useBottomMenu.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        false
+    )
+
     fun updateThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             appSettings.updateThemeMode(mode)
@@ -343,6 +349,12 @@ class SettingsViewModel @Inject constructor(
     fun updateFixBottomBar(enabled: Boolean) {
         viewModelScope.launch {
             appSettings.updateFixBottomBar(enabled)
+        }
+    }
+
+    fun updateUseBottomMenu(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettings.updateUseBottomMenu(enabled)
         }
     }
 

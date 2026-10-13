@@ -71,6 +71,7 @@ class AppSettings @Inject constructor(
     private val lastAutoUpdateCheckAtKey = longPreferencesKey("last_auto_update_check_at")
     private val useSystemDnsKey = booleanPreferencesKey("use_system_dns")
     private val fixBottomBarKey = booleanPreferencesKey("fix_bottom_bar")
+    private val useBottomMenuKey = booleanPreferencesKey("use_bottom_menu")
 
     val themeConfig: Flow<ThemeConfig> = context.appSettingsDataStore.data.map { prefs ->
         ThemeConfig(
@@ -164,6 +165,9 @@ class AppSettings @Inject constructor(
     val autoCheckUpdate: Flow<Boolean> = context.appSettingsDataStore.data.map { it[autoCheckUpdateKey] ?: true }
     val useSystemDns: Flow<Boolean> = context.appSettingsDataStore.data.map { it[useSystemDnsKey] ?: false }
     val fixBottomBar: Flow<Boolean> = context.appSettingsDataStore.data.map { it[fixBottomBarKey] ?: true }
+    val useBottomMenu: Flow<Boolean> = context.appSettingsDataStore.data.map {
+        it[useBottomMenuKey] ?: false
+    }.distinctUntilChanged()
 
     private val interestDoneKey = booleanPreferencesKey("interest_done")
     val interestDone: Flow<Boolean> = context.appSettingsDataStore.data.map { it[interestDoneKey] ?: false }
@@ -211,6 +215,10 @@ class AppSettings @Inject constructor(
 
     suspend fun updateFixBottomBar(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[fixBottomBarKey] = enabled }
+    }
+
+    suspend fun updateUseBottomMenu(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[useBottomMenuKey] = enabled }
     }
 
     suspend fun markInterestDone() {

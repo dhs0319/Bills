@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":feature:comment"))
     implementation(project(":core:auth"))
     implementation(project(":core:im"))
+    implementation(project(":core:space"))
     implementation(project(":core:model"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
@@ -47,4 +48,5 @@ dependencies {
     implementation(libs.navigation.compose)
 
     implementation(libs.coil.compose)
+    testImplementation(libs.junit)
 }

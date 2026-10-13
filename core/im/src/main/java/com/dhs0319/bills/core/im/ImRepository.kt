@@ -47,7 +47,10 @@ import com.dhs0319.bills.core.model.User
 import com.dhs0319.bills.core.model.im.MsgFeedCursor
 import com.dhs0319.bills.core.model.im.MsgFeedItem
 import com.dhs0319.bills.core.model.im.MsgFeedPage
+import com.dhs0319.bills.core.model.im.ReceivedLikesPage
+import com.dhs0319.bills.core.model.im.NewFollowersPage
 import com.dhs0319.bills.core.common.AuthProvider
+import com.dhs0319.bills.core.common.BiliConstants
 import com.dhs0319.bills.core.common.media.httpsImageUrlOrNull
 import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.ImConversationPage
@@ -60,6 +63,9 @@ import com.dhs0319.bills.core.model.ImSessionId
 import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.ImSessionTab
 import com.dhs0319.bills.infra.grpc.BiliGrpcClient
+import com.dhs0319.bills.infra.network.BiliRestClient
+import com.dhs0319.bills.infra.network.BiliRestParamBuilder
+import com.dhs0319.bills.infra.network.BiliRestProfile
 import javax.inject.Inject
 import javax.inject.Singleton
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -78,8 +84,35 @@ import java.util.UUID
 class ImRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val grpcClient: BiliGrpcClient,
-    private val authProvider: AuthProvider
+    private val authProvider: AuthProvider,
+    private val restClient: BiliRestClient,
+    private val restParamBuilder: BiliRestParamBuilder
 ) {
+
+    suspend fun fetchNewFollowers(page: Int = 1, pageSize: Int = 20): NewFollowersPage {
+        val mid = authProvider.mid
+        require(mid > 0L) { "请先登录" }
+        require(page > 0 && pageSize in 1..50)
+        val params = restParamBuilder.app(
+            BiliRestProfile.APP,
+            System.currentTimeMillis() / 1000L,
+            authProvider.accessToken
+        ) + mapOf(
+            "vmid" to mid.toString(),
+            "pn" to page.toString(),
+            "ps" to pageSize.toString(),
+            "order" to "desc",
+            "scene" to "1"
+        )
+        val json = restClient.getSigned(
+            url = "${BiliConstants.BASE_URL_API}/x/relation/fans",
+            params = params,
+            profile = BiliRestProfile.APP
+        )
+        return withContext(Dispatchers.Default) {
+            json.toNewFollowersPage(page, pageSize, mid)
+        }
+    }
 
     private val _sessionListVersion = MutableStateFlow(0L)
     val sessionListVersion: StateFlow<Long> = _sessionListVersion.asStateFlow()
@@ -355,6 +388,21 @@ class ImRepository @Inject constructor(
                 } else null,
                 msgCards = mappedCards
             )
+        }
+    }
+
+    suspend fun fetchReceivedLikes(
+        cursor: MsgFeedCursor? = null,
+        pageSize: Long = 20
+    ): ReceivedLikesPage {
+        require(authProvider.mid > 0L) { "请先登录" }
+        val reply = grpcClient.call(
+            endpoint = MSG_FEED_LIST_ENDPOINT,
+            requestBytes = receivedLikesRequest(cursor, pageSize).toByteArray(),
+            parser = MsgListRsp.parser()
+        )
+        return withContext(Dispatchers.Default) {
+            reply.toReceivedLikesPage()
         }
     }
 
