@@ -9,6 +9,10 @@ import com.dhs0319.bills.core.model.HistoryItem
 import com.dhs0319.bills.core.model.HistoryTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +43,7 @@ class HistoryViewModel @Inject constructor(
 
     private val cache = mutableMapOf<HistoryTab, HistoryCache>()
     private var cursor = HistoryCursor()
+    private var loadJob: Job? = null
 
     init {
         refresh()
@@ -46,7 +51,8 @@ class HistoryViewModel @Inject constructor(
 
     fun selectTab(tab: HistoryTab) {
         val state = _uiState.value
-        if (state.tab == tab || state.isLoading || state.isRefreshing || state.isLoadingMore) return
+        if (state.tab == tab) return
+        loadJob?.cancel()
         val cached = cache[tab]
         if (cached != null) {
             cursor = cached.cursor
@@ -70,9 +76,15 @@ class HistoryViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = tab, reset = true, refreshing = false)
         }
+    }
+
+    fun previewState(tab: HistoryTab): HistoryUiState {
+        if (_uiState.value.tab == tab) return _uiState.value
+        val cached = cache[tab] ?: return HistoryUiState(tab = tab, isLoading = true)
+        return HistoryUiState(tab = tab, items = cached.items, hasMore = cached.hasMore)
     }
 
     fun refresh() {
@@ -92,7 +104,7 @@ class HistoryViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = tab, reset = true, refreshing = hasItems)
         }
     }
@@ -107,7 +119,7 @@ class HistoryViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = state.tab, reset = false, refreshing = false)
         }
     }
@@ -119,6 +131,7 @@ class HistoryViewModel @Inject constructor(
     ) {
         try {
             val page = repo.fetchPage(tab, if (reset) HistoryCursor() else cursor)
+            currentCoroutineContext().ensureActive()
             cursor = page.cursor
             cache[tab] = HistoryCache(
                 items = if (reset) page.items else _uiState.value.items + page.items,
@@ -137,6 +150,8 @@ class HistoryViewModel @Inject constructor(
                     errorOnLoadMore = false
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Logger.e(TAG, e) { "加载历史记录失败" }
             _uiState.update {

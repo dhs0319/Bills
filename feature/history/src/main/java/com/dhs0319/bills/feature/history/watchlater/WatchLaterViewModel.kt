@@ -9,6 +9,10 @@ import com.dhs0319.bills.core.model.WatchLaterItem
 import com.dhs0319.bills.core.model.WatchLaterTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +46,7 @@ class WatchLaterViewModel @Inject constructor(
     private val cache = mutableMapOf<WatchLaterCacheKey, WatchLaterCache>()
     private var currentStartKey = ""
     private var splitKey = ""
+    private var loadJob: Job? = null
 
     init {
         refresh()
@@ -49,7 +54,8 @@ class WatchLaterViewModel @Inject constructor(
 
     fun selectTab(tab: WatchLaterTab) {
         val state = _uiState.value
-        if (state.tab == tab || state.isLoading || state.isRefreshing || state.isLoadingMore) return
+        if (state.tab == tab) return
+        loadJob?.cancel()
         val key = WatchLaterCacheKey(tab, state.asc)
         val cached = cache[key]
         if (cached != null) {
@@ -60,12 +66,16 @@ class WatchLaterViewModel @Inject constructor(
                 items = cached.items,
                 countText = cached.countText,
                 hasMore = cached.hasMore,
+                isLoading = false,
+                isRefreshing = false,
+                isLoadingMore = false,
                 errorMessage = null,
                 errorOnLoadMore = false
             )
             return
         }
         currentStartKey = ""
+        splitKey = ""
         _uiState.update {
             it.copy(
                 tab = tab,
@@ -79,9 +89,23 @@ class WatchLaterViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = tab, asc = state.asc, reset = true, refreshing = false)
         }
+    }
+
+    fun previewState(tab: WatchLaterTab): WatchLaterUiState {
+        val state = _uiState.value
+        if (state.tab == tab) return state
+        val cached = cache[WatchLaterCacheKey(tab, state.asc)]
+            ?: return WatchLaterUiState(tab = tab, asc = state.asc, isLoading = true)
+        return WatchLaterUiState(
+            tab = tab,
+            asc = state.asc,
+            items = cached.items,
+            countText = cached.countText,
+            hasMore = cached.hasMore
+        )
     }
 
     fun selectSort(asc: Boolean) {
@@ -116,7 +140,7 @@ class WatchLaterViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = state.tab, asc = asc, reset = true, refreshing = false)
         }
     }
@@ -139,7 +163,7 @@ class WatchLaterViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = state.tab, asc = state.asc, reset = true, refreshing = hasItems)
         }
     }
@@ -154,7 +178,7 @@ class WatchLaterViewModel @Inject constructor(
                 errorOnLoadMore = false
             )
         }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             load(tab = state.tab, asc = state.asc, reset = false, refreshing = false)
         }
     }
@@ -171,6 +195,7 @@ class WatchLaterViewModel @Inject constructor(
                 splitKey = splitKey
             )
             val page = repo.fetchPage(tab, asc, reqCursor)
+            currentCoroutineContext().ensureActive()
             currentStartKey = page.cursor.startKey
             splitKey = page.cursor.splitKey
             val items = if (reset) page.items else _uiState.value.items + page.items
@@ -194,6 +219,8 @@ class WatchLaterViewModel @Inject constructor(
                     errorOnLoadMore = false
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Logger.e(TAG, e) { "加载稍后再看失败" }
             _uiState.update {

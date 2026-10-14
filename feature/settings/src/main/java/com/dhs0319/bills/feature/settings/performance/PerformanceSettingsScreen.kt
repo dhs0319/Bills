@@ -74,7 +74,7 @@ fun PerformanceSettingsScreen(
             }
             item {
                 SettingDropdown(
-                    title = "菜单样式",
+                    title = "底部菜单样式",
                     selected = useBottomMenu,
                     options = listOf(false, true),
                     optionLabel = { if (it) "底栏菜单" else "悬浮菜单" },

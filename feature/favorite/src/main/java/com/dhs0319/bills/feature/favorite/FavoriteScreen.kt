@@ -1,10 +1,13 @@
 package com.dhs0319.bills.feature.favorite
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -16,21 +19,23 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
-import com.dhs0319.bills.core.designsystem.component.FilledTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
 import com.dhs0319.bills.core.model.FavoriteContentTarget
 import com.dhs0319.bills.feature.favorite.folder.FavoriteFolderList
 import com.dhs0319.bills.feature.favorite.item.FavoriteContentList
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun FavoriteScreen(
     onBack: () -> Unit,
@@ -41,6 +46,15 @@ fun FavoriteScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val contentListState = rememberLazyListState()
     val folderListState = rememberLazyListState()
+    val pagerState = rememberPagerState(
+        initialPage = state.tab.ordinal,
+        pageCount = { FavoriteTab.entries.size }
+    )
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            viewModel.selectTab(FavoriteTab.entries[page])
+        }
+    }
 
     CollapsingTopBarScaffold(
         topBar = { scrollBehavior ->
@@ -63,27 +77,41 @@ fun FavoriteScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            FilledTabRow(
+            AdaptivePagerSlidingTabRow(
                 tabs = FavoriteTab.entries.map { it.title },
-                selectedIndex = state.tab.ordinal,
-                onSelect = { index -> viewModel.selectTab(FavoriteTab.entries[index]) },
-                modifier = Modifier
+                pagerState = pagerState
             )
 
-            BiliPullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::refresh,
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.weight(1f)
-            ) {
-                FavoriteBody(
-                    state = state,
-                    contentListState = contentListState,
-                    folderListState = folderListState,
-                    onOpenContent = onOpenContent,
-                    onOpenFolder = onOpenFolder,
-                    onRetry = viewModel::refresh,
-                    onLoadMore = viewModel::loadMore
-                )
+            ) { page ->
+                val tab = FavoriteTab.entries[page]
+                BiliPullToRefreshBox(
+                    isRefreshing = when (tab) {
+                        FavoriteTab.CONTENT -> state.content.isRefreshing
+                        FavoriteTab.FOLDER -> state.folder.isRefreshing
+                    },
+                    onRefresh = {
+                        if (!pagerState.isScrollInProgress && state.tab == tab) {
+                            viewModel.refresh()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    FavoriteBody(
+                        tab = tab,
+                        state = state,
+                        isActive = !pagerState.isScrollInProgress &&
+                            pagerState.settledPage == page && state.tab == tab,
+                        contentListState = contentListState,
+                        folderListState = folderListState,
+                        onOpenContent = onOpenContent,
+                        onOpenFolder = onOpenFolder,
+                        onRetry = { if (state.tab == tab) viewModel.refresh() },
+                        onLoadMore = viewModel::loadMore
+                    )
+                }
             }
         }
     }
@@ -91,7 +119,9 @@ fun FavoriteScreen(
 
 @Composable
 private fun FavoriteBody(
+    tab: FavoriteTab,
     state: FavoriteUiState,
+    isActive: Boolean,
     contentListState: LazyListState,
     folderListState: LazyListState,
     onOpenContent: (FavoriteContentTarget) -> Unit,
@@ -101,20 +131,20 @@ private fun FavoriteBody(
 ) {
     val content = state.content
     val folder = state.folder
-    val hasCurrentItems = when (state.tab) {
+    val hasCurrentItems = when (tab) {
         FavoriteTab.CONTENT -> content.items.isNotEmpty()
         FavoriteTab.FOLDER -> folder.folders.isNotEmpty()
     }
     when {
-        ((state.tab == FavoriteTab.CONTENT && content.isLoading) ||
-            (state.tab == FavoriteTab.FOLDER && folder.isLoading)) && !hasCurrentItems -> {
+        ((tab == FavoriteTab.CONTENT && content.isLoading) ||
+            (tab == FavoriteTab.FOLDER && folder.isLoading) || state.tab != tab) && !hasCurrentItems -> {
             FavoriteLoading(modifier = Modifier.fillMaxSize())
         }
 
-        ((state.tab == FavoriteTab.CONTENT && content.errorMessage != null) ||
-            (state.tab == FavoriteTab.FOLDER && folder.errorMessage != null)) && !hasCurrentItems -> {
+        ((tab == FavoriteTab.CONTENT && content.errorMessage != null) ||
+            (tab == FavoriteTab.FOLDER && folder.errorMessage != null)) && !hasCurrentItems -> {
             StateMessageCard(
-                text = when (state.tab) {
+                text = when (tab) {
                     FavoriteTab.CONTENT -> content.errorMessage.orEmpty()
                     FavoriteTab.FOLDER -> folder.errorMessage.orEmpty()
                 }.ifBlank { "加载收藏失败" },
@@ -127,7 +157,7 @@ private fun FavoriteBody(
 
         !hasCurrentItems -> {
             StateMessageCard(
-                text = when (state.tab) {
+                text = when (tab) {
                     FavoriteTab.CONTENT -> "暂无收藏内容"
                     FavoriteTab.FOLDER -> "暂无收藏夹"
                 },
@@ -135,13 +165,13 @@ private fun FavoriteBody(
             )
         }
 
-        state.tab == FavoriteTab.CONTENT -> {
+        tab == FavoriteTab.CONTENT -> {
             FavoriteContentList(
                 items = content.items,
                 isLoadingMore = content.isLoadingMore,
                 errorMessage = content.errorMessage,
                 errorOnLoadMore = content.errorOnLoadMore,
-                canLoadMore = content.canLoadMore,
+                canLoadMore = content.canLoadMore && isActive,
                 onLoadMore = onLoadMore,
                 onRetry = if (content.errorOnLoadMore) onLoadMore else onRetry,
                 onOpenContent = onOpenContent,
@@ -149,7 +179,7 @@ private fun FavoriteBody(
             )
         }
 
-        state.tab == FavoriteTab.FOLDER -> {
+        tab == FavoriteTab.FOLDER -> {
             FavoriteFolderList(
                 folders = folder.folders,
                 listState = folderListState,

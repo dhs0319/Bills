@@ -78,6 +78,7 @@ internal fun VideoPlaybackSidebar(
 ) {
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     var section by rememberSaveable { mutableStateOf(PlaybackSheetSection.Playback) }
+    var showCdnDialog by rememberSaveable { mutableStateOf(false) }
 
     PlaybackSettingsPanel(title = "更多设置", onDismiss = onDismiss, modifier = modifier, embedded = embedded) {
         VideoPlaybackPanelContent(
@@ -87,7 +88,18 @@ internal fun VideoPlaybackSidebar(
             viewModel = viewModel,
             section = section,
             onSectionChange = { section = it },
+            onCdnDialogRequest = { showCdnDialog = true },
             modifier = Modifier.fillMaxWidth()
+        )
+    }
+    if (showCdnDialog) {
+        VideoCdnModeDialog(
+            currentMode = settingsState.playback.videoCdnMode,
+            onDismiss = { showCdnDialog = false },
+            onSelect = {
+                showCdnDialog = false
+                viewModel.updateVideoCdnMode(it)
+            }
         )
     }
 }
@@ -100,6 +112,7 @@ private fun VideoPlaybackPanelContent(
     viewModel: VideoViewModel,
     section: PlaybackSheetSection,
     onSectionChange: (PlaybackSheetSection) -> Unit,
+    onCdnDialogRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -126,7 +139,8 @@ private fun VideoPlaybackPanelContent(
             PlaybackSheetSection.Info -> PlayerInfoSection(state, ids)
             PlaybackSheetSection.Playback -> PlaybackSettingsSection(
                 settingsState = settingsState,
-                viewModel = viewModel
+                viewModel = viewModel,
+                onCdnDialogRequest = onCdnDialogRequest
             )
 
             PlaybackSheetSection.Danmaku -> DanmakuSettingsSection(
@@ -140,9 +154,9 @@ private fun VideoPlaybackPanelContent(
 @Composable
 private fun PlaybackSettingsSection(
     settingsState: PlayerSettingsState,
-    viewModel: VideoViewModel
+    viewModel: VideoViewModel,
+    onCdnDialogRequest: () -> Unit
 ) {
-    var showCdnDialog by rememberSaveable { mutableStateOf(false) }
     SheetSectionTitle("播放设置")
 
     Card {
@@ -153,6 +167,11 @@ private fun PlaybackSettingsSection(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("CDN 偏好", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "经常遇到卡顿缓冲时，可以切换到其它的CDN",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -162,19 +181,9 @@ private fun PlaybackSettingsSection(
                     text = settingsState.playback.videoCdnMode.label,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                TextButton(onClick = { showCdnDialog = true }) { Text("切换 CDN") }
+                TextButton(onClick = onCdnDialogRequest) { Text("切换 CDN") }
             }
         }
-    }
-    if (showCdnDialog) {
-        VideoCdnModeDialog(
-            currentMode = settingsState.playback.videoCdnMode,
-            onDismiss = { showCdnDialog = false },
-            onSelect = {
-                showCdnDialog = false
-                viewModel.updateVideoCdnMode(it)
-            }
-        )
     }
 
     SheetChoiceCard(

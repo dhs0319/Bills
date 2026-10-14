@@ -1,6 +1,7 @@
 package com.dhs0319.bills.feature.history.watchlater
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.selectable
@@ -13,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -31,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,10 +43,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.FilledTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
 import com.dhs0319.bills.core.model.VideoTarget
@@ -53,7 +57,7 @@ import com.dhs0319.bills.feature.history.component.LOAD_MORE_SKELETON_COUNT
 import com.dhs0319.bills.feature.history.component.LoadMoreTrigger
 import com.dhs0319.bills.feature.history.component.formatVideoDuration
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun WatchLaterScreen(
     onBack: () -> Unit,
@@ -61,22 +65,26 @@ fun WatchLaterScreen(
     viewModel: WatchLaterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
+    val pagerState = rememberPagerState(
+        initialPage = state.tab.ordinal,
+        pageCount = { WatchLaterTab.entries.size }
+    )
+    val listStates = remember(state.asc) { WatchLaterTab.entries.map { LazyListState() } }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            viewModel.selectTab(WatchLaterTab.entries[page])
+        }
+    }
     LoadMoreTrigger(
-        listState = listState,
-        canLoadMore = { state.canLoadMore },
+        listState = listStates[state.tab.ordinal],
+        canLoadMore = {
+            state.canLoadMore && !pagerState.isScrollInProgress &&
+                pagerState.settledPage == state.tab.ordinal
+        },
         isLoadingMore = { state.isLoadingMore },
         hasError = { state.errorMessage != null },
         onLoadMore = viewModel::loadMore
     )
-
-    LaunchedEffect(state.tab, state.asc) {
-        val needScrollTop = listState.firstVisibleItemIndex > 0 ||
-                listState.firstVisibleItemScrollOffset > 0
-        if (needScrollTop && listState.layoutInfo.totalItemsCount > 0) {
-            listState.scrollToItem(0)
-        }
-    }
 
     CollapsingTopBarScaffold(
         topBar = { scrollBehavior ->
@@ -113,52 +121,59 @@ fun WatchLaterScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            FilledTabRow(
+            AdaptivePagerSlidingTabRow(
                 tabs = WatchLaterTab.entries.map { it.title },
-                selectedIndex = state.tab.ordinal,
-                onSelect = { index -> viewModel.selectTab(WatchLaterTab.entries[index]) },
-                modifier = Modifier
+                pagerState = pagerState
             )
 
-            BiliPullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::refresh,
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.weight(1f)
-            ) {
+            ) { page ->
+                val pageState = viewModel.previewState(WatchLaterTab.entries[page])
+                BiliPullToRefreshBox(
+                    isRefreshing = pageState.isRefreshing,
+                    onRefresh = {
+                        if (!pagerState.isScrollInProgress && pageState.tab == state.tab) {
+                            viewModel.refresh()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
                 when {
-                    state.isLoading && state.items.isEmpty() -> {
+                    pageState.isLoading && pageState.items.isEmpty() -> {
                         HistoryListLoading(
                             skeletonPrefix = "watch_later_skeleton",
                             modifier = Modifier.fillMaxSize()
                         )
                     }
 
-                    state.errorMessage != null && state.items.isEmpty() -> {
+                    pageState.errorMessage != null && pageState.items.isEmpty() -> {
                         StateMessageCard(
-                            text = state.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" },
+                            text = pageState.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" },
                             modifier = Modifier.fillMaxSize(),
                             isError = true,
                             actionText = "重试",
-                            onAction = viewModel::refresh
+                            onAction = { if (pageState.tab == state.tab) viewModel.refresh() }
                         )
                     }
 
-                    state.items.isEmpty() -> {
+                    pageState.items.isEmpty() -> {
                         StateMessageCard(
-                            text = "暂无${state.tab.title}内容",
+                            text = "暂无${pageState.tab.title}内容",
                             modifier = Modifier.fillMaxSize()
                         )
                     }
 
                     else -> {
                         LazyColumn(
-                            state = listState,
+                            state = listStates[page],
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             items(
-                                items = state.items,
+                                items = pageState.items,
                                 key = { it.key },
                                 contentType = { it.cardType }
                             ) { item ->
@@ -170,7 +185,7 @@ fun WatchLaterScreen(
                                 )
                             }
 
-                            if (state.isLoadingMore) {
+                            if (pageState.isLoadingMore) {
                                 items(
                                     count = LOAD_MORE_SKELETON_COUNT,
                                     key = { index -> "watch_later_loading_$index" },
@@ -180,16 +195,16 @@ fun WatchLaterScreen(
                                 }
                             }
 
-                            if (state.errorMessage != null && state.items.isNotEmpty()) {
+                            if (pageState.errorMessage != null && pageState.items.isNotEmpty()) {
                                 item(
                                     key = "watch_later_error",
                                     contentType = "error"
                                 ) {
                                     StateMessageCard(
-                                        text = state.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" },
+                                        text = pageState.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" },
                                         isError = true,
                                         actionText = "重试",
-                                        onAction = if (state.errorOnLoadMore) {
+                                        onAction = if (pageState.errorOnLoadMore) {
                                             viewModel::loadMore
                                         } else {
                                             viewModel::refresh
@@ -199,6 +214,7 @@ fun WatchLaterScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }
