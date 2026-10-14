@@ -860,6 +860,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
                 val state = _videoState.value
                 StreamPlaybackSessionState(
                     target = target,
+                    waitingForPlay = state.waitingForPlay,
                     isPreparing = state.isPreparing,
                     isPlaying = state.isPlaying,
                     playWhenReady = state.playWhenReady,

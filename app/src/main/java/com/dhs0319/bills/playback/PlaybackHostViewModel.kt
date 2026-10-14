@@ -9,6 +9,7 @@ import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.playback.LivePlaybackController
 import com.dhs0319.bills.core.playback.StreamPlaybackSession
 import com.dhs0319.bills.core.model.LiveRoute
+import com.dhs0319.bills.core.model.StreamPlaybackTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
@@ -36,8 +37,12 @@ class PlaybackHostViewModel @Inject constructor(
             initialValue = false
         )
     val miniPlayerAvailable = playerSettings.state
-        .combine(playbackSession.currentTarget) { settings, target ->
-            settings.playback.inAppMiniPlayer && target != null
+        .combine(sessionState) { settings, state ->
+            settings.playback.inAppMiniPlayer && when (state.target) {
+                is StreamPlaybackTarget.Video -> !state.waitingForPlay
+                is StreamPlaybackTarget.Live -> true
+                null -> false
+            }
         }
         .stateIn(
             scope = viewModelScope,
@@ -72,6 +77,10 @@ class PlaybackHostViewModel @Inject constructor(
     }
 
     fun minimize() {
+        if (currentTarget.value is StreamPlaybackTarget.Video && sessionState.value.waitingForPlay) {
+            close()
+            return
+        }
         if (!miniPlayerAvailable.value) return
         if (currentTarget.value == null) return
         _hostMode.value = PlaybackHostMode.Mini

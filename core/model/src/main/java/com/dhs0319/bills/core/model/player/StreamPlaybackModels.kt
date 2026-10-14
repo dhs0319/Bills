@@ -28,6 +28,7 @@ sealed interface StreamPlaybackTarget {
 @Immutable
 data class StreamPlaybackSessionState(
     val target: StreamPlaybackTarget? = null,
+    val waitingForPlay: Boolean = false,
     val isPreparing: Boolean = false,
     val isPlaying: Boolean = false,
     val playWhenReady: Boolean = false,

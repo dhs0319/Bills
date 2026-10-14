@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,10 +49,10 @@ import com.dhs0319.bills.core.model.DynamicDetail
 import com.dhs0319.bills.core.model.DynamicDetailAuthor
 import com.dhs0319.bills.core.model.DynamicDetailParagraph
 import com.dhs0319.bills.core.model.DynamicImage
-import com.dhs0319.bills.core.model.DynamicStats
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.feature.comment.CommentPanel
 import com.dhs0319.bills.feature.comment.component.CommentRichText
+import com.dhs0319.bills.feature.dynamic.component.DynamicStatsRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -155,7 +156,7 @@ fun DynamicDetailScreen(
                             vertical = 12.dp
                         ),
                         header = {
-                            DetailContent(detail)
+                            DetailContent(detail, horizontalPadding = 0.dp)
                         }
                     )
                 } else {
@@ -174,16 +175,19 @@ fun DynamicDetailScreen(
 }
 
 @Composable
-private fun DetailContent(detail: DynamicDetail) {
+private fun DetailContent(detail: DynamicDetail, horizontalPadding: Dp = 16.dp) {
     DynamicDetailHeader(
         author = detail.author,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 12.dp)
     )
     detail.paragraphs.forEach { paragraph ->
-        DynamicDetailParagraphItem(paragraph)
+        DynamicDetailParagraphItem(paragraph, horizontalPadding = horizontalPadding)
     }
     detail.stats?.let { stats ->
-        DynamicDetailStats(stats)
+        DynamicStatsRow(
+            stats = stats,
+            modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 12.dp)
+        )
     }
 }
 
@@ -222,7 +226,10 @@ private fun DynamicDetailHeader(
 }
 
 @Composable
-private fun DynamicDetailParagraphItem(paragraph: DynamicDetailParagraph) {
+private fun DynamicDetailParagraphItem(
+    paragraph: DynamicDetailParagraph,
+    horizontalPadding: Dp = 16.dp
+) {
     when (paragraph.type) {
         DynamicDetailParagraph.TYPE_TEXT -> {
             paragraph.text?.let { text ->
@@ -230,7 +237,7 @@ private fun DynamicDetailParagraphItem(paragraph: DynamicDetailParagraph) {
                     text = text,
                     emotes = paragraph.emotes,
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 6.dp)
                 )
             }
         }
@@ -238,7 +245,7 @@ private fun DynamicDetailParagraphItem(paragraph: DynamicDetailParagraph) {
             if (paragraph.images.isNotEmpty()) {
                 DynamicDetailImageGrid(
                     images = paragraph.images,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 6.dp)
                 )
             }
         }
@@ -262,31 +269,6 @@ private fun DynamicDetailImageGrid(images: List<DynamicImage>, modifier: Modifie
     )
 }
 
-@Composable
-private fun DynamicDetailStats(stats: DynamicStats) {
-    val text = remember(stats) {
-        buildString {
-            if (stats.repost > 0) append("转发 ${stats.repost}")
-            if (stats.reply > 0) {
-                if (isNotEmpty()) append("  ")
-                append("评论 ${stats.reply}")
-            }
-            if (stats.like > 0) {
-                if (isNotEmpty()) append("  ")
-                append("点赞 ${stats.like}")
-            }
-        }
-    }
-    if (text.isNotEmpty()) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
-    }
-}
-
 private fun LazyListScope.detailContentItems(detail: DynamicDetail) {
     item(key = "detail_author", contentType = "author") {
         DynamicDetailHeader(
@@ -305,7 +287,10 @@ private fun LazyListScope.detailContentItems(detail: DynamicDetail) {
 
     detail.stats?.let { stats ->
         item(key = "detail_stats", contentType = "stats") {
-            DynamicDetailStats(stats)
+            DynamicStatsRow(
+                stats = stats,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
         }
     }
 }
