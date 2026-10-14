@@ -1,5 +1,8 @@
 package com.dhs0319.bills.feature.download
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -30,18 +33,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.CoverImage
-import com.dhs0319.bills.core.designsystem.component.FilledTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.model.VideoDownloadKind
 import com.dhs0319.bills.core.model.VideoDownloadOption
@@ -79,6 +84,7 @@ fun DownloadScreen(
     ) { innerPadding ->
         DownloadContent(
             state = state,
+            initialTab = viewModel.selectedTab,
             onSelectTab = viewModel::selectTab,
             onInputChange = viewModel::updateInput,
             onSelectKind = viewModel::selectKind,
@@ -98,9 +104,11 @@ fun DownloadScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DownloadContent(
     state: DownloadUiState,
+    initialTab: DownloadTab,
     onSelectTab: (DownloadTab) -> Unit,
     onInputChange: (String) -> Unit,
     onSelectKind: (VideoDownloadKind) -> Unit,
@@ -115,35 +123,48 @@ private fun DownloadContent(
     onOpenPlayer: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val pagerState = rememberPagerState(
+        initialPage = initialTab.ordinal,
+        pageCount = { DownloadTab.entries.size }
+    )
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            onSelectTab(DownloadTab.entries[page])
+        }
+    }
+
     Column(modifier = modifier) {
-        FilledTabRow(
+        AdaptivePagerSlidingTabRow(
             tabs = DownloadTab.entries.map { it.title },
-            selectedIndex = state.tab.ordinal,
-            onSelect = { index -> onSelectTab(DownloadTab.entries[index]) },
-            modifier = Modifier
+            pagerState = pagerState
         )
 
-        when (state.tab) {
-            DownloadTab.CONFIG -> ConfigTab(
-                state = state,
-                onInputChange = onInputChange,
-                onSelectKind = onSelectKind,
-                onSelectQuality = onSelectQuality,
-                onSelectAudio = onSelectAudio,
-                onStartInputTask = onStartInputTask,
-                onStartDownload = onStartDownload,
-                modifier = Modifier.fillMaxSize()
-            )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f)
+        ) { page ->
+            when (DownloadTab.entries[page]) {
+                DownloadTab.CONFIG -> ConfigTab(
+                    state = state,
+                    onInputChange = onInputChange,
+                    onSelectKind = onSelectKind,
+                    onSelectQuality = onSelectQuality,
+                    onSelectAudio = onSelectAudio,
+                    onStartInputTask = onStartInputTask,
+                    onStartDownload = onStartDownload,
+                    modifier = Modifier.fillMaxSize()
+                )
 
-            DownloadTab.QUEUE -> QueueTab(
-                state = state,
-                onPauseTask = onPauseTask,
-                onResumeTask = onResumeTask,
-                onDeleteTask = onDeleteTask,
-                onExportTask = onExportTask,
-                onOpenPlayer = onOpenPlayer,
-                modifier = Modifier.fillMaxSize()
-            )
+                DownloadTab.QUEUE -> QueueTab(
+                    state = state,
+                    onPauseTask = onPauseTask,
+                    onResumeTask = onResumeTask,
+                    onDeleteTask = onDeleteTask,
+                    onExportTask = onExportTask,
+                    onOpenPlayer = onOpenPlayer,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }

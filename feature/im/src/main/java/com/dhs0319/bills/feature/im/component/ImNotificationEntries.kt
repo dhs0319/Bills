@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun ImNotificationEntries(
     onOpenReplyAndMentions: () -> Unit,
+    onOpenReceivedLikes: () -> Unit,
+    onOpenNewFollowers: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -46,13 +48,13 @@ internal fun ImNotificationEntries(
         ImNotificationEntry(
             label = "收到喜欢",
             icon = Icons.Filled.ThumbUp,
-            onClick = {},
+            onClick = onOpenReceivedLikes,
             modifier = Modifier.weight(1f)
         )
         ImNotificationEntry(
             label = "新增粉丝",
             icon = Icons.Filled.PersonAdd,
-            onClick = {},
+            onClick = onOpenNewFollowers,
             modifier = Modifier.weight(1f)
         )
     }

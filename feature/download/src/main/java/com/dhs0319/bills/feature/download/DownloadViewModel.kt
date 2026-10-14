@@ -46,6 +46,7 @@ class DownloadViewModel @Inject constructor(
         initialValue = DownloadUiState()
     )
     private var parseJob: Job? = null
+    val selectedTab: DownloadTab get() = _formState.value.tab
 
     fun selectTab(tab: DownloadTab) {
         _formState.update { it.copy(tab = tab) }

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -149,6 +151,66 @@ fun SlidingTabRow(
                 }
             }
         }
+    }
+}
+
+/** Uses the home tab style with compact tabs aligned to the start and larger sets centered. */
+@Composable
+fun AdaptiveSlidingTabRow(
+    tabs: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AdaptiveTabLayout(tabCount = tabs.size, modifier = modifier) { tabModifier, alignment ->
+        SlidingTabRow(
+            tabs = tabs,
+            selectedIndex = selectedIndex,
+            onSelect = onSelect,
+            tabHorizontalAlignment = alignment,
+            modifier = tabModifier
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun AdaptivePagerSlidingTabRow(
+    tabs: List<String>,
+    pagerState: PagerState,
+    modifier: Modifier = Modifier
+) {
+    AdaptiveTabLayout(tabCount = tabs.size, modifier = modifier) { tabModifier, alignment ->
+        PagerSlidingTabRow(
+            tabs = tabs,
+            pagerState = pagerState,
+            tabHorizontalAlignment = alignment,
+            modifier = tabModifier
+        )
+    }
+}
+
+@Composable
+private fun AdaptiveTabLayout(
+    tabCount: Int,
+    modifier: Modifier,
+    content: @Composable (Modifier, Alignment.Horizontal) -> Unit
+) {
+    if (tabCount == 0) return
+
+    val isCompact = tabCount == 2
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = if (isCompact) Alignment.CenterStart else Alignment.Center
+    ) {
+        content(
+            if (isCompact) {
+                Modifier.padding(horizontal = 12.dp).width(88.dp * tabCount)
+            } else {
+                Modifier.widthIn(max = 360.dp)
+            },
+            if (isCompact) Alignment.Start else Alignment.CenterHorizontally
+        )
     }
 }
 

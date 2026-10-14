@@ -1,6 +1,7 @@
 package com.dhs0319.bills.navigation
 
 import android.content.res.Configuration
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -8,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawing
@@ -50,6 +53,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -80,7 +84,6 @@ import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.StreamPlaybackTarget
-import androidx.compose.runtime.CompositionLocalProvider
 import com.dhs0319.bills.core.model.VideoSrc
 import com.dhs0319.bills.core.model.VideoTarget
 
@@ -110,8 +113,12 @@ import com.dhs0319.bills.feature.home.HomeScreen
 import com.dhs0319.bills.feature.im.ImScreen
 import com.dhs0319.bills.feature.im.navigation.imConversationScreen
 import com.dhs0319.bills.feature.im.navigation.imMsgFeedScreen
+import com.dhs0319.bills.feature.im.navigation.imNewFollowersScreen
+import com.dhs0319.bills.feature.im.navigation.imReceivedLikesScreen
 import com.dhs0319.bills.feature.im.navigation.navigateToImConversation
 import com.dhs0319.bills.feature.im.navigation.navigateToMsgFeed
+import com.dhs0319.bills.feature.im.navigation.navigateToNewFollowers
+import com.dhs0319.bills.feature.im.navigation.navigateToReceivedLikes
 import com.dhs0319.bills.feature.listen.navigation.listenDetailScreen
 import com.dhs0319.bills.feature.listen.navigation.navigateToListenDetail
 import com.dhs0319.bills.feature.live.LiveViewModel
@@ -258,6 +265,8 @@ fun AppNavHost(
                     onNavigateToDynamicDetail = rootNavController::navigateToDynamicDetail,
                     onNavigateToListenDetail = openListenDetail,
                     onNavigateToMsgFeed = { rootNavController.navigateToMsgFeed() },
+                    onNavigateToReceivedLikes = { rootNavController.navigateToReceivedLikes() },
+                    onNavigateToNewFollowers = { rootNavController.navigateToNewFollowers() },
                     onNavigateToImConversation = { item ->
                         rootNavController.navigateToImConversation(item)
                     }
@@ -391,6 +400,19 @@ fun AppNavHost(
                 onOpenVideo = openVideo
             )
 
+            imReceivedLikesScreen(
+                onBack = { rootNavController.popBackStack() },
+                onOpenSpace = rootNavController::navigateToSpace,
+                onOpenVideoDetail = openVideo,
+                onOpenDynamicDetail = rootNavController::navigateToDynamicDetail,
+                onOpenLiveDetail = openLive
+            )
+
+            imNewFollowersScreen(
+                onBack = { rootNavController.popBackStack() },
+                onOpenSpace = rootNavController::navigateToSpace
+            )
+
             imMsgFeedScreen(
                 onBack = { rootNavController.popBackStack() },
                 onOpenSpace = rootNavController::navigateToSpace,
@@ -440,6 +462,8 @@ private fun MainTabsScaffold(
     onNavigateToDynamicDetail: (String) -> Unit,
     onNavigateToListenDetail: (Long, Int, Long, String, String, String) -> Unit,
     onNavigateToMsgFeed: () -> Unit,
+    onNavigateToReceivedLikes: () -> Unit,
+    onNavigateToNewFollowers: () -> Unit,
     onNavigateToImConversation: (ImSessionItem) -> Unit
 ) {
     val saveableStateHolder = rememberSaveableStateHolder()
@@ -482,8 +506,18 @@ private fun MainTabsScaffold(
     val useStartAlignedBottomToolbar = configuration.screenWidthDp >= 600
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
+    val useBottomMenu by settingsViewModel.useBottomMenu.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
-    var topLevelNavSpace by remember { mutableStateOf(0.dp) }
+    var topLevelNavSpace by remember(useBottomMenu, isLandscape) { mutableStateOf(0.dp) }
+    val bottomContentPadding by animateDpAsState(
+        targetValue = if (!isLandscape && useBottomMenu && !navVisibilityController.hidden) {
+            topLevelNavSpace
+        } else {
+            0.dp
+        },
+        animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
+        label = "bottom menu content padding"
+    )
 
     val tabContent: @Composable () -> Unit = {
         TopLevelRoute.entries.forEach { tab ->
@@ -513,6 +547,8 @@ private fun MainTabsScaffold(
                         TopLevelRoute.MESSAGE -> ImScreen(
                             onOpenConversation = onNavigateToImConversation,
                             onOpenMsgFeed = onNavigateToMsgFeed,
+                            onOpenReceivedLikes = onNavigateToReceivedLikes,
+                            onOpenNewFollowers = onNavigateToNewFollowers,
                             refreshRequest = messageRefreshRequest
                         )
                         TopLevelRoute.PROFILE -> UserScreen(
@@ -562,26 +598,46 @@ private fun MainTabsScaffold(
                 )
                 .nestedScroll(navVisibilityController.connection)
         ) {
-            CompositionLocalProvider(LocalTopLevelNavSpace provides topLevelNavSpace) {
-                tabContent()
+            CompositionLocalProvider(
+                LocalTopLevelNavSpace provides if (useBottomMenu) 0.dp else topLevelNavSpace
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = bottomContentPadding)
+                        .consumeWindowInsets(PaddingValues(bottom = bottomContentPadding))
+                        .clipToBounds()
+                ) {
+                    tabContent()
+                }
             }
-            TopLevelFloatingNavigation(
-                modifier = Modifier
-                    .align(
-                        if (useStartAlignedBottomToolbar) {
-                            Alignment.BottomStart
-                        } else {
-                            Alignment.BottomCenter
-                        }
-                    )
-                    .zIndex(1f),
-                currentTab = currentTab,
-                visibilityController = navVisibilityController,
-                startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
-                onTabChange = selectTab,
-                onNavigateToSearch = onNavigateToSearch,
-                onHeightChanged = { topLevelNavSpace = it }
-            )
+            if (useBottomMenu) {
+                TopLevelBottomNavigation(
+                    modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f),
+                    currentTab = currentTab,
+                    hidden = navVisibilityController.hidden,
+                    onTabChange = selectTab,
+                    onHeightChanged = { topLevelNavSpace = it }
+                )
+            } else {
+                TopLevelFloatingNavigation(
+                    modifier = Modifier
+                        .align(
+                            if (useStartAlignedBottomToolbar) {
+                                Alignment.BottomStart
+                            } else {
+                                Alignment.BottomCenter
+                            }
+                        )
+                        .zIndex(1f),
+                    currentTab = currentTab,
+                    visibilityController = navVisibilityController,
+                    startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
+                    onTabChange = selectTab,
+                    onNavigateToSearch = onNavigateToSearch,
+                    onHeightChanged = { topLevelNavSpace = it }
+                )
+            }
         }
     }
 }
