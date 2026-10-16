@@ -1,10 +1,10 @@
 {
-  "version": "1.1.4",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.4/Bills-1.1.4-arm64-v8a-release.apk",
+  "version": "1.1.5",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.5/Bills-1.1.5-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.4/Bills-1.1.4-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.4/Bills-1.1.4-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.5/Bills-1.1.5-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.5/Bills-1.1.5-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.4",
-  "releaseNotes": "## 更新内容\n\n- 消息页支持左滑置顶和删除\n- 优化消息页的UI\n- 私信页会话气泡支持表情展示\n- 去除tab栏点击时的反馈阴影\n- 修复最后一条消息被导航栏遮挡的问题\n- 修复弹幕在倍速时会回退的问题\n"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.5",
+  "releaseNotes": "## 更新内容\n\n- 支持收到喜欢和新增粉丝页面\n- 显示设置里新增底部菜单样式切换\n- 其他页面统一接入滑动tab栏样式\n- 修复CDN弹窗里文字颜色错误\n"
 }
