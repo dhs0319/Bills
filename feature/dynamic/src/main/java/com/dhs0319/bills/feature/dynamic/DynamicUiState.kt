@@ -7,6 +7,7 @@ import com.dhs0319.bills.core.model.DynamicUpList
 
 @Immutable
 data class DynamicUiState(
+    val currentMid: Long = 0L,
     val upList: DynamicUpList? = null,
     val items: List<DynamicItem> = emptyList(),
     val cursor: DynamicCursor = DynamicCursor(),

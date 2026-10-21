@@ -3,6 +3,8 @@ package com.dhs0319.bills.feature.video
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
+import com.dhs0319.bills.core.common.log.Logger
+import com.dhs0319.bills.core.history.WatchLaterRepository
 import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.playback.VideoPlaybackController
 import com.dhs0319.bills.core.model.CommentSubject
@@ -11,6 +13,7 @@ import com.dhs0319.bills.core.model.DanmakuConfig
 import com.dhs0319.bills.core.model.PlayBiz
 import com.dhs0319.bills.core.model.PlaybackProgress
 import com.dhs0319.bills.core.model.PlayerBufferProfile
+import com.dhs0319.bills.core.model.StreamPlaybackTarget
 import com.dhs0319.bills.core.model.VideoCdnMode
 import com.dhs0319.bills.core.model.VideoDownloadKind
 import com.dhs0319.bills.core.model.VideoDownloadMeta
@@ -24,8 +27,10 @@ import com.dhs0319.bills.feature.video.action.VideoActionUiState
 import com.dhs0319.bills.core.video.VideoActionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -34,10 +39,14 @@ import kotlinx.coroutines.launch
 class VideoViewModel @Inject constructor(
     private val playbackController: VideoPlaybackController,
     private val playerSettings: AppSettings,
-    private val videoActionRepository: VideoActionRepository
+    private val videoActionRepository: VideoActionRepository,
+    private val watchLaterRepository: WatchLaterRepository
 ) : ViewModel() {
 
     private val _targetStack = MutableStateFlow<List<VideoTarget>>(emptyList())
+    private val _watchLaterMessage = MutableStateFlow<String?>(null)
+    val watchLaterMessage = _watchLaterMessage.asStateFlow()
+    private val addingToWatchLater = mutableSetOf<Long>()
 
     val player: StateFlow<Player?> = playbackController.player
     val videoState: StateFlow<VideoPlaybackState> = playbackController.videoState
@@ -49,6 +58,16 @@ class VideoViewModel @Inject constructor(
     internal val actionUiState: StateFlow<VideoActionUiState> = videoActions.state
 
     init {
+        viewModelScope.launch {
+            playbackController.currentTarget.collect { playbackTarget ->
+                val target = (playbackTarget as? StreamPlaybackTarget.Video)?.target
+                    ?: return@collect
+                val stack = _targetStack.value
+                if (stack.isNotEmpty() && stack.last() != target) {
+                    _targetStack.value = stack.dropLast(1) + target
+                }
+            }
+        }
         viewModelScope.launch {
             videoState
                 .map { state ->
@@ -152,6 +171,27 @@ class VideoViewModel @Inject constructor(
 
     fun consumeActionMessage() {
         videoActions.consumeMessage()
+    }
+
+    fun addToWatchLater(aid: Long) {
+        if (!addingToWatchLater.add(aid)) return
+        viewModelScope.launch {
+            try {
+                watchLaterRepository.addVideo(aid)
+                _watchLaterMessage.value = "已加入稍后再看"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e("VideoViewModel", e) { "加入稍后再看失败" }
+                _watchLaterMessage.value = e.message?.takeIf(String::isNotBlank) ?: "加入稍后再看失败"
+            } finally {
+                addingToWatchLater.remove(aid)
+            }
+        }
+    }
+
+    fun consumeWatchLaterMessage() {
+        _watchLaterMessage.value = null
     }
 
     fun consumeDislikeThanks() {

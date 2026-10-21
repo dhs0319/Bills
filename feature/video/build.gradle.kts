@@ -27,6 +27,7 @@ android {
 
 dependencies {
     implementation(project(":feature:comment"))
+    implementation(project(":core:history"))
     implementation(project(":core:video"))
     implementation(project(":core:playback"))
     implementation(project(":core:model"))

@@ -3,12 +3,14 @@ package com.dhs0319.bills.core.playback
 import androidx.media3.common.Player
 import com.dhs0319.bills.core.model.DanmakuSessionState
 import com.dhs0319.bills.core.model.PlaybackProgress
+import com.dhs0319.bills.core.model.StreamPlaybackTarget
 import com.dhs0319.bills.core.model.VideoPlaybackState
 import com.dhs0319.bills.core.model.VideoTarget
 import kotlinx.coroutines.flow.StateFlow
 
 interface VideoPlaybackController {
     val player: StateFlow<Player?>
+    val currentTarget: StateFlow<StreamPlaybackTarget?>
     val videoState: StateFlow<VideoPlaybackState>
     val playbackProgress: StateFlow<PlaybackProgress>
     val downloadSpeedBytesPerSecond: StateFlow<Long>

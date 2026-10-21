@@ -144,6 +144,13 @@ fun AudioVideoSettingsScreen(
             )
 
             SettingSwitch(
+                title = "分P自动连播",
+                subtitle = "当前分P播放结束后自动播放下一集",
+                checked = playerSettings.playback.autoPlayNextPart,
+                onCheckedChange = viewModel::updateAutoPlayNextPart
+            )
+
+            SettingSwitch(
                 title = "后台播放",
                 subtitle = "退出页面或切到后台后继续播放，并显示系统通知",
                 checked = playerSettings.playback.backgroundPlayback,

@@ -1,5 +1,6 @@
 package com.dhs0319.bills.feature.dynamic
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +40,8 @@ fun DynamicScreen(
     viewModel: DynamicViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val listState = rememberLazyListState()
     val shouldLoadMore by remember(
         state.items.size,
@@ -65,6 +69,13 @@ fun DynamicScreen(
                 listState.scrollToItem(0)
             }
             viewModel.refresh()
+        }
+    }
+
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeActionMessage()
         }
     }
 
@@ -117,6 +128,7 @@ fun DynamicScreen(
 
                 else -> {
                     DynamicFeed(
+                        currentMid = state.currentMid,
                         upList = state.upList,
                         items = state.items,
                         listState = listState,
@@ -129,6 +141,8 @@ fun DynamicScreen(
                         onOpenSpace = onOpenSpace,
                         onOpenLive = onOpenLive,
                         onOpenDynamic = onOpenDynamic,
+                        onAddToWatchLater = viewModel::addToWatchLater,
+                        onUnfollow = viewModel::unfollow,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

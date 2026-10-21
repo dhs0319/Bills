@@ -243,6 +243,7 @@ class AppSettings @Inject constructor(
     private val preferSoftDecKey = booleanPreferencesKey("prefer_soft_dec")
     private val decFallbackKey = booleanPreferencesKey("dec_fallback")
     private val autoPlayKey = booleanPreferencesKey("auto_play")
+    private val autoPlayNextPartKey = booleanPreferencesKey("auto_play_next_part")
     private val bgPlayKey = booleanPreferencesKey("bg_play")
     private val inAppMiniPlayerKey = booleanPreferencesKey("in_app_mini_player")
     private val autoRotateFullscreenKey = booleanPreferencesKey("auto_rotate_fullscreen")
@@ -286,6 +287,7 @@ class AppSettings @Inject constructor(
             ),
             playback = PlayerPlaybackPrefs(
                 autoPlay = prefs[autoPlayKey] ?: defaultPlaybackPrefs.autoPlay,
+                autoPlayNextPart = prefs[autoPlayNextPartKey] ?: defaultPlaybackPrefs.autoPlayNextPart,
                 backgroundPlayback = prefs[bgPlayKey] ?: defaultPlaybackPrefs.backgroundPlayback,
                 inAppMiniPlayer = prefs[inAppMiniPlayerKey] ?: defaultPlaybackPrefs.inAppMiniPlayer,
                 reportPlayback = prefs[reportPlaybackKey] ?: defaultPlaybackPrefs.reportPlayback,
@@ -376,6 +378,10 @@ class AppSettings @Inject constructor(
 
     suspend fun setAutoPlay(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[autoPlayKey] = enabled }
+    }
+
+    suspend fun setAutoPlayNextPart(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[autoPlayNextPartKey] = enabled }
     }
 
     suspend fun setBackgroundPlayback(enabled: Boolean) {

@@ -1,4 +1,4 @@
-package com.dhs0319.bills.feature.home.component
+package com.dhs0319.bills.core.designsystem.component
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box

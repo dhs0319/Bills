@@ -38,7 +38,7 @@ import com.dhs0319.bills.core.designsystem.component.UpListRow
 import com.dhs0319.bills.core.model.LiveRecommendItem
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
-import com.dhs0319.bills.feature.home.component.UploaderBadge
+import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 
 private val liveCoverMetadataBrush = Brush.verticalGradient(
     0f to Color.Transparent,

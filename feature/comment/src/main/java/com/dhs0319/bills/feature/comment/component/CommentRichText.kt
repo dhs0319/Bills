@@ -41,7 +41,8 @@ fun CommentRichText(
     style: TextStyle,
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
-    copyLabel: String = "评论"
+    copyLabel: String = "评论",
+    onTap: (() -> Unit)? = null
 ) {
     val parsed = remember(text, emotes) {
         parseCommentText(text, emotes)
@@ -52,7 +53,7 @@ fun CommentRichText(
             style = style,
             maxLines = maxLines,
             overflow = overflow,
-            modifier = modifier.copyTextOnLongPress(text, copyLabel)
+            modifier = modifier.copyTextOnLongPress(text, copyLabel, onTap)
         )
         return
     }
@@ -83,7 +84,7 @@ fun CommentRichText(
         style = style,
         maxLines = maxLines,
         overflow = overflow,
-        modifier = modifier.copyTextOnLongPress(text, copyLabel)
+        modifier = modifier.copyTextOnLongPress(text, copyLabel, onTap)
     )
 }
 
