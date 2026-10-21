@@ -80,6 +80,7 @@ fun VideoScreen(
 ) {
     val videoState by viewModel.videoState.collectAsStateWithLifecycle()
     val actionUiState by viewModel.actionUiState.collectAsStateWithLifecycle()
+    val watchLaterMessage by viewModel.watchLaterMessage.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val act = LocalActivity.current
     val context = LocalContext.current
@@ -116,6 +117,13 @@ fun VideoScreen(
         actionUiState.message?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             viewModel.consumeActionMessage()
+        }
+    }
+
+    LaunchedEffect(watchLaterMessage, context) {
+        watchLaterMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeWatchLaterMessage()
         }
     }
 
@@ -231,6 +239,7 @@ fun VideoScreen(
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 0.dp,
                         onOpenVideo = openTarget,
+                        onAddToWatchLater = viewModel::addToWatchLater,
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
                         onToggleLike = viewModel::toggleLike,
@@ -280,6 +289,7 @@ fun VideoScreen(
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 16.dp,
                         onOpenVideo = openTarget,
+                        onAddToWatchLater = viewModel::addToWatchLater,
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
                         onToggleLike = viewModel::toggleLike,

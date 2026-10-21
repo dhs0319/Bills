@@ -341,51 +341,6 @@ fun VideoDetailInfoSkeleton(
 }
 
 @Composable
-fun VideoRelateCardSkeleton(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = MaterialTheme.shapes.large
-            )
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        SkeletonBlock(
-            modifier = Modifier
-                .weight(0.38f)
-                .aspectRatio(16f / 10f),
-            shape = MaterialTheme.shapes.large
-        )
-        Column(
-            modifier = Modifier.weight(0.62f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SkeletonBlock(
-                modifier = Modifier
-                    .fillMaxWidth(0.94f)
-                    .height(18.dp),
-                shape = MaterialTheme.shapes.extraSmall
-            )
-            SkeletonBlock(
-                modifier = Modifier
-                    .fillMaxWidth(0.76f)
-                    .height(18.dp),
-                shape = MaterialTheme.shapes.extraSmall
-            )
-            SkeletonBlock(
-                modifier = Modifier
-                    .fillMaxWidth(0.46f)
-                    .height(14.dp),
-                shape = MaterialTheme.shapes.extraSmall
-            )
-        }
-    }
-}
-
-@Composable
 private fun SkeletonChip(width: Dp) {
     SkeletonBlock(
         modifier = Modifier

@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.model.DynamicStats
 
 @Composable
@@ -71,7 +72,7 @@ private fun DynamicStat(
         )
         Spacer(modifier = Modifier.width(5.dp))
         Text(
-            text = count.toString(),
+            text = compactCount(count),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,

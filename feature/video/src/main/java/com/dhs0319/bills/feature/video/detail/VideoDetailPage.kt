@@ -1,5 +1,6 @@
 package com.dhs0319.bills.feature.video.detail
 
+import android.content.res.Configuration
 import android.content.ComponentName
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -18,6 +19,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -89,18 +92,23 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.PagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.SkeletonBlock
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
-import com.dhs0319.bills.core.designsystem.component.VideoRelateCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.WatchLaterMoreMenu
 import com.dhs0319.bills.core.designsystem.component.copyTextOnLongPress
 import com.dhs0319.bills.core.designsystem.icon.AppIcons
 import com.dhs0319.bills.core.model.CommentSubject
@@ -134,6 +142,7 @@ internal fun VideoDetailPage(
     commentSubject: CommentSubject?,
     contentHorizontalPad: Dp,
     onOpenVideo: (VideoTarget) -> Unit,
+    onAddToWatchLater: (Long) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
@@ -245,6 +254,7 @@ internal fun VideoDetailPage(
                         }
                     },
                     onOpenVideo = onOpenVideo,
+                    onAddToWatchLater = onAddToWatchLater,
                     onOpenSpace = onOpenSpace,
                     onDownloadClick = onDownloadClick,
                     onToggleLike = onToggleLike,
@@ -447,6 +457,7 @@ private fun DetailPageContent(
     onPageClick: () -> Unit,
     onOpenComments: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
+    onAddToWatchLater: (Long) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
@@ -460,6 +471,11 @@ private fun DetailPageContent(
     val itemMod = remember(horizontalPad) {
         if (horizontalPad > 0.dp) Modifier.padding(horizontal = horizontalPad) else Modifier
     }
+    // Keep recommendation cards on the same 6 dp grid inset as the popular page.
+    val relateItemMod = Modifier.padding(horizontal = 6.dp)
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.smallestScreenWidthDp >= 600
+    val showTwoColumns = isTablet && configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     val infoTopPad = remember(horizontalPad) {
         if (horizontalPad > 0.dp) 16.dp else 0.dp
     }
@@ -477,11 +493,15 @@ private fun DetailPageContent(
             detailError = detailError,
             actionState = actionState,
             itemMod = itemMod,
+            relateItemMod = relateItemMod,
+            isTablet = isTablet,
+            showTwoColumns = showTwoColumns,
             infoExpanded = infoExpanded,
             onToggleInfo = onToggleInfo,
             onSeasonClick = onSeasonClick,
             onPageClick = onPageClick,
             onOpenVideo = onOpenVideo,
+            onAddToWatchLater = onAddToWatchLater,
             onOpenSpace = onOpenSpace,
             onDownloadClick = onDownloadClick,
             onToggleLike = onToggleLike,
@@ -503,11 +523,15 @@ private fun LazyListScope.detailItems(
     detailError: String?,
     actionState: VideoActionUiState,
     itemMod: Modifier,
+    relateItemMod: Modifier,
+    isTablet: Boolean,
+    showTwoColumns: Boolean,
     infoExpanded: Boolean,
     onToggleInfo: () -> Unit,
     onSeasonClick: () -> Unit,
     onPageClick: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
+    onAddToWatchLater: (Long) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
@@ -575,11 +599,33 @@ private fun LazyListScope.detailItems(
                 }
             }
             items(
-                count = DETAIL_RELATE_SKELETON_COUNT,
+                count = if (showTwoColumns) {
+                    (DETAIL_RELATE_SKELETON_COUNT + 1) / 2
+                } else {
+                    DETAIL_RELATE_SKELETON_COUNT
+                },
                 key = { index -> "detail_loading_relate_$index" },
                 contentType = { "skeleton" }
             ) {
-                VideoRelateCardSkeleton(modifier = itemMod)
+                if (showTwoColumns) {
+                    Row(
+                        modifier = relateItemMod.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        repeat(2) {
+                            HorizontalVideoCardSkeleton(
+                                modifier = Modifier.weight(1f),
+                                isTablet = isTablet
+                            )
+                        }
+                    }
+                } else {
+                    HorizontalVideoCardSkeleton(
+                        modifier = relateItemMod,
+                        isTablet = isTablet
+                    )
+                }
             }
         }
 
@@ -650,16 +696,38 @@ private fun LazyListScope.detailItems(
             }
 
             if (detail.relates.isNotEmpty()) {
+                val relateRows = detail.relates.chunked(if (showTwoColumns) 2 else 1)
                 items(
-                    items = detail.relates,
-                    key = { "${it.target.aid}_${it.target.cid}" },
+                    items = relateRows,
+                    key = { row -> row.joinToString("_") { "${it.target.aid}_${it.target.cid}" } },
                     contentType = { "relate" }
-                ) { relate ->
-                    RelateRow(
-                        relate = relate,
-                        onOpenVideo = onOpenVideo,
-                        modifier = itemMod
-                    )
+                ) { row ->
+                    if (showTwoColumns) {
+                        Row(
+                            modifier = relateItemMod.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            row.forEach { relate ->
+                                RelateRow(
+                                    relate = relate,
+                                    onOpenVideo = onOpenVideo,
+                                    onAddToWatchLater = onAddToWatchLater,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (row.size < 2) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        RelateRow(
+                            relate = row.single(),
+                            onOpenVideo = onOpenVideo,
+                            onAddToWatchLater = onAddToWatchLater,
+                            modifier = relateItemMod
+                        )
+                    }
                 }
             }
         }
@@ -1749,22 +1817,6 @@ private fun adjustedCount(value: String, delta: Int): String {
         ?: value
 }
 
-private fun compactCount(value: String): String {
-    val number = value.toLongOrNull() ?: return value
-    return when {
-        number < 10_000L -> value
-        number < 100_000_000L -> scaledCount(number, 10_000L, "万")
-        else -> scaledCount(number, 100_000_000L, "亿")
-    }
-}
-
-private fun scaledCount(number: Long, unit: Long, suffix: String): String {
-    val tenths = (number * 10L + unit / 2L) / unit
-    val whole = tenths / 10L
-    val decimal = tenths % 10L
-    return if (decimal == 0L) "$whole$suffix" else "$whole.$decimal$suffix"
-}
-
 @Composable
 private fun SeasonEntryCard(
     season: VideoSeason,
@@ -2102,78 +2154,104 @@ private fun PageSheetRow(
 private fun RelateRow(
     relate: VideoRelate,
     onOpenVideo: (VideoTarget) -> Unit,
+    onAddToWatchLater: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val meta = listOfNotNull(
-        relate.viewText?.let { "$it 播放" },
-        relate.danmakuText?.let { "$it 弹幕" },
-        relate.durationText
-    ).joinToString(" · ")
-
-    Card(
+    val viewText = relate.viewText?.takeIf(String::isNotBlank)?.let(::compactCount)
+    val danmakuText = relate.danmakuText?.takeIf(String::isNotBlank)?.let(::compactCount)
+    val author = relate.author?.takeIf(String::isNotBlank)
+    val reason = relate.reason?.takeIf(String::isNotBlank)
+    HorizontalVideoCard(
+        title = relate.title,
+        coverUrl = relate.cover,
+        durationText = relate.durationText,
         onClick = { onOpenVideo(relate.target) },
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier,
+        isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            BiliAsyncImage(
-                url = relate.cover,
-                contentDescription = relate.title,
-                modifier = Modifier
-                    .weight(0.38f)
-                    .aspectRatio(16f / 10f)
-                    .clip(MaterialTheme.shapes.large),
-                contentScale = ContentScale.Crop
-            )
-
-            Column(
-                modifier = Modifier.weight(0.62f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = relate.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                relate.author?.let { author ->
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            if (reason != null || author != null) {
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val reasonMaxWidth = maxWidth * if (author != null) 0.4f else 1f
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        reason?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier
+                                    .widthIn(max = reasonMaxWidth)
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        MaterialTheme.shapes.extraSmall
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        author?.let {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (reason == null) {
+                                    UploaderBadge()
+                                }
+                                Text(
+                                    text = it,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (viewText != null) {
+                    Icon(
+                        imageVector = Icons.Outlined.PlayCircleOutline,
+                        contentDescription = "播放量",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Text(
-                        text = author,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = viewText,
+                        modifier = Modifier.padding(start = 3.dp),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = 1
                     )
                 }
-                if (meta.isNotBlank()) {
+                if (danmakuText != null) {
+                    Icon(
+                        imageVector = Icons.Outlined.Subtitles,
+                        contentDescription = "弹幕数",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(15.dp)
+                    )
                     Text(
-                        text = meta,
+                        text = danmakuText,
+                        modifier = Modifier.padding(start = 3.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                relate.reason?.let { reason ->
-                    Text(
-                        text = reason,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.secondaryContainer,
-                                MaterialTheme.shapes.extraSmall
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Spacer(modifier = Modifier.weight(1f))
+                WatchLaterMoreMenu { onAddToWatchLater(relate.target.aid) }
             }
         }
     }

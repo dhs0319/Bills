@@ -58,6 +58,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -111,6 +112,21 @@ class StreamPlaybackSessionImpl @Inject constructor(
     override val sessionState: StateFlow<StreamPlaybackSessionState> = _sessionState.asStateFlow()
 
     init {
+        runtimeScope.launch {
+            videoState
+                .combine(
+                    playerSettings.state
+                        .map { it.playback.autoPlayNextPart }
+                        .distinctUntilChanged()
+                ) { state, autoPlayNextPart -> state to autoPlayNextPart }
+                .collect { (state, autoPlayNextPart) ->
+                    if (!autoPlayNextPart || !nextPlayWhenReady) return@collect
+                    val target = (_currentTarget.value as? StreamPlaybackTarget.Video)?.target
+                        ?: return@collect
+                    val nextTarget = nextVideoTarget(target, state) ?: return@collect
+                    openVideoInternal(target = nextTarget, seekToMs = 0L, autoPlay = true)
+                }
+        }
         runtimeScope.launch {
             playerEngine.playbackState.collect { state ->
                 when (_currentTarget.value) {
@@ -313,7 +329,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
         target: VideoTarget,
         seekToMs: Long? = null,
         preferredQuality: Int? = null,
-        controlMode: PlaybackControlMode = PlaybackControlMode.Default
+        controlMode: PlaybackControlMode = PlaybackControlMode.Default,
+        autoPlay: Boolean? = null
     ) {
         val request = target.toPlayableParams().getResolveParams(
             seekToMs = seekToMs,
@@ -341,7 +358,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
         }
 
         val token = openId.incrementAndGet()
-        val autoPlay = playerSettings.state.first().playback.autoPlay
+        val shouldAutoPlay = autoPlay ?: playerSettings.state.first().playback.autoPlay
         if (openId.get() != token) return
         reporter.bindOwner(token)
         val initState = PlayerSessionState(
@@ -356,8 +373,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
             ),
             detail = reuseDetail?.detail ?: target.previewDetail(),
             detailLoading = reuseDetail == null,
-            waitingForPlay = !autoPlay,
-            isPreparing = autoPlay
+            waitingForPlay = !shouldAutoPlay,
+            isPreparing = shouldAutoPlay
         )
         finishVideoPlayback(
             invalidateOpen = false,
@@ -367,12 +384,12 @@ class StreamPlaybackSessionImpl @Inject constructor(
             finalizeReportAsync = true
         )
         if (openId.get() != token) return
-        nextPlayWhenReady = autoPlay
+        nextPlayWhenReady = shouldAutoPlay
 
         if (reuseDetail == null) {
             runtimeScope.launch { loadVideoDetail(request, token) }
         }
-        if (autoPlay) {
+        if (shouldAutoPlay) {
             loadVideoPlayback(request, token)
         }
     }

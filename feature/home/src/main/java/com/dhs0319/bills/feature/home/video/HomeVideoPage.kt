@@ -51,13 +51,13 @@ import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.feature.home.paging.HomePagingState
 import com.dhs0319.bills.core.designsystem.component.CoverImage
+import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.model.FeedItem
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.ThreePointItem
 import com.dhs0319.bills.core.model.ThreePointReason
 import com.dhs0319.bills.core.model.VideoTarget
-import com.dhs0319.bills.feature.home.component.UploaderBadge
 import kotlinx.coroutines.launch
 
 private const val FEED_CARD_CONTENT_TYPE = "feed_card"
