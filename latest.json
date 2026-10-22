@@ -1,10 +1,10 @@
 {
-  "version": "1.1.5",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.5/Bills-1.1.5-arm64-v8a-release.apk",
+  "version": "1.1.6",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.6/Bills-1.1.6-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.5/Bills-1.1.5-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.5/Bills-1.1.5-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.6/Bills-1.1.6-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.6/Bills-1.1.6-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.5",
-  "releaseNotes": "## 更新内容\n\n- 支持收到喜欢和新增粉丝页面\n- 显示设置里新增底部菜单样式切换\n- 其他页面统一接入滑动tab栏样式\n- 修复CDN弹窗里文字颜色错误\n"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.6",
+  "releaseNotes": "## 更新内容\n\n- 优化动态页的部分UI\n- 优化详情页推荐视频卡片的UI\n- 动态页卡片支持加稍后再看、取消关注\n- 播放器设置里新增分P连播开关\n- 修复未播放的情况下返回依然会唤起小窗\n- 修复热门页在横屏时一行只展示一个卡片\n"
 }
