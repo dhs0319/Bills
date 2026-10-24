@@ -25,7 +25,7 @@ private val DEFAULT_PACKAGE_IDS = listOf(1L, 2L, 3L, 4L)
 
 @Singleton
 class CommentEmoteRepository @Inject constructor(
-    @param:ApplicationContext context: Context,
+    @ApplicationContext context: Context,
     private val restClient: BiliRestClient,
     private val restParamBuilder: BiliRestParamBuilder,
     private val authProvider: AuthProvider
@@ -115,30 +115,38 @@ internal fun parseCommentEmotePackages(data: JSONObject): List<CommentEmotePacka
         val item = packages.optJSONObject(index) ?: return@mapNotNull null
         val id = item.optLong("id")
         val isText = item.optInt("type") == 4
+        val packageFlags = item.optJSONObject("flags")
+        val packageSize = item.optJSONObject("meta")?.optLong("size", 1L)?.coerceAtLeast(1L) ?: 1L
         val entries = item.optJSONArray("emote") ?: return@mapNotNull null
         val emotes = (0 until entries.length()).mapNotNull emote@{ emoteIndex ->
             val entry = entries.optJSONObject(emoteIndex) ?: return@emote null
             val text = entry.optString("text").takeIf { it.isNotBlank() } ?: return@emote null
-            val rawUrl = entry.optString("url")
-            val url = if (isText) "" else rawUrl.takeIf {
-                it.startsWith("http://") || it.startsWith("https://") || it.startsWith("//")
-            }?.httpsImageUrl() ?: return@emote null
+            val url = if (isText) "" else emoteImageUrl(entry.optString("url")).ifBlank { return@emote null }
             val flags = entry.optJSONObject("flags")
+            // Free entries also return unlocked=false. Only no_access restricts
+            // usage; an entry can override its package's access flag.
+            val noAccess = flags?.optBoolean("no_access", packageFlags?.optBoolean("no_access", false) ?: false)
+                ?: packageFlags?.optBoolean("no_access", false) ?: false
             CommentEmote(
                 text = text,
                 url = url,
-                size = entry.optJSONObject("meta")?.optLong("size", 1L)?.coerceAtLeast(1L) ?: 1L,
-                available = id in DEFAULT_PACKAGE_IDS ||
-                    (flags?.optBoolean("unlocked", true) != false && flags?.optBoolean("no_access", false) != true)
+                size = entry.optJSONObject("meta")?.optLong("size", packageSize)?.coerceAtLeast(1L) ?: packageSize,
+                available = !noAccess
             )
         }.distinctBy { it.text }
         if (id <= 0L || emotes.isEmpty()) return@mapNotNull null
         CommentEmotePackage(
             id = id,
             name = item.optString("text").ifBlank { "表情包" },
-            iconUrl = item.optString("url").httpsImageUrl(),
+            iconUrl = emoteImageUrl(item.optString("url")),
             emotes = emotes,
             isText = isText
         )
     }.distinctBy { it.id }
+}
+
+private fun emoteImageUrl(url: String): String = when {
+    url.startsWith("//") -> "https:$url"
+    url.startsWith("http://") || url.startsWith("https://") -> url.httpsImageUrl()
+    else -> ""
 }

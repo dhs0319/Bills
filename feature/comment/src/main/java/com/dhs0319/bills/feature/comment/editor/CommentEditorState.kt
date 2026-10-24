@@ -27,6 +27,18 @@ data class CommentEditorState(
 
 enum class CommentEditorPanel { Keyboard, Emotes, Mentions }
 
+internal sealed interface CommentEditorAction {
+    data object ShowKeyboard : CommentEditorAction
+    data object ToggleEmotes : CommentEditorAction
+    data object ReloadEmotes : CommentEditorAction
+    data object DeleteText : CommentEditorAction
+    data object OpenMentions : CommentEditorAction
+    data class SelectPackage(val id: Long) : CommentEditorAction
+    data class InsertEmote(val emote: CommentEmote) : CommentEditorAction
+    data class SearchMentions(val query: String) : CommentEditorAction
+    data class InsertMention(val user: CommentUser) : CommentEditorAction
+}
+
 @Immutable
 data class CommentEditorMention(val user: CommentUser, val range: TextRange) {
     val token: String get() = "@${user.name}"

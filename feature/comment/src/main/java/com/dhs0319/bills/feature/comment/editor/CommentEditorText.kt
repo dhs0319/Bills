@@ -48,6 +48,43 @@ internal fun findCommentMentionQuery(
     return CommentMentionQuery(TextRange(start, end), keyword)
 }
 
+internal fun shouldOpenCommentMentionPicker(
+    previous: TextFieldValue,
+    current: TextFieldValue,
+    mentions: List<CommentEditorMention>
+): Boolean {
+    val query = findCommentMentionQuery(current, mentions) ?: return false
+    if (previous.text == current.text) {
+        return current.composition == null && previous.composition?.let {
+            query.range.start >= it.min && query.range.start < it.max
+        } == true
+    }
+    val prefix = previous.text.commonPrefixWith(current.text).length
+    val suffix = previous.text.substring(prefix).commonSuffixWith(current.text.substring(prefix)).length
+    // Only a newly inserted @ opens the picker. Deleting a nickname or separator never does.
+    return query.range.start >= prefix && query.range.start < current.text.length - suffix
+}
+
+internal fun mentionDeletionRange(
+    text: String,
+    cursor: Int,
+    mentions: List<CommentEditorMention>,
+    before: Int = 1,
+    after: Int = 0
+): TextRange? {
+    if (cursor !in 0..text.length || before < 0 || after < 0 || before == 0 && after == 0) return null
+    val start = (cursor - before).coerceAtLeast(0)
+    val end = (cursor.toLong() + after).coerceAtMost(text.length.toLong()).toInt()
+    val validMentions = mentions.filter { it.isValidIn(text) }
+    val trailing = validMentions.firstOrNull {
+        before > 0 && cursor == it.range.end + 1 && text.getOrNull(it.range.end) == ' '
+    }
+    if (trailing != null) return TextRange(minOf(start, trailing.range.start), maxOf(end, cursor))
+    val touched = validMentions.filter { start < it.range.end && end > it.range.start }
+    if (touched.isEmpty()) return null
+    return TextRange(minOf(start, touched.minOf { it.range.start }), maxOf(end, touched.maxOf { it.range.end }))
+}
+
 internal fun CommentEditorState.replaceSelection(
     text: String,
     range: TextRange = input.selection
@@ -73,16 +110,40 @@ internal fun CommentEditorState.insertMention(user: CommentUser): CommentEditorS
     )
 }
 
+internal fun CommentEditorState.startMentionPicker(): CommentEditorState {
+    val existing = findCommentMentionQuery(input, mentions)
+    val next = if (existing != null) this else {
+        val start = input.selection.min
+        val separator = start > 0 && input.text[start - 1].isMentionNameCharacter()
+        replaceSelection(if (separator) " @" else "@")
+    }
+    val query = existing ?: CommentMentionQuery(
+        range = TextRange(next.input.selection.end - 1, next.input.selection.end),
+        keyword = ""
+    )
+    return next.copy(
+        panel = CommentEditorPanel.Mentions,
+        mentionPicker = CommentMentionPickerState(query = query.keyword, replacement = query.range)
+    )
+}
+
+internal fun CommentEditorState.updateMentionQuery(): CommentEditorState {
+    // Keep the native editor's composition intact; only use its current text to search.
+    val query = findCommentMentionQuery(input.copy(composition = null), mentions)
+        ?: return copy(panel = CommentEditorPanel.Keyboard, mentionPicker = CommentMentionPickerState())
+    return copy(mentionPicker = mentionPicker.copy(query = query.keyword, replacement = query.range))
+}
+
 internal fun CommentEditorState.deleteBeforeCursor(): CommentEditorState {
     if (!input.selection.collapsed) return replaceSelection("")
     val end = input.selection.end
     if (end == 0) return this
-    val mentionStart = mentions.firstOrNull { it.range.end == end }?.range?.start
+    mentionDeletionRange(input.text, end, mentions)?.let { return replaceSelection("", it) }
     val emote = (emotes.recent.asSequence() + emotes.packages.asSequence().flatMap { it.emotes })
         .filter { it.text.startsWith('[') && it.text.endsWith(']') }
         .filter { it.text.length <= end && input.text.regionMatches(end - it.text.length, it.text, 0, it.text.length) }
         .maxByOrNull { it.text.length }
-    val start = mentionStart ?: emote?.let { end - it.text.length }
+    val start = emote?.let { end - it.text.length }
         ?: (end - Character.charCount(Character.codePointBefore(input.text, end)))
     return replaceSelection("", TextRange(start, end))
 }

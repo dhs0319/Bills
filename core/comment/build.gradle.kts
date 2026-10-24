@@ -30,4 +30,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
 }

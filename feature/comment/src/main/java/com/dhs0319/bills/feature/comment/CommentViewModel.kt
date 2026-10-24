@@ -1,13 +1,16 @@
 package com.dhs0319.bills.feature.comment
 
 import android.net.Uri
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.auth.AuthRepository
 import com.dhs0319.bills.core.comment.CommentRepository
+import com.dhs0319.bills.core.comment.CommentEmoteRepository
 import com.dhs0319.bills.core.comment.ImageAttachmentHandler
 import com.dhs0319.bills.core.model.COMMENT_FILTER_ALL
 import com.dhs0319.bills.core.model.CommentPage
+import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.CommentReply
 import com.dhs0319.bills.core.model.CommentSort
 import com.dhs0319.bills.core.model.CommentSubject
@@ -16,10 +19,25 @@ import com.dhs0319.bills.core.model.PublishedRecord
 import com.dhs0319.bills.feature.comment.editor.COMMENT_EDITOR_MAX_IMAGE_COUNT
 import com.dhs0319.bills.feature.comment.editor.CommentEditorState
 import com.dhs0319.bills.feature.comment.editor.CommentEditorTarget
+import com.dhs0319.bills.feature.comment.editor.CommentEditorPanel
+import com.dhs0319.bills.feature.comment.editor.CommentEditorAction
+import com.dhs0319.bills.feature.comment.editor.CommentMentionPickerState
+import com.dhs0319.bills.feature.comment.editor.deleteBeforeCursor
+import com.dhs0319.bills.feature.comment.editor.insertMention
+import com.dhs0319.bills.feature.comment.editor.mentionIds
+import com.dhs0319.bills.feature.comment.editor.reconcileCommentMentions
+import com.dhs0319.bills.feature.comment.editor.shouldOpenCommentMentionPicker
+import com.dhs0319.bills.feature.comment.editor.startMentionPicker
+import com.dhs0319.bills.feature.comment.editor.updateMentionQuery
+import com.dhs0319.bills.feature.comment.editor.replaceSelection
 import com.dhs0319.bills.feature.comment.thread.CommentThreadState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import java.util.LinkedHashMap
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -34,6 +52,7 @@ import org.json.JSONObject
 class CommentViewModel @Inject constructor(
     private val imageHandler: ImageAttachmentHandler,
     private val repo: CommentRepository,
+    private val emoteRepo: CommentEmoteRepository,
     authRepo: AuthRepository
 ) : ViewModel() {
 
@@ -45,10 +64,17 @@ class CommentViewModel @Inject constructor(
     val msg = _msg.asSharedFlow()
 
     private var reqId = 0L
+    private var emoteJob: Job? = null
+    private var mentionJob: Job? = null
 
     init {
         viewModelScope.launch {
             authRepo.currentMidFlow.collectLatest { mid ->
+                if (_uiState.value.currentMid != mid) {
+                    emoteJob?.cancel()
+                    mentionJob?.cancel()
+                    _editorState.value = CommentEditorState()
+                }
                 _uiState.update { cur ->
                     cur.copy(currentMid = mid)
                 }
@@ -421,11 +447,14 @@ class CommentViewModel @Inject constructor(
 
     fun dismissEditor() {
         val editor = _editorState.value
-        if (editor.loading || !editor.visible) return
+        if (editor.loading || editor.uploading || !editor.visible) return
+        mentionJob?.cancel()
         _editorState.update {
             it.copy(
                 visible = false,
-                target = CommentEditorTarget()
+                target = CommentEditorTarget(),
+                panel = CommentEditorPanel.Keyboard,
+                mentionPicker = CommentMentionPickerState()
             )
         }
     }
@@ -437,10 +466,141 @@ class CommentViewModel @Inject constructor(
         }
     }
 
-    fun updateEditorInput(value: String) {
+    fun updateEditorInput(value: TextFieldValue) {
+        val previous = _editorState.value
+        if (previous.loading || previous.uploading) return
+        val nextMentions = reconcileCommentMentions(previous.input.text, value.text, previous.mentions)
         _editorState.update {
-            it.copy(input = value)
+            val next = it.copy(
+                input = value,
+                mentions = nextMentions
+            )
+            if (previous.panel == CommentEditorPanel.Mentions) next.updateMentionQuery() else next
         }
+        if (previous.panel == CommentEditorPanel.Mentions) {
+            val next = _editorState.value
+            if (next.panel != CommentEditorPanel.Mentions) {
+                mentionJob?.cancel()
+            } else if (next.mentionPicker.query != previous.mentionPicker.query) {
+                searchEditorMentions(next.mentionPicker.query)
+            }
+            return
+        }
+        if (shouldOpenCommentMentionPicker(previous.input, value, nextMentions)) {
+            openMentionPicker()
+        }
+    }
+
+    fun showEditorKeyboard() {
+        mentionJob?.cancel()
+        _editorState.update { it.copy(panel = CommentEditorPanel.Keyboard, mentionPicker = CommentMentionPickerState()) }
+    }
+
+    internal fun onEditorAction(action: CommentEditorAction) {
+        when (action) {
+            CommentEditorAction.ShowKeyboard -> showEditorKeyboard()
+            CommentEditorAction.ToggleEmotes -> toggleEditorEmotes()
+            CommentEditorAction.ReloadEmotes -> loadEditorEmotes(force = true)
+            CommentEditorAction.DeleteText -> deleteEditorText()
+            CommentEditorAction.OpenMentions -> openMentionPicker()
+            is CommentEditorAction.SelectPackage -> selectEditorEmotePackage(action.id)
+            is CommentEditorAction.InsertEmote -> insertEditorEmote(action.emote)
+            is CommentEditorAction.SearchMentions -> searchEditorMentions(action.query)
+            is CommentEditorAction.InsertMention -> insertEditorMention(action.user)
+        }
+    }
+
+    fun toggleEditorEmotes() {
+        val editor = _editorState.value
+        if (editor.loading || editor.uploading) return
+        if (editor.panel == CommentEditorPanel.Emotes) {
+            showEditorKeyboard()
+        } else {
+            mentionJob?.cancel()
+            _editorState.update { it.copy(panel = CommentEditorPanel.Emotes) }
+            loadEditorEmotes()
+        }
+    }
+
+    fun loadEditorEmotes(force: Boolean = false) {
+        if (emoteJob?.isActive == true) return
+        val editor = _editorState.value
+        if (!force && editor.emotes.packages.isNotEmpty()) return
+        val mid = _uiState.value.currentMid
+        _editorState.update { it.copy(emotes = it.emotes.copy(loading = true, error = null)) }
+        emoteJob = viewModelScope.launch {
+            try {
+                val packages = emoteRepo.fetchPackages(force)
+                ensureActive()
+                if (_uiState.value.currentMid != mid) return@launch
+                _editorState.update {
+                    it.copy(emotes = it.emotes.copy(
+                        loading = false,
+                        packages = packages,
+                        recent = emoteRepo.recent(packages),
+                        selectedPackageId = it.emotes.selectedPackageId.takeIf { selected ->
+                            selected == -1L || packages.any { pkg -> pkg.id == selected }
+                        } ?: packages.first().id
+                    ))
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _editorState.update { it.copy(emotes = it.emotes.copy(loading = false, error = error.message ?: "表情加载失败")) }
+            }
+        }
+    }
+
+    fun selectEditorEmotePackage(id: Long) {
+        _editorState.update { it.copy(emotes = it.emotes.copy(selectedPackageId = id)) }
+    }
+
+    fun insertEditorEmote(emote: CommentEmote) {
+        val editor = _editorState.value
+        if (editor.loading || editor.uploading || !emote.available) return
+        val recent = emoteRepo.recordRecent(emote, editor.emotes.packages)
+        _editorState.update {
+            it.replaceSelection(emote.text).copy(emotes = it.emotes.copy(recent = recent))
+        }
+    }
+
+    fun deleteEditorText() {
+        _editorState.update { if (it.loading || it.uploading) it else it.deleteBeforeCursor() }
+    }
+
+    fun openMentionPicker() {
+        val editor = _editorState.value
+        if (editor.loading || editor.uploading) return
+        _editorState.update { it.startMentionPicker() }
+        searchEditorMentions(_editorState.value.mentionPicker.query)
+    }
+
+    fun searchEditorMentions(query: String) {
+        mentionJob?.cancel()
+        val mid = _uiState.value.currentMid
+        _editorState.update { it.copy(mentionPicker = it.mentionPicker.copy(
+            query = query, loading = true, error = null, groups = emptyList()
+        )) }
+        mentionJob = viewModelScope.launch {
+            if (query.isNotBlank()) delay(250L)
+            try {
+                val groups = repo.searchMentionUsers(query)
+                ensureActive()
+                if (_uiState.value.currentMid != mid || _editorState.value.panel != CommentEditorPanel.Mentions) return@launch
+                _editorState.update { it.copy(mentionPicker = it.mentionPicker.copy(loading = false, groups = groups)) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _editorState.update { it.copy(mentionPicker = it.mentionPicker.copy(loading = false, error = error.message ?: "用户搜索失败")) }
+            }
+        }
+    }
+
+    fun insertEditorMention(user: CommentUser) {
+        val editor = _editorState.value
+        if (editor.loading || editor.uploading || user.mid <= 0L || user.name.isBlank()) return
+        mentionJob?.cancel()
+        _editorState.update { it.insertMention(user) }
     }
 
     fun addImages(uris: List<Uri>) {
@@ -466,7 +626,7 @@ class CommentViewModel @Inject constructor(
         }
         val editor = _editorState.value
         if (editor.loading || editor.uploading) return
-        val text = editor.input.trim()
+        val text = editor.input.text.trim()
         if (text.isBlank()) {
             _msg.tryEmit("评论内容不能为空")
             return
@@ -519,7 +679,8 @@ class CommentViewModel @Inject constructor(
                     rootRpid = target.rootRpid,
                     parentRpid = target.parentRpid,
                     sort = sort,
-                    pictures = picturesJson
+                    pictures = picturesJson,
+                    mentions = editor.mentionIds()
                 )
             }
             if (callId != reqId || _uiState.value.subject != subject) return@launch
@@ -530,7 +691,12 @@ class CommentViewModel @Inject constructor(
                         insertPublishedReply(
                             state = it,
                             target = target,
-                            reply = published
+                            reply = published.copy(
+                                emotes = (published.emotes + editor.emotes.packages.flatMap { pkg ->
+                                    pkg.emotes.filter { emote -> emote.url.isNotBlank() && text.contains(emote.text) }
+                                }).distinctBy { it.text },
+                                mentions = (published.mentions + editor.mentions.map { it.user }).distinctBy { it.mid }
+                            )
                         )
                     }
                     _msg.tryEmit(if (target.isReply) "回复已发送" else "评论已发送")
@@ -668,9 +834,11 @@ class CommentViewModel @Inject constructor(
             if (it.loading) return@update it
             it.copy(
                 visible = true,
-                target = target
+                target = target,
+                panel = CommentEditorPanel.Keyboard
             )
         }
+        if (_editorState.value.visible) loadEditorEmotes()
     }
 
     private fun replyTarget(
