@@ -349,7 +349,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
             return
         }
         val reuseDetail = currentState.takeIf {
-            !it.detailLoading && it.detail != null &&
+            request.ids.aid > 0L && request.ids.cid > 0L &&
+                !it.detailLoading && it.detail != null &&
                 (currentVideoTarget == target ||
                     currentVideoTarget is VideoTarget.Ugc &&
                     target is VideoTarget.Ugc &&
@@ -416,11 +417,13 @@ class StreamPlaybackSessionImpl @Inject constructor(
         if (openId.get() != token) return
         try {
             coroutineScope {
+                val playbackRequest = resolveVideoPlaybackRequest(request, token) ?: return@coroutineScope
+                vodSession.value = vodSession.value.copy(request = playbackRequest)
                 val prepareJob = async { prepare() }
-                val sourceJob = async { videoRepository.fetchPlaybackSource(request) }
-                val localResumeJob = async(Dispatchers.IO) { readLocalResumeIfResolvable(request) }
+                val sourceJob = async { videoRepository.fetchPlaybackSource(playbackRequest) }
+                val localResumeJob = async(Dispatchers.IO) { readLocalResumeIfResolvable(playbackRequest) }
                 val qualityJob = async {
-                    request.preferredQuality ?: appSettings.defaultVideoQuality.first()
+                    playbackRequest.preferredQuality ?: appSettings.defaultVideoQuality.first()
                 }
                 val audioJob = async { appSettings.defaultAudioQuality.first() }
 
@@ -443,7 +446,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
                     durationMs = source.durationMs
                 )
                     ?: throw NoPlayableStreamException("暂无可用播放流")
-                val startMs = resolveStartMs(request, source, localResume)
+                val startMs = resolveStartMs(playbackRequest, source, localResume)
                 if (openId.get() != token) return@coroutineScope
 
                 val playbackState = vodSession.value.copy(
@@ -710,25 +713,30 @@ class StreamPlaybackSessionImpl @Inject constructor(
         )
     }
 
+    private suspend fun resolveVideoPlaybackRequest(request: PlaybackRequest, token: Long): PlaybackRequest? {
+        val state = if (request.ids.aid <= 0L || request.ids.cid <= 0L) {
+            // 先等待详情补全 ID，确保取流和本地历史使用的是实际播放的分 P/剧集。
+            vodSession.first { !it.detailLoading || openId.get() != token }
+        } else {
+            vodSession.value
+        }
+        if (openId.get() != token) return null
+        return request.withResolvedVideoIds(state.ids)
+    }
+
     private suspend fun resolveStartMs(
         request: PlaybackRequest,
         source: PlaybackSource,
         prefetchedLocal: PlaybackHistory?
-    ): Long? {
-        request.seekToMs?.let { return it }
-        val report = request.toInitialReportParams() ?: return source.resumePositionMs ?: 0L
-        val key = PlaybackHistoryKey.video(report)
+    ): Long {
+        request.seekToMs?.let { return it.coerceAtLeast(0L) }
+        val key = request.toInitialReportParams()?.let(PlaybackHistoryKey::video)
         val local = when {
-            prefetchedLocal?.key == key -> prefetchedLocal
+            key == null -> null
+            prefetchedLocal?.key == key && prefetchedLocal.uid == authProvider.mid -> prefetchedLocal
             else -> playbackHistoryRepo.getVideo(authProvider.mid, key)
         }
-        if (local != null && canResume(local.progressMs, local.finished, source.durationMs)) {
-            return local.progressMs
-        }
-        if (canResume(source.resumePositionMs, finished = false, durationMs = source.durationMs)) {
-            return source.resumePositionMs
-        }
-        return 0L
+        return resolveVideoStartPosition(request, source, local)
     }
 
     private suspend fun readLocalResumeIfResolvable(request: PlaybackRequest): PlaybackHistory? {
@@ -784,17 +792,6 @@ class StreamPlaybackSessionImpl @Inject constructor(
         val source = state.playbackSource ?: return
         if (!playerSettings.state.first().danmaku.enabled) return
         danmakuSession.setSource(ids, source.durationMs)
-    }
-
-    private fun canResume(
-        progressMs: Long?,
-        finished: Boolean,
-        durationMs: Long
-    ): Boolean {
-        val progress = progressMs?.coerceAtLeast(0L) ?: return false
-        if (progress <= 0L || finished) return false
-        if (durationMs <= 0L) return true
-        return durationMs - progress > COMPLETE_THRESHOLD_MS
     }
 
     // vod: state mapping
@@ -940,7 +937,6 @@ class StreamPlaybackSessionImpl @Inject constructor(
 
     private companion object {
         const val TAG = "StreamPlayback"
-        const val COMPLETE_THRESHOLD_MS = 3_000L
     }
 }
 

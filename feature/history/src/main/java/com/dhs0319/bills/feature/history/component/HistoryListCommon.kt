@@ -11,8 +11,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
-import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -25,6 +26,7 @@ fun HistoryListLoading(
     modifier: Modifier = Modifier,
     count: Int = 8
 ) {
+    val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
@@ -35,7 +37,7 @@ fun HistoryListLoading(
             key = { index -> "${skeletonPrefix}_$index" },
             contentType = { "skeleton" }
         ) {
-            VideoListCardSkeleton()
+            HorizontalVideoCardSkeleton(isTablet = isTablet)
         }
     }
 }

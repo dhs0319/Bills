@@ -3,6 +3,7 @@ package com.dhs0319.bills.core.designsystem.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,22 +32,43 @@ fun HorizontalVideoCard(
     title: String,
     coverUrl: String?,
     durationText: String?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
+    coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
+    coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
+    metadata: @Composable (cardWidth: Dp) -> Unit
+) {
+    HorizontalVideoCard(
+        title = AnnotatedString(title),
+        coverUrl = coverUrl,
+        durationText = durationText,
+        onClick = onClick,
+        modifier = modifier,
+        isTablet = isTablet,
+        coverOverlay = coverOverlay,
+        coverBottomContent = coverBottomContent,
+        metadata = metadata
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HorizontalVideoCard(
+    title: AnnotatedString,
+    coverUrl: String?,
+    durationText: String?,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    isTablet: Boolean = false,
+    coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
+    coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
     val titleStyle = if (isTablet) MaterialTheme.typography.titleSmall
         else MaterialTheme.typography.titleMedium
 
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
+    val cardContent: @Composable () -> Unit = {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val cardWidth = maxWidth
             val coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet)
@@ -60,7 +83,7 @@ fun HorizontalVideoCard(
             ) {
                 CoverImage(
                     url = coverUrl,
-                    contentDescription = title,
+                    contentDescription = title.text,
                     modifier = Modifier
                         .width(coverWidth)
                         .height(coverHeight),
@@ -79,6 +102,8 @@ fun HorizontalVideoCard(
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
+                    coverOverlay?.invoke(this, coverWidth)
+                    coverBottomContent?.invoke(this)
                 }
                 Column(
                     modifier = Modifier
@@ -97,6 +122,28 @@ fun HorizontalVideoCard(
                 }
             }
         }
+    }
+
+    val cardModifier = modifier.fillMaxWidth()
+    val cardShape = MaterialTheme.shapes.medium
+    val cardColors = CardDefaults.cardColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    )
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = cardModifier,
+            shape = cardShape,
+            colors = cardColors,
+            content = { cardContent() }
+        )
+    } else {
+        Card(
+            modifier = cardModifier,
+            shape = cardShape,
+            colors = cardColors,
+            content = { cardContent() }
+        )
     }
 }
 

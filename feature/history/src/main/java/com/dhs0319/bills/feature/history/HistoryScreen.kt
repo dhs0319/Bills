@@ -1,16 +1,14 @@
 package com.dhs0319.bills.feature.history
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -21,24 +19,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
-import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
+import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
-import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.model.HistoryTab
 import com.dhs0319.bills.core.model.HistoryTarget
 import com.dhs0319.bills.feature.history.component.HistoryItemCard
-import com.dhs0319.bills.feature.history.component.HistoryListLoading
-import com.dhs0319.bills.feature.history.component.LOAD_MORE_SKELETON_COUNT
-import com.dhs0319.bills.feature.history.component.LoadMoreTrigger
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -48,28 +45,27 @@ fun HistoryScreen(
     onOpenHistoryTarget: (HistoryTarget?) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(
-        initialPage = state.tab.ordinal,
+        initialPage = HistoryTab.ALL.ordinal,
         pageCount = { HistoryTab.entries.size }
     )
-    val listStates = remember { HistoryTab.entries.map { LazyListState() } }
+    val tabTitles = remember { HistoryTab.entries.map { it.title } }
+    val gridStates = HistoryTab.entries.map {
+        rememberLazyStaggeredGridState()
+    }
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.smallestScreenWidthDp >= 600
+    val showTwoColumns = when (configuration.orientation) {
+        android.content.res.Configuration.ORIENTATION_PORTRAIT -> isTablet
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE -> true
+        else -> false
+    }
+    val columns = if (showTwoColumns) 2 else 1
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
             viewModel.selectTab(HistoryTab.entries[page])
         }
     }
-    LoadMoreTrigger(
-        listState = listStates[state.tab.ordinal],
-        canLoadMore = {
-            state.canLoadMore && !pagerState.isScrollInProgress &&
-                pagerState.settledPage == state.tab.ordinal
-        },
-        isLoadingMore = { state.isLoadingMore },
-        hasError = { state.errorMessage != null },
-        onLoadMore = viewModel::loadMore
-    )
-
     CollapsingTopBarScaffold(
         topBar = { scrollBehavior ->
             TopAppBar(
@@ -83,7 +79,7 @@ fun HistoryScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onSearch(state.tab) }) {
+                    IconButton(onClick = { onSearch(HistoryTab.entries[pagerState.settledPage]) }) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "搜索历史记录"
@@ -100,7 +96,7 @@ fun HistoryScreen(
                 .padding(padding)
         ) {
             AdaptivePagerSlidingTabRow(
-                tabs = HistoryTab.entries.map { it.title },
+                tabs = tabTitles,
                 pagerState = pagerState
             )
 
@@ -108,91 +104,87 @@ fun HistoryScreen(
                 state = pagerState,
                 modifier = Modifier.weight(1f)
             ) { page ->
-                val pageState = viewModel.previewState(HistoryTab.entries[page])
-                BiliPullToRefreshBox(
-                    isRefreshing = pageState.isRefreshing,
-                    onRefresh = {
-                        if (!pagerState.isScrollInProgress && pageState.tab == state.tab) {
-                            viewModel.refresh()
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                when {
-                    pageState.isLoading && pageState.items.isEmpty() -> {
-                        HistoryListLoading(
-                            skeletonPrefix = "history_skeleton",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    pageState.errorMessage != null && pageState.items.isEmpty() -> {
-                        StateMessageCard(
-                            text = pageState.errorMessage.orEmpty().ifBlank { "加载历史记录失败" },
-                            modifier = Modifier.fillMaxSize(),
-                            isError = true,
-                            actionText = "重试",
-                            onAction = { if (pageState.tab == state.tab) viewModel.refresh() }
-                        )
-                    }
-
-                    pageState.items.isEmpty() -> {
-                        StateMessageCard(
-                            text = "暂无${pageState.tab.title}历史",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    else -> {
-                        LazyColumn(
-                            state = listStates[page],
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            items(
-                                items = pageState.items,
-                                key = { it.key },
-                                contentType = { it.type }
-                            ) { item ->
-                                HistoryItemCard(
-                                    item = item,
-                                    onClick = { onOpenHistoryTarget(item.target) }
-                                )
-                            }
-
-                            if (pageState.isLoadingMore) {
-                                items(
-                                    count = LOAD_MORE_SKELETON_COUNT,
-                                    key = { index -> "history_loading_$index" },
-                                    contentType = { "loading" }
-                                ) {
-                                    VideoListCardSkeleton()
-                                }
-                            }
-
-                            if (pageState.errorMessage != null && pageState.items.isNotEmpty()) {
-                                item(
-                                    key = "history_error",
-                                    contentType = "error"
-                                ) {
-                                    StateMessageCard(
-                                        text = pageState.errorMessage.orEmpty().ifBlank { "加载历史记录失败" },
-                                        isError = true,
-                                        actionText = "重试",
-                                        onAction = if (pageState.errorOnLoadMore) {
-                                            viewModel::loadMore
-                                        } else {
-                                            viewModel::refresh
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                }
+                HistoryPage(
+                    tab = HistoryTab.entries[page],
+                    pagerState = pagerState,
+                    gridState = gridStates[page],
+                    columns = columns,
+                    isTablet = isTablet,
+                    viewModel = viewModel,
+                    onOpenHistoryTarget = onOpenHistoryTarget
+                )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HistoryPage(
+    tab: HistoryTab,
+    pagerState: PagerState,
+    gridState: LazyStaggeredGridState,
+    columns: Int,
+    isTablet: Boolean,
+    viewModel: HistoryViewModel,
+    onOpenHistoryTarget: (HistoryTarget?) -> Unit
+) {
+    val pageStates = remember(viewModel, tab) { viewModel.observeTab(tab) }
+    val pageState by pageStates.collectAsStateWithLifecycle(
+        initialValue = viewModel.previewState(tab)
+    )
+    val isActivePage by remember(pagerState, tab) {
+        derivedStateOf {
+            !pagerState.isScrollInProgress && tab.ordinal == pagerState.settledPage
+        }
+    }
+
+    AdaptiveMediaGrid(
+        items = pageState.items,
+        isRefreshing = pageState.isRefreshing || pageState.isLoading,
+        isLoadingMore = pageState.isLoadingMore,
+        onRefresh = {
+            if (isActivePage) viewModel.refresh()
+        },
+        onLoadMore = viewModel::loadMore,
+        modifier = Modifier.fillMaxSize(),
+        state = gridState,
+        columns = columns,
+        loadMoreEnabled = pageState.canLoadMore &&
+            pageState.errorMessage == null && isActivePage,
+        prefetchScreens = 1,
+        loadMoreError = pageState.errorMessage?.takeIf { pageState.errorOnLoadMore },
+        onRetryLoadMore = viewModel::loadMore,
+        errorMessage = pageState.errorMessage?.takeIf { !pageState.errorOnLoadMore },
+        errorContent = { message ->
+            StateMessageCard(
+                text = message,
+                isError = true,
+                actionText = "重试",
+                onAction = viewModel::refresh,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+            )
+        },
+        endReached = pageState.items.isNotEmpty() && !pageState.hasMore,
+        key = { _, item -> item.key },
+        contentType = { _, item -> item.type },
+        loadingPlaceholderCount = columns * 8,
+        loadingContent = {
+            HorizontalVideoCardSkeleton(isTablet = isTablet)
+        },
+        emptyContent = {
+            StateMessageCard(
+                text = pageState.errorMessage ?: "暂无${pageState.tab.title}历史",
+                isError = pageState.errorMessage != null,
+                actionText = pageState.errorMessage?.let { "重试" },
+                onAction = pageState.errorMessage?.let { { viewModel.refresh() } },
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 48.dp)
+            )
+        }
+    ) { item ->
+        HistoryItemCard(
+            item = item,
+            onClick = { onOpenHistoryTarget(item.target) }
+        )
     }
 }

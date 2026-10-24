@@ -13,9 +13,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -87,6 +90,12 @@ class HistoryViewModel @Inject constructor(
         return HistoryUiState(tab = tab, items = cached.items, hasMore = cached.hasMore)
     }
 
+    fun observeTab(tab: HistoryTab): Flow<HistoryUiState> {
+        return uiState.map { state ->
+            if (state.tab == tab) state else previewState(tab)
+        }.distinctUntilChanged()
+    }
+
     fun refresh() {
         val state = _uiState.value
         if (state.isLoading || state.isRefreshing || state.isLoadingMore) return
@@ -132,16 +141,23 @@ class HistoryViewModel @Inject constructor(
         try {
             val page = repo.fetchPage(tab, if (reset) HistoryCursor() else cursor)
             currentCoroutineContext().ensureActive()
+            val state = _uiState.value
+            if (state.tab != tab) return
+            val items = when {
+                reset -> page.items
+                page.items.isEmpty() -> state.items
+                else -> state.items + page.items
+            }
             cursor = page.cursor
             cache[tab] = HistoryCache(
-                items = if (reset) page.items else _uiState.value.items + page.items,
+                items = items,
                 cursor = page.cursor,
                 hasMore = page.hasMore
             )
             _uiState.update {
                 if (it.tab != tab) return@update it
                 it.copy(
-                    items = if (reset) page.items else it.items + page.items,
+                    items = items,
                     isLoading = false,
                     isRefreshing = false,
                     isLoadingMore = false,

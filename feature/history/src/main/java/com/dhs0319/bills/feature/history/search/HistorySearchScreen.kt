@@ -1,14 +1,11 @@
 package com.dhs0319.bills.feature.history.search
 
-import androidx.compose.foundation.layout.Arrangement
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -17,32 +14,35 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.SearchCapsuleField
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
-import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
 import com.dhs0319.bills.core.model.HistoryTarget
 import com.dhs0319.bills.feature.history.component.HistoryItemCard
-import com.dhs0319.bills.feature.history.component.HistoryListLoading
-import com.dhs0319.bills.feature.history.component.LOAD_MORE_SKELETON_COUNT
-import com.dhs0319.bills.feature.history.component.LoadMoreTrigger
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,17 +52,17 @@ fun HistorySearchScreen(
     viewModel: HistorySearchViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyStaggeredGridState()
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.smallestScreenWidthDp >= 600
+    val columns = if (isTablet || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        2
+    } else {
+        1
+    }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
-    LoadMoreTrigger(
-        listState = listState,
-        canLoadMore = { state.canLoadMore },
-        isLoadingMore = { state.isLoadingMore },
-        hasError = { state.errorMessage != null },
-        onLoadMore = viewModel::loadMore
-    )
 
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -138,13 +138,6 @@ fun HistorySearchScreen(
                 .padding(padding)
         ) {
             when {
-                state.isLoading && state.items.isEmpty() -> {
-                    HistoryListLoading(
-                        skeletonPrefix = "history_search_skeleton",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
                 state.errorMessage != null && state.items.isEmpty() -> {
                     StateMessageCard(
                         text = state.errorMessage.orEmpty().ifBlank { "搜索历史记录失败" },
@@ -155,58 +148,48 @@ fun HistorySearchScreen(
                     )
                 }
 
-                state.query.isBlank() -> {
-                    StateMessageCard(
-                        text = "输入关键词搜索历史记录",
-                        modifier = Modifier.fillMaxSize().padding(16.dp)
-                    )
-                }
-
-                state.items.isEmpty() -> {
-                    StateMessageCard(
-                        text = "没有找到相关历史记录",
-                        modifier = Modifier.fillMaxSize().padding(16.dp)
+                !state.isLoading && (state.query.isBlank() || state.items.isEmpty()) -> {
+                    Text(
+                        text = if (state.query.isBlank()) {
+                            "输入关键词搜索历史记录"
+                        } else {
+                            "没有找到相关历史记录"
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(start = 24.dp, top = 96.dp, end = 24.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
 
                 else -> {
-                    LazyColumn(
-                        state = listState,
+                    AdaptiveMediaGrid(
+                        items = state.items,
+                        isRefreshing = state.isLoading,
+                        isLoadingMore = state.isLoadingMore,
+                        onRefresh = submitSearch,
+                        onLoadMore = viewModel::loadMore,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(
-                            items = state.items,
-                            key = { it.key },
-                            contentType = { it.type }
-                        ) { item ->
-                            HistoryItemCard(
-                                item = item,
-                                onClick = { onOpenHistoryTarget(item.target) }
-                            )
+                        state = gridState,
+                        columns = columns,
+                        loadMoreEnabled = state.canLoadMore && state.errorMessage == null,
+                        prefetchScreens = 1,
+                        loadMoreError = state.errorMessage,
+                        onRetryLoadMore = viewModel::loadMore,
+                        endReached = state.items.isNotEmpty() && !state.hasMore,
+                        key = { _, item -> item.key },
+                        contentType = { _, item -> item.type },
+                        loadingPlaceholderCount = columns * 8,
+                        loadingContent = {
+                            HorizontalVideoCardSkeleton(isTablet = isTablet)
                         }
-
-                        if (state.isLoadingMore) {
-                            items(
-                                count = LOAD_MORE_SKELETON_COUNT,
-                                key = { index -> "history_search_loading_$index" },
-                                contentType = { "loading" }
-                            ) {
-                                VideoListCardSkeleton()
-                            }
-                        }
-
-                        if (state.errorMessage != null && state.items.isNotEmpty()) {
-                            item(key = "history_search_error", contentType = "error") {
-                                StateMessageCard(
-                                    text = state.errorMessage.orEmpty().ifBlank { "搜索历史记录失败" },
-                                    isError = true,
-                                    actionText = "重试",
-                                    onAction = viewModel::loadMore
-                                )
-                            }
-                        }
+                    ) { item ->
+                        HistoryItemCard(
+                            item = item,
+                            onClick = { onOpenHistoryTarget(item.target) }
+                        )
                     }
                 }
             }

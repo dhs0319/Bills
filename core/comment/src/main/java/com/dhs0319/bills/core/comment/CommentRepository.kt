@@ -2,6 +2,8 @@ package com.dhs0319.bills.core.comment
 
 import android.text.format.DateFormat
 import com.bapis.bilibili.main.community.reply.v1.Emote as ReplyEmote
+import com.bapis.bilibili.main.community.reply.v1.AtSearchReply
+import com.bapis.bilibili.main.community.reply.v1.AtSearchReq
 import com.bapis.bilibili.main.community.reply.v1.DetailListReply
 import com.bapis.bilibili.main.community.reply.v1.DetailListReq
 import com.bapis.bilibili.main.community.reply.v1.MainListReply
@@ -25,6 +27,7 @@ import com.dhs0319.bills.core.model.COMMENT_FILTER_ALL
 import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.CommentFilterTag
 import com.dhs0319.bills.core.model.CommentMedal
+import com.dhs0319.bills.core.model.CommentMentionGroup
 import com.dhs0319.bills.core.model.CommentPage
 import com.dhs0319.bills.core.model.CommentPicture
 import com.dhs0319.bills.core.model.CommentReply
@@ -89,7 +92,8 @@ class CommentRepository @Inject constructor(
         rootRpid: Long = 0L,
         parentRpid: Long = 0L,
         sort: CommentSort = CommentSort.HOT,
-        pictures: String? = null
+        pictures: String? = null,
+        mentions: Map<String, Long> = emptyMap()
     ): CommentReply {
         val accessToken = authProvider.accessToken
         check(accessToken.isNotBlank()) { "请先登录" }
@@ -102,6 +106,9 @@ class CommentRepository @Inject constructor(
                 put("plat", "2")
                 put("from", subject.source.from)
                 put("message", message.trim())
+                if (mentions.isNotEmpty()) {
+                    put("at_name_to_mid", JSONObject(mentions).toString())
+                }
                 put("ordering", sort.toOrdering())
                 put("scene", if (rootRpid > 0L || parentRpid > 0L) "detail" else subject.source.scene)
                 put("sync_to_dynamic", "false")
@@ -139,6 +146,24 @@ class CommentRepository @Inject constructor(
             Logger.e(TAG, err) { "save published record failed" }
         }
         return mapPublishedReply(reply)
+    }
+
+    suspend fun searchMentionUsers(keyword: String): List<CommentMentionGroup> {
+        check(authProvider.mid > 0L) { "请先登录" }
+        val reply = grpcClient.call(
+            endpoint = AT_SEARCH_ENDPOINT,
+            requestBytes = AtSearchReq.newBuilder()
+                .setMid(authProvider.mid)
+                .setKeyword(keyword.trim())
+                .build().toByteArray(),
+            parser = AtSearchReply.parser()
+        )
+        return reply.groupsList.mapNotNull { group ->
+            val users = group.itemsList.filter { it.mid > 0L && it.name.isNotBlank() }.map { item ->
+                CommentUser(item.mid, item.name, item.face.httpsImageUrl().ifBlank { null })
+            }.distinctBy { it.mid }
+            users.takeIf { it.isNotEmpty() }?.let { CommentMentionGroup(group.groupName, it) }
+        }
     }
 
     suspend fun fetchMainPage(
@@ -434,7 +459,10 @@ class CommentRepository @Inject constructor(
                 medal = medal
             ),
             emotes = emotes,
-            pictures = pictures
+            pictures = pictures,
+            mentions = info.content.atNameToMidMap.mapNotNull { (name, mid) ->
+                if (mid > 0L && name.isNotBlank()) CommentUser(mid, name.removePrefix("@")) else null
+            }
         )
     }
 
@@ -475,7 +503,12 @@ class CommentRepository @Inject constructor(
                     ?.optString("text")
                     ?.takeIf(String::isNotBlank)
             ),
-            emotes = emotes
+            emotes = emotes,
+            mentions = content?.optJSONObject("at_name_to_mid")?.let { mapping ->
+                mapping.keys().asSequence().mapNotNull { name ->
+                    mapping.optLong(name).takeIf { it > 0L }?.let { CommentUser(it, name.removePrefix("@")) }
+                }.toList()
+            }.orEmpty()
         )
     }
 
@@ -703,6 +736,7 @@ class CommentRepository @Inject constructor(
         const val DETAIL_ENDPOINT = "bilibili.main.community.reply.v1.Reply/DetailList"
         const val REPLY_INFO_ENDPOINT = "bilibili.main.community.reply.v1.Reply/ReplyInfo"
         const val TRANSLATE_ENDPOINT = "bilibili.main.community.reply.v1.Reply/TranslateReply"
+        const val AT_SEARCH_ENDPOINT = "bilibili.main.community.reply.v1.Reply/AtSearch"
         const val ADD_ENDPOINT = "/x/v2/reply/add"
         const val DEL_ENDPOINT = "/x/v2/reply/del"
         const val UPLOAD_ENDPOINT = "/x/dynamic/feed/draw/upload_bfs"

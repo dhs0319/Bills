@@ -16,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.StreamPlaybackTarget
 import com.dhs0319.bills.core.model.VideoDownloadRequest
+import com.dhs0319.bills.core.model.VideoResumePosition
 import com.dhs0319.bills.core.model.VideoSrc
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoTargetTool
@@ -41,6 +42,8 @@ private const val VIDEO_TITLE_HINT_ARG = "titleHint"
 private const val VIDEO_OWNER_NAME_HINT_ARG = "ownerNameHint"
 private const val VIDEO_OWNER_MID_HINT_ARG = "ownerMidHint"
 private const val VIDEO_COVER_HINT_ARG = "coverHint"
+private const val VIDEO_RESUME_POSITION_ARG = "resumePositionMs"
+private const val VIDEO_RESUME_UPDATED_AT_ARG = "resumeUpdatedAtSec"
 
 private const val VIDEO_ROUTE_PATTERN =
     "$VIDEO_ROUTE?$VIDEO_KIND_ARG={$VIDEO_KIND_ARG}" +
@@ -57,7 +60,9 @@ private const val VIDEO_ROUTE_PATTERN =
         "&$VIDEO_TITLE_HINT_ARG={$VIDEO_TITLE_HINT_ARG}" +
         "&$VIDEO_OWNER_NAME_HINT_ARG={$VIDEO_OWNER_NAME_HINT_ARG}" +
         "&$VIDEO_OWNER_MID_HINT_ARG={$VIDEO_OWNER_MID_HINT_ARG}" +
-        "&$VIDEO_COVER_HINT_ARG={$VIDEO_COVER_HINT_ARG}"
+        "&$VIDEO_COVER_HINT_ARG={$VIDEO_COVER_HINT_ARG}" +
+        "&$VIDEO_RESUME_POSITION_ARG={$VIDEO_RESUME_POSITION_ARG}" +
+        "&$VIDEO_RESUME_UPDATED_AT_ARG={$VIDEO_RESUME_UPDATED_AT_ARG}"
 
 fun NavController.navigateToVideo(target: VideoTarget) {
     navigate(target.toRoute())
@@ -98,7 +103,16 @@ fun NavGraphBuilder.videoScreen(
         LaunchedEffect(target, currentTarget, initialized) {
             val playingTarget = (currentTarget as? StreamPlaybackTarget.Video)?.target
             if (!initialized || playingTarget == null) {
-                if (!target.isSameEntry(playingTarget)) {
+                val playingState = videoViewModel.videoState.value
+                val playingIds = playingState.ids
+                val samePart = when (target) {
+                    is VideoTarget.Ugc -> target.cid <= 0L || target.cid == playingIds.cid
+                    is VideoTarget.Pgc -> target.epId <= 0L || target.epId == playingIds.epId
+                    is VideoTarget.Pugv -> target.epId <= 0L || target.epId == playingIds.epId
+                }
+                val resumeChangedBeforePlayback = playingState.playbackSource == null &&
+                    target.resumePosition != null && target.resumePosition != playingTarget?.resumePosition
+                if (!target.isSameEntry(playingTarget) || !samePart || resumeChangedBeforePlayback) {
                     videoViewModel.openRoot(target)
                 }
                 entry.savedStateHandle[VIDEO_INITIALIZED_KEY] = true
@@ -138,6 +152,8 @@ private val videoNavArguments = listOf(
     navArgument(VIDEO_OWNER_NAME_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
     navArgument(VIDEO_OWNER_MID_HINT_ARG) { type = NavType.LongType; defaultValue = -1L },
     navArgument(VIDEO_COVER_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
+    navArgument(VIDEO_RESUME_POSITION_ARG) { type = NavType.LongType; defaultValue = -1L },
+    navArgument(VIDEO_RESUME_UPDATED_AT_ARG) { type = NavType.LongType; defaultValue = 0L },
 )
 
 private fun VideoTarget.toRoute(): String {
@@ -160,7 +176,9 @@ private fun VideoTarget.toRoute(): String {
         "&$VIDEO_TITLE_HINT_ARG=${src.titleHint.orEmpty().encode()}" +
         "&$VIDEO_OWNER_NAME_HINT_ARG=${src.ownerNameHint.orEmpty().encode()}" +
         "&$VIDEO_OWNER_MID_HINT_ARG=${src.ownerMidHint ?: -1L}" +
-        "&$VIDEO_COVER_HINT_ARG=${src.coverHint.orEmpty().encode()}"
+        "&$VIDEO_COVER_HINT_ARG=${src.coverHint.orEmpty().encode()}" +
+        "&$VIDEO_RESUME_POSITION_ARG=${resumePosition?.positionMs ?: -1L}" +
+        "&$VIDEO_RESUME_UPDATED_AT_ARG=${resumePosition?.updatedAtSec ?: 0L}"
 }
 
 private data class VideoRouteValues(
@@ -189,12 +207,19 @@ private fun NavBackStackEntry.toVideoTarget(): VideoTarget {
     val cid = args.getLong(VIDEO_CID_ARG)
     val epId = args.getLong(VIDEO_EP_ID_ARG)
     val seasonId = args.getLong(VIDEO_SEASON_ID_ARG).takeIf { it >= 0L }
+    val resumePosition = args.getLong(VIDEO_RESUME_POSITION_ARG).takeIf { it >= 0L }?.let {
+        VideoResumePosition(
+            positionMs = it,
+            updatedAtSec = args.getLong(VIDEO_RESUME_UPDATED_AT_ARG)
+        )
+    }
     return when (args.getString(VIDEO_KIND_ARG)) {
         "ugc" -> VideoTarget.Ugc(
             aid = aid,
             cid = cid,
             bvid = args.getString(VIDEO_BVID_ARG).orEmpty().ifBlank { null },
             src = src,
+            resumePosition = resumePosition,
         )
 
         "pgc" -> VideoTarget.Pgc(
@@ -204,6 +229,7 @@ private fun NavBackStackEntry.toVideoTarget(): VideoTarget {
             seasonId = seasonId,
             subType = args.getInt(VIDEO_SUB_TYPE_ARG).takeIf { it >= 0 },
             src = src,
+            resumePosition = resumePosition,
         )
 
         "pugv" -> VideoTarget.Pugv(
@@ -211,6 +237,7 @@ private fun NavBackStackEntry.toVideoTarget(): VideoTarget {
             epId = epId,
             seasonId = seasonId,
             src = src,
+            resumePosition = resumePosition,
         )
 
         else -> error("Unsupported video route")
