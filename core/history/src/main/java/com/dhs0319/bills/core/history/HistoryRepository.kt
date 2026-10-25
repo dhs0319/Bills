@@ -14,6 +14,8 @@ import com.bapis.bilibili.app.interfaces.v1.CursorV2Req
 import com.bapis.bilibili.app.interfaces.v1.PlayerPreloadParams
 import com.bapis.bilibili.app.interfaces.v1.SearchReply
 import com.bapis.bilibili.app.interfaces.v1.SearchReq
+import com.dhs0319.bills.core.auth.AuthStore
+import com.dhs0319.bills.core.common.BiliConstants
 import com.dhs0319.bills.core.common.media.httpsImageUrl
 import com.dhs0319.bills.core.model.HistoryCursor
 import com.dhs0319.bills.core.model.HistoryItem
@@ -27,6 +29,9 @@ import com.dhs0319.bills.core.model.VideoResumePosition
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoTargetTool
 import com.dhs0319.bills.infra.grpc.BiliGrpcClient
+import com.dhs0319.bills.infra.network.BiliRestClient
+import com.dhs0319.bills.infra.network.BiliRestParamBuilder
+import com.dhs0319.bills.infra.network.BiliRestProfile
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -34,8 +39,26 @@ import kotlinx.coroutines.withContext
 
 @Singleton
 class HistoryRepository @Inject constructor(
-    private val grpcClient: BiliGrpcClient
+    private val grpcClient: BiliGrpcClient,
+    private val restClient: BiliRestClient,
+    private val restParamBuilder: BiliRestParamBuilder,
+    private val authStore: AuthStore
 ) {
+
+    suspend fun delete(item: HistoryItem) {
+        check(item.historyId > 0L && item.type.isNotBlank()) { "历史记录信息无效" }
+        val accessToken = authStore.accessToken
+        check(accessToken.isNotBlank()) { "请先登录" }
+        restClient.postSigned(
+            url = "${BiliConstants.BASE_URL_API}$DELETE_ENDPOINT",
+            params = restParamBuilder.app(
+                profile = BiliRestProfile.APP,
+                ts = System.currentTimeMillis() / 1000,
+                accessKey = accessToken
+            ) + mapOf("kid" to "${item.type}_${item.historyId}"),
+            profile = BiliRestProfile.APP
+        )
+    }
 
     suspend fun fetchPage(
         tab: HistoryTab,
@@ -149,7 +172,8 @@ class HistoryRepository @Inject constructor(
                     viewedAtSec = item.viewAt,
                     progressSec = card.progress,
                     durationSec = card.duration.takeIf { it > 0L },
-                    target = buildUgcTarget(item, card)
+                    target = buildUgcTarget(item, card),
+                    historyId = item.kid
                 )
             }
 
@@ -168,7 +192,8 @@ class HistoryRepository @Inject constructor(
                     viewedAtSec = item.viewAt,
                     progressSec = card.progress,
                     durationSec = card.duration.takeIf { it > 0L },
-                    target = buildPgcTarget(item)
+                    target = buildPgcTarget(item),
+                    historyId = item.kid
                 )
             }
 
@@ -187,7 +212,8 @@ class HistoryRepository @Inject constructor(
                     viewedAtSec = item.viewAt,
                     progressSec = null,
                     durationSec = null,
-                    target = parseArticleTarget(item.uri)
+                    target = parseArticleTarget(item.uri),
+                    historyId = item.kid
                 )
             }
 
@@ -206,7 +232,8 @@ class HistoryRepository @Inject constructor(
                     viewedAtSec = item.viewAt,
                     progressSec = null,
                     durationSec = null,
-                    target = buildLiveTarget(item, card)
+                    target = buildLiveTarget(item, card),
+                    historyId = item.kid
                 )
             }
 
@@ -225,7 +252,8 @@ class HistoryRepository @Inject constructor(
                     viewedAtSec = item.viewAt,
                     progressSec = card.progress,
                     durationSec = card.duration.takeIf { it > 0L },
-                    target = buildCheeseTarget(item, card)
+                    target = buildCheeseTarget(item, card),
+                    historyId = item.kid
                 )
             }
 
@@ -365,6 +393,7 @@ class HistoryRepository @Inject constructor(
     private companion object {
         const val ENDPOINT = "bilibili.app.interface.v1.History/CursorV2"
         const val SEARCH_ENDPOINT = "bilibili.app.interface.v1.History/Search"
+        const val DELETE_ENDPOINT = "/x/v2/history/delete"
         const val DEFAULT_QN = 80L
         const val DEFAULT_FNVER = 0L
         const val DEFAULT_FNVAL = 272L

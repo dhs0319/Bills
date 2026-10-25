@@ -44,7 +44,12 @@ class HistoryViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
+    private val _actionMessage = MutableStateFlow<String?>(null)
+    val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
+
     private val cache = mutableMapOf<HistoryTab, HistoryCache>()
+    private val deletingItems = mutableSetOf<Pair<String, Long>>()
+    private val deletedItems = mutableMapOf<Pair<String, Long>, Long>()
     private var cursor = HistoryCursor()
     private var loadJob: Job? = null
 
@@ -133,6 +138,42 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
+    fun deleteItem(item: HistoryItem) {
+        val identity = item.type to item.historyId
+        if (!deletingItems.add(identity)) return
+        viewModelScope.launch {
+            try {
+                repo.delete(item)
+                deletedItems[identity] = maxOf(
+                    deletedItems[identity] ?: Long.MIN_VALUE,
+                    item.viewedAtSec
+                )
+                cache.replaceAll { _, cached ->
+                    cached.copy(items = withoutDeletedItems(cached.items))
+                }
+                _uiState.update { it.copy(items = withoutDeletedItems(it.items)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "删除历史记录失败" }
+                _actionMessage.value = e.message?.takeIf(String::isNotBlank) ?: "删除历史记录失败"
+            } finally {
+                deletingItems.remove(identity)
+            }
+        }
+    }
+
+    fun consumeActionMessage() {
+        _actionMessage.value = null
+    }
+
+    private fun withoutDeletedItems(items: List<HistoryItem>): List<HistoryItem> {
+        return items.filter { item ->
+            val deletedAt = deletedItems[item.type to item.historyId]
+            deletedAt == null || item.viewedAtSec > deletedAt
+        }
+    }
+
     private suspend fun load(
         tab: HistoryTab,
         reset: Boolean,
@@ -143,11 +184,13 @@ class HistoryViewModel @Inject constructor(
             currentCoroutineContext().ensureActive()
             val state = _uiState.value
             if (state.tab != tab) return
-            val items = when {
-                reset -> page.items
-                page.items.isEmpty() -> state.items
-                else -> state.items + page.items
-            }
+            val items = withoutDeletedItems(
+                when {
+                    reset -> page.items
+                    page.items.isEmpty() -> state.items
+                    else -> state.items + page.items
+                }
+            )
             cursor = page.cursor
             cache[tab] = HistoryCache(
                 items = items,

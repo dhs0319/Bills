@@ -4,6 +4,7 @@ import android.media.AudioManager
 import android.os.BatteryManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.SubtitlesOff
@@ -56,6 +55,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -77,6 +78,7 @@ import com.dhs0319.bills.core.designsystem.component.shouldShowPlaybackSidebar
 import com.dhs0319.bills.core.designsystem.component.PlayerBottomControls
 import com.dhs0319.bills.core.designsystem.component.PlayerControlTextButton
 import com.dhs0319.bills.core.designsystem.component.formatPlaybackDownloadSpeed
+import com.dhs0319.bills.core.designsystem.R as DesignSystemR
 import com.dhs0319.bills.infra.player.danmaku.DanmakuLayer
 import com.dhs0319.bills.infra.player.danmaku.DanmakuOverlayState
 import com.dhs0319.bills.infra.player.danmaku.rememberDanmakuOverlayState
@@ -330,18 +332,22 @@ internal fun VideoPlayerPane(
                         modifier = Modifier.fillMaxSize()
                     )
                     if (state.waitingForPlay) {
-                        IconButton(
-                            onClick = onPlayVideo,
+                        // Keep the original SVG shadows outside a circular button clip.
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(64.dp)
-                                .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 12.dp, bottom = 12.dp)
+                                .size(if (isFull) 80.dp else 64.dp)
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = "播放视频",
+                                    onClick = onPlayVideo
+                                )
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
+                            Image(
+                                painter = painterResource(DesignSystemR.drawable.ic_play_video),
                                 contentDescription = "播放视频",
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                     }

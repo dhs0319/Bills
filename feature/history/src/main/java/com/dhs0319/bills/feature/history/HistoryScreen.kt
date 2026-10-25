@@ -1,5 +1,6 @@
 package com.dhs0319.bills.feature.history
 
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,10 +26,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
+import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
@@ -45,6 +48,15 @@ fun HistoryScreen(
     onOpenHistoryTarget: (HistoryTarget?) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
+    val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeActionMessage()
+        }
+    }
+
     val pagerState = rememberPagerState(
         initialPage = HistoryTab.ALL.ordinal,
         pageCount = { HistoryTab.entries.size }
@@ -97,7 +109,8 @@ fun HistoryScreen(
         ) {
             AdaptivePagerSlidingTabRow(
                 tabs = tabTitles,
-                pagerState = pagerState
+                pagerState = pagerState,
+                layout = SlidingTabLayout.Equal
             )
 
             HorizontalPager(
@@ -184,7 +197,8 @@ private fun HistoryPage(
     ) { item ->
         HistoryItemCard(
             item = item,
-            onClick = { onOpenHistoryTarget(item.target) }
+            onClick = { onOpenHistoryTarget(item.target) },
+            onDelete = { viewModel.deleteItem(item) }
         )
     }
 }
