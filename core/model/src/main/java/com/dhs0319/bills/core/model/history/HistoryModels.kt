@@ -9,8 +9,7 @@ enum class HistoryTab(
     ALL("all", "全部"),
     ARCHIVE("archive", "视频"),
     LIVE("live", "直播"),
-    ARTICLE("article", "专栏"),
-    NONFINISH("nonfinish", "未看完");
+    ARTICLE("article", "专栏");
 
     companion object {
         fun fromBusiness(business: String): HistoryTab {
@@ -52,7 +51,8 @@ data class HistoryItem(
     val viewedAtSec: Long,
     val progressSec: Long?,
     val durationSec: Long?,
-    val target: HistoryTarget?
+    val target: HistoryTarget?,
+    val historyId: Long = 0L
 ) {
     val isOpenable: Boolean
         get() = target != null

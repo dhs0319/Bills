@@ -8,6 +8,7 @@ import com.dhs0319.bills.core.model.ResolvedVideoIds
 import com.dhs0319.bills.core.model.VideoDetail
 import com.dhs0319.bills.core.model.VideoPagePart
 import com.dhs0319.bills.core.model.VideoPlaybackState
+import com.dhs0319.bills.core.model.VideoResumePosition
 import com.dhs0319.bills.core.model.VideoSeason
 import com.dhs0319.bills.core.model.VideoSeasonEpisode
 import com.dhs0319.bills.core.model.VideoSeasonSection
@@ -72,6 +73,14 @@ class VideoAutoAdvanceTest {
             target.copy(cid = 20L),
             nextVideoTarget(middle, ended.copy(ids = ended.ids.copy(cid = middle.cid)))
         )
+    }
+
+    @Test
+    fun nextPartDoesNotInheritThePreviousPartsHistoryPosition() {
+        val historyTarget = target.copy(
+            resumePosition = VideoResumePosition(positionMs = 45_000L, updatedAtSec = 200L)
+        )
+        assertEquals(target.copy(cid = 10L), nextVideoTarget(historyTarget, ended))
     }
 
     @Test

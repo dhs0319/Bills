@@ -95,7 +95,8 @@ data class CommentReply(
     val parentName: String? = null,
     val user: CommentUser,
     val emotes: List<CommentEmote> = emptyList(),
-    val pictures: List<CommentPicture> = emptyList()
+    val pictures: List<CommentPicture> = emptyList(),
+    val mentions: List<CommentUser> = emptyList()
 )
 
 @Immutable
@@ -125,5 +126,21 @@ data class CommentPicture(
 data class CommentEmote(
     val text: String,
     val url: String,
-    val size: Long = 1L
+    val size: Long = 1L,
+    val available: Boolean = true
+)
+
+@Immutable
+data class CommentEmotePackage(
+    val id: Long,
+    val name: String,
+    val iconUrl: String,
+    val emotes: List<CommentEmote>,
+    val isText: Boolean = false
+)
+
+@Immutable
+data class CommentMentionGroup(
+    val name: String,
+    val users: List<CommentUser>
 )

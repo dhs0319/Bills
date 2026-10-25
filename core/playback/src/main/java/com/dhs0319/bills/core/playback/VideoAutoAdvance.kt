@@ -29,6 +29,7 @@ internal fun nextVideoTarget(
     return target.copy(
         aid = ids.aid,
         cid = nextPage.cid,
-        bvid = ids.bvid ?: target.bvid
+        bvid = ids.bvid ?: target.bvid,
+        resumePosition = null
     )
 }

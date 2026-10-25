@@ -5,10 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.history.HistoryRepository
 import com.dhs0319.bills.core.model.HistoryItem
+import com.dhs0319.bills.core.model.HistorySearchPage
 import com.dhs0319.bills.core.model.HistoryTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,10 +34,15 @@ data class HistorySearchUiState(
 }
 
 @HiltViewModel
-class HistorySearchViewModel @Inject constructor(
+class HistorySearchViewModel internal constructor(
     savedStateHandle: SavedStateHandle,
-    private val repo: HistoryRepository
+    private val searchHistory: suspend (String, HistoryTab, Int) -> HistorySearchPage
 ) : ViewModel() {
+
+    @Inject constructor(
+        savedStateHandle: SavedStateHandle,
+        repo: HistoryRepository
+    ) : this(savedStateHandle, repo::search)
 
     private val _uiState = MutableStateFlow(
         HistorySearchUiState(
@@ -45,30 +54,31 @@ class HistorySearchViewModel @Inject constructor(
     val uiState: StateFlow<HistorySearchUiState> = _uiState.asStateFlow()
 
     private var nextPage = 1
+    private var searchJob: Job? = null
 
     fun updateKeyword(value: String) {
+        if (value.isBlank()) {
+            clearSearch(input = value)
+            return
+        }
         _uiState.update { it.copy(input = value) }
+    }
+
+    private fun clearSearch(input: String = "") {
+        searchJob?.cancel()
+        searchJob = null
+        nextPage = 1
+        _uiState.update { HistorySearchUiState(tab = it.tab, input = input) }
     }
 
     fun submitSearch() {
         val state = _uiState.value
-        if (state.isLoading || state.isLoadingMore) return
         val keyword = state.input.trim()
         if (keyword.isBlank()) {
-            nextPage = 1
-            _uiState.update {
-                it.copy(
-                    input = "",
-                    query = "",
-                    items = emptyList(),
-                    isLoading = false,
-                    isLoadingMore = false,
-                    hasMore = false,
-                    errorMessage = null
-                )
-            }
+            clearSearch()
             return
         }
+        if (state.isLoading || state.isLoadingMore) return
         nextPage = 1
         _uiState.update {
             it.copy(
@@ -98,14 +108,12 @@ class HistorySearchViewModel @Inject constructor(
     private fun search(reset: Boolean) {
         val state = _uiState.value
         val pageNo = if (reset) 1 else nextPage
-        viewModelScope.launch {
-            runCatching {
-                repo.search(
-                    keyword = state.query,
-                    tab = state.tab,
-                    page = pageNo
-                )
-            }.onSuccess { page ->
+        searchJob = viewModelScope.launch {
+            val result = runCatching {
+                searchHistory(state.query, state.tab, pageNo)
+            }
+            currentCoroutineContext().ensureActive()
+            result.onSuccess { page ->
                 nextPage = pageNo + 1
                 _uiState.update {
                     it.copy(

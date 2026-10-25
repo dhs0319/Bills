@@ -231,7 +231,7 @@ fun <T> AdaptiveMediaGrid(
                     } else if (endReached) {
                         item(key = "end_reached", span = StaggeredGridItemSpan.FullLine) {
                             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                Text("没有更多内容了", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("没有更多啦~", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }

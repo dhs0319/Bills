@@ -203,7 +203,7 @@ private fun ReplyBody(
                 }
             }
 
-            ReplyMessage(reply)
+            ReplyMessage(reply, onAction)
 
             if (previewImages.isNotEmpty()) {
                 PreviewImageGrid(
@@ -256,7 +256,7 @@ private fun ReplyBody(
 }
 
 @Composable
-private fun ReplyMessage(reply: CommentReply) {
+private fun ReplyMessage(reply: CommentReply, onAction: (CommentReplyAction) -> Unit) {
     val message = reply.message.takeIf(String::isNotBlank)
     val translated = reply.translatedMessage?.takeIf(String::isNotBlank)
     if (message == null && translated == null) return
@@ -274,7 +274,9 @@ private fun ReplyMessage(reply: CommentReply) {
             CommentRichText(
                 text = it,
                 emotes = reply.emotes,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                mentions = reply.mentions,
+                onOpenUser = { user -> onAction(CommentReplyAction.OpenUser(user)) }
             )
         }
         translated?.let {

@@ -6,13 +6,15 @@ import java.net.URLDecoder
 
 sealed interface VideoTarget {
     val src: VideoSrc
+    val resumePosition: VideoResumePosition?
 
     @Immutable
     data class Ugc(
         val aid: Long,
         val cid: Long,
         val bvid: String? = null,
-        override val src: VideoSrc = VideoTargetTool.feed()
+        override val src: VideoSrc = VideoTargetTool.feed(),
+        override val resumePosition: VideoResumePosition? = null
     ) : VideoTarget
 
     @Immutable
@@ -22,7 +24,8 @@ sealed interface VideoTarget {
         val epId: Long = 0L,
         val seasonId: Long? = null,
         val subType: Int? = null,
-        override val src: VideoSrc = VideoTargetTool.feed()
+        override val src: VideoSrc = VideoTargetTool.feed(),
+        override val resumePosition: VideoResumePosition? = null
     ) : VideoTarget
 
     @Immutable
@@ -30,9 +33,16 @@ sealed interface VideoTarget {
         val aid: Long = 0L,
         val epId: Long = 0L,
         val seasonId: Long? = null,
-        override val src: VideoSrc = VideoTargetTool.feed()
+        override val src: VideoSrc = VideoTargetTool.feed(),
+        override val resumePosition: VideoResumePosition? = null
     ) : VideoTarget
 }
+
+@Immutable
+data class VideoResumePosition(
+    val positionMs: Long,
+    val updatedAtSec: Long
+)
 
 fun VideoTarget.previewDetail(): VideoDetail? {
     val title = src.titleHint?.takeIf(String::isNotBlank)
@@ -57,7 +67,11 @@ fun VideoTarget.previewDetail(): VideoDetail? {
 fun VideoTarget.isSameEntry(other: VideoTarget?): Boolean {
     other ?: return false
     return when (this) {
-        is VideoTarget.Ugc -> other is VideoTarget.Ugc && aid == other.aid
+        is VideoTarget.Ugc -> other is VideoTarget.Ugc && when {
+            aid > 0L && other.aid > 0L -> aid == other.aid
+            !bvid.isNullOrBlank() && !other.bvid.isNullOrBlank() -> bvid == other.bvid
+            else -> false
+        }
         is VideoTarget.Pgc -> other is VideoTarget.Pgc &&
             (
                 epId > 0L && other.epId > 0L && epId == other.epId ||
@@ -115,7 +129,8 @@ fun VideoTarget.toPlayableParams(): PlayableParams {
         is VideoTarget.Pugv -> PlayableParams(
             ids = ids,
             src = src,
-            biz = biz
+            biz = biz,
+            resumePosition = resumePosition
         )
     }
 }

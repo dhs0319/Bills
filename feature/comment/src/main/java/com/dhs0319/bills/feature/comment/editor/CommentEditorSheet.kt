@@ -7,6 +7,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -14,10 +15,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -28,9 +28,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -38,11 +41,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,6 +58,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 
 import kotlinx.coroutines.Dispatchers
@@ -90,10 +94,11 @@ internal fun CommentEditorFab(
 internal fun CommentEditorSheet(
     state: CommentEditorState,
     onDismiss: () -> Unit,
-    onValueChange: (String) -> Unit,
+    onValueChange: (TextFieldValue) -> Unit,
     onSubmit: () -> Unit,
     onAddImages: (List<Uri>) -> Unit,
-    onRemoveImage: (Int) -> Unit
+    onRemoveImage: (Int) -> Unit,
+    onAction: (CommentEditorAction) -> Unit
 ) {
     if (!state.visible) return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -115,50 +120,24 @@ internal fun CommentEditorSheet(
         sheetState = sheetState,
         contentWindowInsets = { WindowInsets.navigationBars }
     ) {
+        BackHandler(enabled = state.panel != CommentEditorPanel.Keyboard) {
+            onAction(CommentEditorAction.ShowKeyboard)
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = if (state.target.isReply) "回复评论" else "发表评论",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    state.target.parentName?.takeIf(String::isNotBlank)?.let { name ->
-                        Text(
-                            text = "回复 @$name",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                    enabled = !busy && state.selectedImageUris.size < COMMENT_EDITOR_MAX_IMAGE_COUNT
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "添加图片",
-                        tint = if (state.selectedImageUris.size < COMMENT_EDITOR_MAX_IMAGE_COUNT) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                        }
-                    )
-                }
-            }
+            CommentEditorTextField(
+                state = state,
+                onValueChange = onValueChange,
+                onShowKeyboard = { onAction(CommentEditorAction.ShowKeyboard) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+            )
             if (state.selectedImageUris.isNotEmpty()) {
                 LazyRow(
+                    modifier = Modifier.padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(
@@ -195,46 +174,38 @@ internal fun CommentEditorSheet(
                     }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextField(
-                    value = state.input,
-                    onValueChange = onValueChange,
+                val showEmotes = state.panel == CommentEditorPanel.Emotes
+                IconButton(
+                    onClick = { onAction(CommentEditorAction.ToggleEmotes) },
                     enabled = !busy,
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.large,
-                    minLines = 4,
-                    maxLines = 8,
-                    placeholder = {
-                        Text(
-                            if (state.target.isReply) {
-                                "输入你的回复"
-                            } else {
-                                "发一条友善的评论"
-                            }
-                        )
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (showEmotes) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
                     )
-                )
+                ) {
+                    Icon(
+                        if (showEmotes) Icons.Outlined.Keyboard else Icons.Outlined.SentimentSatisfied,
+                        contentDescription = if (showEmotes) "切换键盘" else "选择表情"
+                    )
+                }
+                IconButton(
+                    onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    enabled = !busy && state.selectedImageUris.size < COMMENT_EDITOR_MAX_IMAGE_COUNT
+                ) {
+                    Icon(Icons.Outlined.Image, "添加图片")
+                }
+                IconButton(onClick = { onAction(CommentEditorAction.OpenMentions) }, enabled = !busy) {
+                    Icon(Icons.Outlined.AlternateEmail, "提及用户")
+                }
+                Spacer(modifier = Modifier.weight(1f))
                 Button(
                     onClick = onSubmit,
-                    enabled = !busy && state.input.isNotBlank(),
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .fillMaxHeight(),
+                    enabled = !busy && state.input.text.isNotBlank(),
+                    modifier = Modifier.padding(end = 8.dp),
                     shape = MaterialTheme.shapes.extraLarge,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -249,6 +220,11 @@ internal fun CommentEditorSheet(
                         }
                     )
                 }
+            }
+            if (state.panel == CommentEditorPanel.Mentions) {
+                CommentMentionPanel(state.mentionPicker, onAction)
+            } else if (state.panel == CommentEditorPanel.Emotes) {
+                CommentEmotePanel(state.emotes, enabled = !busy, onAction = onAction)
             }
         }
     }

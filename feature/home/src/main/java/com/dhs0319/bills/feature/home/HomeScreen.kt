@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.PagerSlidingTabRow
+import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
@@ -353,6 +354,7 @@ private fun HomeTopBar(
             PagerSlidingTabRow(
                 tabs = homeTabs,
                 pagerState = pagerState,
+                layout = SlidingTabLayout.Equal,
                 modifier = Modifier.widthIn(max = 360.dp),
                 onReselect = onReselectTab
             )

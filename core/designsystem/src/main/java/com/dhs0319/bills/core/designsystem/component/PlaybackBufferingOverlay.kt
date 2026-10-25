@@ -2,7 +2,6 @@ package com.dhs0319.bills.core.designsystem.component
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,7 +10,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.dhs0319.bills.core.designsystem.R
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -33,12 +41,22 @@ fun PlaybackBufferingOverlay(
 
     if (!delayedVisible) return
 
-    CircularProgressIndicator(
+    val context = LocalContext.current
+    val imageRequest = remember(context) {
+        ImageRequest.Builder(context)
+            .data(R.drawable.loading)
+            .crossfade(false)
+            .build()
+    }
+
+    AsyncImage(
+        model = imageRequest,
+        contentDescription = "正在加载",
         modifier = modifier
             .padding(16.dp)
-            .size(36.dp),
-        color = Color.White,
-        strokeWidth = 3.dp
+            .size(32.dp)
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate },
+        colorFilter = ColorFilter.tint(Color.White)
     )
 }
 

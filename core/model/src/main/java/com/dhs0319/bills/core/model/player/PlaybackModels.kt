@@ -111,7 +111,8 @@ data class PlayableParams(
     val biz: PlayBizInfo,
     val fromScene: String = DEFAULT_FROM_SCENE,
     val adExtra: String? = null,
-    val extraResolve: Map<String, String> = emptyMap()
+    val extraResolve: Map<String, String> = emptyMap(),
+    val resumePosition: VideoResumePosition? = null
 ) {
     fun getResolveParams(
         seekToMs: Long? = null,

@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyLayoutScrollScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -78,13 +79,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -104,6 +108,7 @@ import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.PagerSlidingTabRow
+import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.designsystem.component.SkeletonBlock
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
@@ -130,6 +135,8 @@ import com.dhs0319.bills.core.video.VideoFavoriteFolder
 import com.dhs0319.bills.feature.video.action.VideoActionUiState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
+import kotlin.math.abs
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun VideoDetailPage(
@@ -161,10 +168,10 @@ internal fun VideoDetailPage(
     var infoExpanded by rememberSaveable(aidKey) { mutableStateOf(false) }
     var sheet by remember(aidKey) { mutableStateOf<DetailSheet?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val detailListState = remember(aidKey) { LazyListState() }
-    val commentListState = remember(aidKey) { LazyListState() }
-    val commentThreadListState = remember(aidKey) { LazyListState() }
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val detailListState = key(aidKey) { rememberLazyListState() }
+    val commentListState = key(aidKey) { rememberLazyListState() }
+    val commentThreadListState = key(aidKey) { rememberLazyListState() }
+    val pagerState = key(aidKey) { rememberPagerState(pageCount = { 2 }) }
     val scope = rememberCoroutineScope()
     var tabScrollJob by remember(aidKey) { mutableStateOf<Job?>(null) }
     var coinSheetVisible by remember(aidKey) { mutableStateOf(false) }
@@ -181,10 +188,6 @@ internal fun VideoDetailPage(
     }
     val shareUrl = remember(detail, ids) { detail?.let { buildVideoShareUrl(ids) } }
 
-    LaunchedEffect(aidKey) {
-        pagerState.scrollToPage(0)
-    }
-
     fun closeSheet(afterClose: (() -> Unit)? = null) {
         scope.launch {
             if (sheetState.isVisible) {
@@ -195,32 +198,36 @@ internal fun VideoDetailPage(
         }
     }
 
-    val detailTabs = remember(detail?.stat?.reply) {
+    val detailTabs = remember { listOf("简介", "评论") }
+    val detailTabBadges = remember(detail?.stat?.reply) {
         listOf(
-            "简介",
+            null,
             detail?.stat?.reply
                 ?.takeIf(String::isNotBlank)
-                ?.let { "评论 ${compactCount(it)}" }
-                ?: "评论"
+                ?.let { compactCount(it) }
         )
     }
 
     Column(modifier = modifier.fillMaxSize()) {
         PagerSlidingTabRow(
             tabs = detailTabs,
+            badges = detailTabBadges,
             pagerState = pagerState,
             tabTextStyle = MaterialTheme.typography.titleSmall,
-            tabHorizontalAlignment = Alignment.Start,
+            layout = SlidingTabLayout.Content,
             onReselect = { page ->
                 val listState = if (page == 0) detailListState else commentListState
                 tabScrollJob?.cancel()
                 tabScrollJob = scope.launch {
-                    listState.animateScrollToItem(0)
+                    if (page == 0) {
+                        listState.animateScrollToItem(0)
+                    } else {
+                        listState.animateContinuouslyToTop()
+                    }
                 }
             },
             modifier = Modifier
                 .padding(horizontal = contentHorizontalPad)
-                .width(detailTabWidth * detailTabs.size)
         )
 
         HorizontalPager(
@@ -2411,8 +2418,52 @@ private fun VideoDetail.toSpaceRouteOrNull(fromViewAid: Long?): SpaceRoute? {
     )
 }
 
-private val detailTabWidth = 70.dp
 
+private suspend fun LazyListState.animateContinuouslyToTop() {
+    if (!canScrollBackward) return
+
+    val durationScale = coroutineContext[MotionDurationScale]
+    scroll {
+        val lazyScope = LazyLayoutScrollScope(this@animateContinuouslyToTop, this)
+        val viewportPx = layoutInfo.viewportSize.height.coerceAtLeast(1).toFloat()
+        val estimatedDistancePx = abs(lazyScope.calculateDistanceTo(0).toFloat())
+        if ((durationScale?.scaleFactor ?: 1f) <= 0f ||
+            estimatedDistancePx >= viewportPx * COMMENT_SCROLL_TO_TOP_INSTANT_THRESHOLD_VIEWPORTS
+        ) {
+            lazyScope.snapToItem(0)
+            return@scroll
+        }
+
+        // The estimate sets the speed, not an intermediate destination for tall comments.
+        val durationSeconds = (180f + estimatedDistancePx / viewportPx * 35f)
+            .coerceAtMost(700f) / 1000f
+        val pixelsPerSecond = (estimatedDistancePx / durationSeconds)
+            .coerceIn(80f, (viewportPx * 18f).coerceAtLeast(80f))
+        var previousFrame = withFrameNanos { it }
+
+        while (this@animateContinuouslyToTop.canScrollBackward) {
+            val frame = withFrameNanos { it }
+            val elapsedNanos = (frame - previousFrame).coerceIn(0L, 32_000_000L)
+            previousFrame = frame
+            val scale = durationScale?.scaleFactor ?: 1f
+            if (scale <= 0f) {
+                lazyScope.snapToItem(0)
+                return@scroll
+            }
+            if (elapsedNanos == 0L) continue
+
+            val consumed = lazyScope.scrollBy(-pixelsPerSecond * elapsedNanos / 1_000_000_000f / scale)
+            if (consumed == 0f) break
+        }
+        if (this@animateContinuouslyToTop.canScrollBackward &&
+            firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset <= 2
+        ) {
+            lazyScope.snapToItem(0)
+        }
+    }
+}
+
+private const val COMMENT_SCROLL_TO_TOP_INSTANT_THRESHOLD_VIEWPORTS = 8f
 private const val DETAIL_RELATE_SKELETON_COUNT = 2
 private sealed interface DetailSheet {
     data class Season(

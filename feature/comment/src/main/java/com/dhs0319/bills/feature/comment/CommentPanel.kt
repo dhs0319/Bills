@@ -434,7 +434,8 @@ private fun BoxScope.CommentEditorLayer(
         onValueChange = viewModel::updateEditorInput,
         onSubmit = { viewModel.submitEditor() },
         onAddImages = viewModel::addImages,
-        onRemoveImage = viewModel::removeImage
+        onRemoveImage = viewModel::removeImage,
+        onAction = viewModel::onEditorAction
     )
 }
 

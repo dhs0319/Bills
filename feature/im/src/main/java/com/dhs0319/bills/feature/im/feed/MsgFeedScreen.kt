@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.model.MsgFeedFilter
 import com.dhs0319.bills.core.designsystem.component.SlidingTabRow
+import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.model.PublishedRecord
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
@@ -37,7 +37,6 @@ import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.comment.CommentPanel
 
 private val msgFeedTabs = listOf("全部", "@我")
-private val msgFeedTabWidth = 88.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,10 +88,7 @@ fun MsgFeedScreen(
                                 1 -> vm.changeFilter(MsgFeedFilter.AT_ME)
                             }
                         },
-                        tabHorizontalAlignment = Alignment.Start,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .width(msgFeedTabWidth * msgFeedTabs.size)
+                        layout = SlidingTabLayout.Content
                     )
                     MsgFeedPane(
                         onOpenCommentDetail = { record ->
