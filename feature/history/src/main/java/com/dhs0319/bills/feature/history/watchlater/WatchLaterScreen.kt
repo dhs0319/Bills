@@ -1,60 +1,80 @@
 package com.dhs0319.bills.feature.history.watchlater
 
-import android.text.format.DateFormat
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.common.compactCount
+import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
-import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
-import com.dhs0319.bills.core.designsystem.component.CoverImage
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
-import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.UploaderBadge
+import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.WatchLaterItem
 import com.dhs0319.bills.core.model.WatchLaterTab
-import com.dhs0319.bills.feature.history.component.HistoryListLoading
 import com.dhs0319.bills.feature.history.component.LOAD_MORE_SKELETON_COUNT
-import com.dhs0319.bills.feature.history.component.LoadMoreTrigger
 import com.dhs0319.bills.feature.history.component.formatVideoDuration
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -65,39 +85,35 @@ fun WatchLaterScreen(
     viewModel: WatchLaterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeActionMessage()
+        }
+    }
+    val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val columns = rememberHorizontalVideoCardColumnCount()
+    val tabs = remember { WatchLaterTab.entries.map { it.title } }
+    val onSelectSort = remember(viewModel) { viewModel::selectSort }
     val pagerState = rememberPagerState(
         initialPage = state.tab.ordinal,
         pageCount = { WatchLaterTab.entries.size }
     )
-    val listStates = remember(state.asc) { WatchLaterTab.entries.map { LazyListState() } }
+    val gridStates = key(state.asc) {
+        WatchLaterTab.entries.map { rememberLazyStaggeredGridState() }
+    }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
             viewModel.selectTab(WatchLaterTab.entries[page])
         }
     }
-    LoadMoreTrigger(
-        listState = listStates[state.tab.ordinal],
-        canLoadMore = {
-            state.canLoadMore && !pagerState.isScrollInProgress &&
-                pagerState.settledPage == state.tab.ordinal
-        },
-        isLoadingMore = { state.isLoadingMore },
-        hasError = { state.errorMessage != null },
-        onLoadMore = viewModel::loadMore
-    )
 
     CollapsingTopBarScaffold(
         topBar = { scrollBehavior ->
             TopAppBar(
-                title = {
-                    Text(
-                        text = if (!state.countText.isNullOrBlank()) {
-                            "稍后再看 ${state.countText}"
-                        } else {
-                            "稍后再看"
-                        }
-                    )
-                },
+                title = { Text("稍后再看") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -107,9 +123,12 @@ fun WatchLaterScreen(
                     }
                 },
                 actions = {
-                    WatchLaterSortSelector(
+                    WatchLaterSortDropdown(
                         asc = state.asc,
-                        onSelect = viewModel::selectSort
+                        onSelect = onSelectSort,
+                        modifier = Modifier.padding(end = 4.dp),
+                        enabled = !state.isLoading && !state.isRefreshing &&
+                            !state.isLoadingMore && !pagerState.isScrollInProgress
                     )
                 },
                 scrollBehavior = scrollBehavior
@@ -122,7 +141,7 @@ fun WatchLaterScreen(
                 .padding(padding)
         ) {
             AdaptivePagerSlidingTabRow(
-                tabs = WatchLaterTab.entries.map { it.title },
+                tabs = tabs,
                 pagerState = pagerState
             )
 
@@ -130,91 +149,127 @@ fun WatchLaterScreen(
                 state = pagerState,
                 modifier = Modifier.weight(1f)
             ) { page ->
-                val pageState = viewModel.previewState(WatchLaterTab.entries[page])
-                BiliPullToRefreshBox(
-                    isRefreshing = pageState.isRefreshing,
-                    onRefresh = {
-                        if (!pagerState.isScrollInProgress && pageState.tab == state.tab) {
-                            viewModel.refresh()
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                when {
-                    pageState.isLoading && pageState.items.isEmpty() -> {
-                        HistoryListLoading(
-                            skeletonPrefix = "watch_later_skeleton",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
+                WatchLaterPage(
+                    tab = WatchLaterTab.entries[page],
+                    pagerState = pagerState,
+                    gridState = gridStates[page],
+                    columns = columns,
+                    isTablet = isTablet,
+                    viewModel = viewModel,
+                    onOpenVideo = onOpenVideo
+                )
+            }
+        }
+    }
+}
 
-                    pageState.errorMessage != null && pageState.items.isEmpty() -> {
-                        StateMessageCard(
-                            text = pageState.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" },
-                            modifier = Modifier.fillMaxSize(),
-                            isError = true,
-                            actionText = "重试",
-                            onAction = { if (pageState.tab == state.tab) viewModel.refresh() }
-                        )
-                    }
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WatchLaterPage(
+    tab: WatchLaterTab,
+    pagerState: PagerState,
+    gridState: LazyStaggeredGridState,
+    columns: Int,
+    isTablet: Boolean,
+    viewModel: WatchLaterViewModel,
+    onOpenVideo: (VideoTarget) -> Unit
+) {
+    val pageStates = remember(viewModel, tab) { viewModel.observeTab(tab) }
+    val pageState by pageStates.collectAsStateWithLifecycle(
+        initialValue = viewModel.previewState(tab)
+    )
+    val isActivePage by remember(pagerState, tab) {
+        derivedStateOf {
+            !pagerState.isScrollInProgress && tab.ordinal == pagerState.settledPage
+        }
+    }
+    val onRefresh = remember(viewModel, pagerState, tab) {
+        {
+            if (!pagerState.isScrollInProgress && pagerState.settledPage == tab.ordinal &&
+                viewModel.uiState.value.tab == tab
+            ) {
+                viewModel.refresh()
+            }
+        }
+    }
+    val onLoadMore = remember(viewModel) { viewModel::loadMore }
+    val onRemoveItem = remember(viewModel) { viewModel::removeItem }
 
-                    pageState.items.isEmpty() -> {
-                        StateMessageCard(
-                            text = "暂无${pageState.tab.title}内容",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
+    AdaptiveMediaGrid(
+        items = pageState.items,
+        isRefreshing = pageState.isRefreshing || pageState.isLoading,
+        isLoadingMore = pageState.isLoadingMore,
+        onRefresh = onRefresh,
+        onLoadMore = onLoadMore,
+        modifier = Modifier.fillMaxSize(),
+        state = gridState,
+        columns = columns,
+        loadMoreEnabled = pageState.canLoadMore &&
+            pageState.errorMessage == null && isActivePage,
+        prefetchScreens = 1,
+        loadMoreError = pageState.errorMessage
+            ?.takeIf { pageState.errorOnLoadMore }
+            ?.ifBlank { "加载稍后再看失败" },
+        onRetryLoadMore = onLoadMore,
+        errorMessage = pageState.errorMessage
+            ?.takeIf { !pageState.errorOnLoadMore }
+            ?.ifBlank { "加载稍后再看失败" },
+        errorContent = { message ->
+            StateMessageCard(
+                text = message.ifBlank { "加载稍后再看失败" },
+                isError = true,
+                actionText = "重试",
+                onAction = onRefresh
+            )
+        },
+        endReached = pageState.items.isNotEmpty() && !pageState.hasMore &&
+            !pageState.isRefreshing && pageState.errorMessage == null,
+        key = { _, item -> item.key },
+        contentType = { _, item -> item.cardType },
+        loadingPlaceholderCount = columns * 8,
+        loadingContent = {
+            HorizontalVideoCardSkeleton(isTablet = isTablet)
+        },
+        loadMoreContent = {
+            WatchLaterLoadingRows(columns = columns, isTablet = isTablet)
+        },
+        emptyContent = {
+            StateMessageCard(
+                text = pageState.errorMessage?.ifBlank { "加载稍后再看失败" }
+                    ?: "暂无${pageState.tab.title}内容",
+                isError = pageState.errorMessage != null,
+                actionText = pageState.errorMessage?.let { "重试" },
+                onAction = pageState.errorMessage?.let { onRefresh },
+                modifier = Modifier.padding(vertical = 48.dp)
+            )
+        }
+    ) { item ->
+        WatchLaterItemCard(
+            item = item,
+            isTablet = isTablet,
+            onDelete = if (item.aid > 0L) {
+                { onRemoveItem(item) }
+            } else null,
+            onClick = {
+                item.target?.let(onOpenVideo)
+            }
+        )
+    }
+}
 
-                    else -> {
-                        LazyColumn(
-                            state = listStates[page],
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            items(
-                                items = pageState.items,
-                                key = { it.key },
-                                contentType = { it.cardType }
-                            ) { item ->
-                                WatchLaterItemCard(
-                                    item = item,
-                                    onClick = {
-                                        item.target?.let(onOpenVideo)
-                                    }
-                                )
-                            }
-
-                            if (pageState.isLoadingMore) {
-                                items(
-                                    count = LOAD_MORE_SKELETON_COUNT,
-                                    key = { index -> "watch_later_loading_$index" },
-                                    contentType = { "loading" }
-                                ) {
-                                    VideoListCardSkeleton()
-                                }
-                            }
-
-                            if (pageState.errorMessage != null && pageState.items.isNotEmpty()) {
-                                item(
-                                    key = "watch_later_error",
-                                    contentType = "error"
-                                ) {
-                                    StateMessageCard(
-                                        text = pageState.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" },
-                                        isError = true,
-                                        actionText = "重试",
-                                        onAction = if (pageState.errorOnLoadMore) {
-                                            viewModel::loadMore
-                                        } else {
-                                            viewModel::refresh
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+@Composable
+private fun WatchLaterLoadingRows(columns: Int, isTablet: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(LOAD_MORE_SKELETON_COUNT) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                repeat(columns) {
+                    HorizontalVideoCardSkeleton(
+                        modifier = Modifier.weight(1f),
+                        isTablet = isTablet
+                    )
                 }
             }
         }
@@ -222,188 +277,258 @@ fun WatchLaterScreen(
 }
 
 @Composable
-private fun WatchLaterSortSelector(
+private fun WatchLaterSortDropdown(
     asc: Boolean,
-    onSelect: (Boolean) -> Unit
+    onSelect: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        listOf(false to "最新添加", true to "最早添加").forEachIndexed { index, (option, label) ->
-            if (index > 0) {
-                VerticalDivider(
-                    modifier = Modifier.height(16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
+    var expanded by remember { mutableStateOf(false) }
+    val options = remember { listOf(false to "最新添加", true to "最早添加") }
+    LaunchedEffect(enabled) {
+        if (!enabled) expanded = false
+    }
+
+    Box(modifier = modifier) {
+        TextButton(
+            onClick = { expanded = !expanded },
+            enabled = enabled,
+            contentPadding = PaddingValues(start = 12.dp, end = 8.dp),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ),
+            modifier = Modifier.heightIn(min = 48.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (asc) "最早添加" else "最近添加",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
                 )
             }
-            val selected = option == asc
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                },
-                modifier = Modifier
-                    .selectable(
-                        selected = selected,
-                        onClick = { onSelect(option) },
-                        role = Role.RadioButton,
-                        interactionSource = remember(option) { MutableInteractionSource() },
-                        indication = null
-                    )
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 128.dp)
+        ) {
+            options.forEach { (option, label) ->
+                DropdownMenuItem(
+                    text = { Text(label, style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                    trailingIcon = {
+                        if (option == asc) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                    },
+                    modifier = Modifier.semantics { selected = option == asc }
+                )
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WatchLaterItemCard(
     item: WatchLaterItem,
+    isTablet: Boolean,
     onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val cardModifier = modifier.fillMaxWidth()
-    val colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-    )
-
-    if (item.isOpenable) {
-        Card(onClick = onClick, modifier = cardModifier, colors = colors) {
-            WatchLaterItemContent(item = item)
-        }
-    } else {
-        Card(modifier = cardModifier, colors = colors) {
-            WatchLaterItemContent(item = item)
-        }
-    }
-}
-
-@Composable
-private fun WatchLaterItemContent(
-    item: WatchLaterItem,
-    modifier: Modifier = Modifier
-) {
-    val infoLine = remember(item) { buildInfoLine(item) }
-    val metaLine = remember(item) { buildMetaLine(item) }
-    val progress = remember(item) { progressText(item) }
-    val duration = remember(item) { durationText(item.durationSec) }
-
     if (!item.isOpenable) {
-        Text(
-            text = item.title,
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 16.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Card(
+            modifier = modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                onDelete?.let { WatchLaterMoreMenu(onDelete = it) }
+            }
+        }
         return
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        CoverImage(
-            url = item.cover,
-            contentDescription = "",
-            modifier = Modifier
-                .weight(0.38f)
-                .aspectRatio(16f / 10f)
-        ) {
-            duration?.let { text ->
+    val ownerName = item.ownerName?.takeIf(String::isNotBlank)
+    val badge = item.badge?.takeIf(String::isNotBlank)
+    val viewText = remember(item.viewText) {
+        item.viewText?.takeIf(String::isNotBlank)?.let(::compactCount)
+    }
+    val danmakuText = remember(item.danmakuText) {
+        item.danmakuText?.takeIf(String::isNotBlank)?.let(::compactCount)
+    }
+    val progress = remember(item.progressSec, item.durationSec) {
+        watchLaterProgress(item.progressSec, item.durationSec)
+    }
+    val duration = remember(item.durationSec) { durationText(item.durationSec) }
+
+    HorizontalVideoCard(
+        title = item.title,
+        coverUrl = item.cover,
+        durationText = progress?.timeText ?: duration,
+        onClick = onClick.takeIf { item.isOpenable },
+        modifier = modifier,
+        isTablet = isTablet,
+        coverOverlay = { _ ->
+            badge?.let { label ->
                 Text(
-                    text = text,
+                    text = label,
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(6.dp)
-                        .background(Color.Black.copy(alpha = 0.56f), MaterialTheme.shapes.extraSmall)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .align(Alignment.TopStart)
+                        .padding(5.dp)
+                        .background(Color.Black.copy(alpha = 0.68f), MaterialTheme.shapes.extraSmall)
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            if (infoLine.isNotBlank()) {
-                Text(
-                    text = infoLine,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Text(
-                text = metaLine,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            progress?.let { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier
-                        .background(
-                            MaterialTheme.colorScheme.secondaryContainer,
-                            MaterialTheme.shapes.extraSmall
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        },
+        coverBottomContent = progress?.fraction?.let { fraction ->
+            {
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(3.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                )
+            }
+        }
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            ownerName?.let { name ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    UploaderBadge()
+                    Text(
+                        text = name,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            if (viewText != null || danmakuText != null || onDelete != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (viewText != null || danmakuText != null) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            viewText?.let { text ->
+                                Icon(
+                                    imageVector = Icons.Outlined.PlayCircleOutline,
+                                    contentDescription = "播放量",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = text,
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .padding(start = 3.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            danmakuText?.let { text ->
+                                Icon(
+                                    imageVector = Icons.Outlined.Subtitles,
+                                    contentDescription = "弹幕数",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .padding(start = if (viewText != null) 8.dp else 0.dp)
+                                        .size(15.dp)
+                                )
+                                Text(
+                                    text = text,
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .padding(start = 3.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    onDelete?.let { WatchLaterMoreMenu(onDelete = it) }
+                }
+            }
         }
     }
 }
 
-private fun buildInfoLine(item: WatchLaterItem): String {
-    return listOfNotNull(
-        item.ownerName,
-        item.badge,
-        item.intro?.takeIf { it.isNotBlank() }
-    ).joinToString(" · ")
-}
-
-private fun buildMetaLine(item: WatchLaterItem): String {
-    return listOfNotNull(
-        item.viewText?.takeIf { it.isNotBlank() }?.let { "播放 $it" },
-        item.danmakuText?.takeIf { it.isNotBlank() }?.let { "弹幕 $it" },
-        item.addedAtSec.takeIf { it > 0L }?.let {
-            DateFormat.format("MM-dd HH:mm", it * 1000).toString()
+@Composable
+private fun WatchLaterMoreMenu(onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "更多操作",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
         }
-    ).joinToString(" · ")
-}
-
-private fun progressText(item: WatchLaterItem): String? {
-    val progress = item.progressSec ?: return null
-    val duration = item.durationSec ?: return if (progress > 0L) "已观看 $progress 秒" else null
-    return if (progress >= duration) {
-        "已看完"
-    } else if (progress <= 0L) {
-        "未开始"
-    } else {
-        "进度 ${formatVideoDuration(progress)} / ${formatVideoDuration(duration)}"
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("删除") },
+                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                }
+            )
+        }
     }
 }
 

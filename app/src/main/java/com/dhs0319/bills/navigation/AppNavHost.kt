@@ -342,8 +342,8 @@ fun AppNavHost(
                         }
                     }
                 },
-                onOpenFolder = { fid ->
-                    rootNavController.navigateToFavoriteFolder(fid)
+                onOpenFolder = { folder ->
+                    rootNavController.navigateToFavoriteFolder(folder)
                 }
             )
             composable(HOME_INTEREST_ROUTE) {

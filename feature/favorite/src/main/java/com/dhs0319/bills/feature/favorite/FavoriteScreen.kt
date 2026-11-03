@@ -1,16 +1,15 @@
 package com.dhs0319.bills.feature.favorite
 
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,19 +19,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
+import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
-import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
+import com.dhs0319.bills.core.model.FavoriteContentItem
 import com.dhs0319.bills.core.model.FavoriteContentTarget
+import com.dhs0319.bills.core.model.FavoriteFolder
 import com.dhs0319.bills.feature.favorite.folder.FavoriteFolderList
+import com.dhs0319.bills.feature.favorite.folder.FavoriteFolderListSkeleton
+import com.dhs0319.bills.feature.favorite.item.FavoriteContentGrid
 import com.dhs0319.bills.feature.favorite.item.FavoriteContentList
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -40,14 +47,29 @@ import com.dhs0319.bills.feature.favorite.item.FavoriteContentList
 fun FavoriteScreen(
     onBack: () -> Unit,
     onOpenContent: (FavoriteContentTarget) -> Unit,
-    onOpenFolder: (Long) -> Unit,
+    onOpenFolder: (FavoriteFolder) -> Unit,
     viewModel: FavoriteViewModel = hiltViewModel()
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val contentListState = rememberLazyListState()
-    val folderListState = rememberLazyListState()
+    val selectedTabFlow = remember(viewModel) { viewModel.observeSelectedTab() }
+    val selectedTab by selectedTabFlow.collectAsStateWithLifecycle(
+        initialValue = viewModel.uiState.value.tab
+    )
+    val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeActionMessage()
+        }
+    }
+    val tabs = remember { FavoriteTab.entries.map { it.title } }
+    val onLoadMore = remember(viewModel) { viewModel::loadMore }
+    val onRemoveContent = remember(viewModel) { viewModel::removeContent }
+    val onLoadFolderPreview = remember(viewModel) { viewModel::loadFolderPreview }
+    val contentGridState = rememberLazyStaggeredGridState()
+    val folderGridState = rememberLazyStaggeredGridState()
     val pagerState = rememberPagerState(
-        initialPage = state.tab.ordinal,
+        initialPage = selectedTab.ordinal,
         pageCount = { FavoriteTab.entries.size }
     )
     LaunchedEffect(pagerState) {
@@ -78,7 +100,7 @@ fun FavoriteScreen(
                 .padding(padding)
         ) {
             AdaptivePagerSlidingTabRow(
-                tabs = FavoriteTab.entries.map { it.title },
+                tabs = tabs,
                 pagerState = pagerState
             )
 
@@ -86,30 +108,24 @@ fun FavoriteScreen(
                 state = pagerState,
                 modifier = Modifier.weight(1f)
             ) { page ->
-                val tab = FavoriteTab.entries[page]
-                BiliPullToRefreshBox(
-                    isRefreshing = when (tab) {
-                        FavoriteTab.CONTENT -> state.content.isRefreshing
-                        FavoriteTab.FOLDER -> state.folder.isRefreshing
-                    },
-                    onRefresh = {
-                        if (!pagerState.isScrollInProgress && state.tab == tab) {
-                            viewModel.refresh()
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    FavoriteBody(
-                        tab = tab,
-                        state = state,
-                        isActive = !pagerState.isScrollInProgress &&
-                            pagerState.settledPage == page && state.tab == tab,
-                        contentListState = contentListState,
-                        folderListState = folderListState,
+                when (FavoriteTab.entries[page]) {
+                    FavoriteTab.CONTENT -> FavoriteContentPage(
+                        selectedTab = selectedTab,
+                        pagerState = pagerState,
+                        gridState = contentGridState,
                         onOpenContent = onOpenContent,
+                        onRemoveContent = onRemoveContent,
+                        onLoadMore = onLoadMore,
+                        viewModel = viewModel
+                    )
+
+                    FavoriteTab.FOLDER -> FavoriteFolderPage(
+                        selectedTab = selectedTab,
+                        pagerState = pagerState,
+                        gridState = folderGridState,
                         onOpenFolder = onOpenFolder,
-                        onRetry = { if (state.tab == tab) viewModel.refresh() },
-                        onLoadMore = viewModel::loadMore
+                        onLoadPreview = onLoadFolderPreview,
+                        viewModel = viewModel
                     )
                 }
             }
@@ -118,36 +134,119 @@ fun FavoriteScreen(
 }
 
 @Composable
-private fun FavoriteBody(
-    tab: FavoriteTab,
-    state: FavoriteUiState,
-    isActive: Boolean,
-    contentListState: LazyListState,
-    folderListState: LazyListState,
+private fun FavoriteContentPage(
+    selectedTab: FavoriteTab,
+    pagerState: PagerState,
+    gridState: LazyStaggeredGridState,
     onOpenContent: (FavoriteContentTarget) -> Unit,
-    onOpenFolder: (Long) -> Unit,
+    onRemoveContent: (FavoriteContentItem) -> Unit,
+    onLoadMore: () -> Unit,
+    viewModel: FavoriteViewModel
+) {
+    val pageStates = remember(viewModel) { viewModel.observeContentState() }
+    val state by pageStates.collectAsStateWithLifecycle(
+        initialValue = viewModel.uiState.value.content
+    )
+    val isActive by remember(pagerState, selectedTab) {
+        derivedStateOf {
+            !pagerState.isScrollInProgress &&
+                pagerState.settledPage == FavoriteTab.CONTENT.ordinal &&
+                selectedTab == FavoriteTab.CONTENT
+        }
+    }
+    val onRefresh = remember(viewModel, pagerState) {
+        {
+            if (!pagerState.isScrollInProgress &&
+                pagerState.settledPage == FavoriteTab.CONTENT.ordinal &&
+                viewModel.uiState.value.tab == FavoriteTab.CONTENT
+            ) {
+                viewModel.refresh()
+            }
+        }
+    }
+
+    BiliPullToRefreshBox(
+        isRefreshing = state.isRefreshing || state.isLoading,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        FavoriteContentBody(
+            state = state,
+            isActive = isActive,
+            gridState = gridState,
+            onOpenContent = onOpenContent,
+            onRemoveContent = onRemoveContent,
+            onRetry = onRefresh,
+            onLoadMore = onLoadMore
+        )
+    }
+}
+
+@Composable
+private fun FavoriteFolderPage(
+    selectedTab: FavoriteTab,
+    pagerState: PagerState,
+    gridState: LazyStaggeredGridState,
+    onOpenFolder: (FavoriteFolder) -> Unit,
+    onLoadPreview: (Long) -> Unit,
+    viewModel: FavoriteViewModel
+) {
+    val pageStates = remember(viewModel) { viewModel.observeFolderState() }
+    val state by pageStates.collectAsStateWithLifecycle(
+        initialValue = viewModel.uiState.value.folder
+    )
+    val isActive by remember(pagerState, selectedTab) {
+        derivedStateOf {
+            !pagerState.isScrollInProgress &&
+                pagerState.settledPage == FavoriteTab.FOLDER.ordinal &&
+                selectedTab == FavoriteTab.FOLDER
+        }
+    }
+    val onRefresh = remember(viewModel, pagerState) {
+        {
+            if (!pagerState.isScrollInProgress &&
+                pagerState.settledPage == FavoriteTab.FOLDER.ordinal &&
+                viewModel.uiState.value.tab == FavoriteTab.FOLDER
+            ) {
+                viewModel.refresh()
+            }
+        }
+    }
+
+    BiliPullToRefreshBox(
+        isRefreshing = state.isRefreshing || state.isLoading,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        FavoriteFolderBody(
+            state = state,
+            isActive = isActive,
+            gridState = gridState,
+            onOpenFolder = onOpenFolder,
+            onLoadPreview = onLoadPreview,
+            onRetry = onRefresh
+        )
+    }
+}
+
+@Composable
+private fun FavoriteContentBody(
+    state: FavoriteContentUiState,
+    isActive: Boolean,
+    gridState: LazyStaggeredGridState,
+    onOpenContent: (FavoriteContentTarget) -> Unit,
+    onRemoveContent: (FavoriteContentItem) -> Unit,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit
 ) {
-    val content = state.content
-    val folder = state.folder
-    val hasCurrentItems = when (tab) {
-        FavoriteTab.CONTENT -> content.items.isNotEmpty()
-        FavoriteTab.FOLDER -> folder.folders.isNotEmpty()
-    }
     when {
-        ((tab == FavoriteTab.CONTENT && content.isLoading) ||
-            (tab == FavoriteTab.FOLDER && folder.isLoading) || state.tab != tab) && !hasCurrentItems -> {
+        state.items.isEmpty() && (state.isLoading || (!state.hasLoaded && state.errorMessage == null)) -> {
             FavoriteLoading(modifier = Modifier.fillMaxSize())
         }
 
-        ((tab == FavoriteTab.CONTENT && content.errorMessage != null) ||
-            (tab == FavoriteTab.FOLDER && folder.errorMessage != null)) && !hasCurrentItems -> {
+        state.items.isEmpty() && state.errorMessage != null -> {
             StateMessageCard(
-                text = when (tab) {
-                    FavoriteTab.CONTENT -> content.errorMessage.orEmpty()
-                    FavoriteTab.FOLDER -> folder.errorMessage.orEmpty()
-                }.ifBlank { "加载收藏失败" },
+                text = state.errorMessage.ifBlank { "加载收藏失败" },
                 modifier = Modifier.fillMaxSize(),
                 isError = true,
                 actionText = "重试",
@@ -155,34 +254,70 @@ private fun FavoriteBody(
             )
         }
 
-        !hasCurrentItems -> {
+        state.items.isEmpty() -> {
             StateMessageCard(
-                text = when (tab) {
-                    FavoriteTab.CONTENT -> "暂无收藏内容"
-                    FavoriteTab.FOLDER -> "暂无收藏夹"
-                },
+                text = "暂无收藏内容",
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        tab == FavoriteTab.CONTENT -> {
+        else -> {
             FavoriteContentList(
-                items = content.items,
-                isLoadingMore = content.isLoadingMore,
-                errorMessage = content.errorMessage,
-                errorOnLoadMore = content.errorOnLoadMore,
-                canLoadMore = content.canLoadMore && isActive,
+                items = state.items,
+                isLoadingMore = state.isLoadingMore,
+                errorMessage = state.errorMessage,
+                errorOnLoadMore = state.errorOnLoadMore,
+                hasMore = state.hasMore,
+                canLoadMore = state.canLoadMore && isActive,
                 onLoadMore = onLoadMore,
-                onRetry = if (content.errorOnLoadMore) onLoadMore else onRetry,
+                onRetry = if (state.errorOnLoadMore) onLoadMore else onRetry,
                 onOpenContent = onOpenContent,
-                listState = contentListState
+                onRemoveContent = onRemoveContent,
+                gridState = gridState
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteFolderBody(
+    state: FavoriteFolderUiState,
+    isActive: Boolean,
+    gridState: LazyStaggeredGridState,
+    onOpenFolder: (FavoriteFolder) -> Unit,
+    onLoadPreview: (Long) -> Unit,
+    onRetry: () -> Unit
+) {
+    when {
+        state.folders.isEmpty() && (state.isLoading || (!state.hasLoaded && state.errorMessage == null)) -> {
+            FavoriteLoading(modifier = Modifier.fillMaxSize(), isContent = false)
+        }
+
+        state.folders.isEmpty() && state.errorMessage != null -> {
+            StateMessageCard(
+                text = state.errorMessage.ifBlank { "加载收藏失败" },
+                modifier = Modifier.fillMaxSize(),
+                isError = true,
+                actionText = "重试",
+                onAction = onRetry
             )
         }
 
-        tab == FavoriteTab.FOLDER -> {
+        state.folders.isEmpty() -> {
+            StateMessageCard(
+                text = "暂无收藏夹",
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        else -> {
             FavoriteFolderList(
-                folders = folder.folders,
-                listState = folderListState,
+                folders = state.folders,
+                previews = state.previews,
+                previewGeneration = state.previewGeneration,
+                isActive = isActive && !state.isRefreshing,
+                gridState = gridState,
+                onLoadPreview = onLoadPreview,
                 onOpenFolder = onOpenFolder
             )
         }
@@ -190,19 +325,28 @@ private fun FavoriteBody(
 }
 
 @Composable
-fun FavoriteLoading(modifier: Modifier = Modifier) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(
-            count = LOADING_COUNT,
-            key = { index -> "favorite_loading_$index" },
-            contentType = { "loading" }
+fun FavoriteLoading(
+    modifier: Modifier = Modifier,
+    isContent: Boolean = true
+) {
+    val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val columns = rememberHorizontalVideoCardColumnCount()
+    if (isContent) {
+        FavoriteContentGrid(
+            columns = columns,
+            modifier = modifier,
+            userScrollEnabled = false
         ) {
-            VideoListCardSkeleton()
+            items(
+                count = LOADING_COUNT * columns,
+                key = { index -> "favorite_loading_$index" },
+                contentType = { "loading" }
+            ) {
+                HorizontalVideoCardSkeleton(isTablet = isTablet)
+            }
         }
+    } else {
+        FavoriteFolderListSkeleton(modifier = modifier)
     }
 }
 

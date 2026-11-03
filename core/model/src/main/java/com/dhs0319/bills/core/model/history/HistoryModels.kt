@@ -94,6 +94,7 @@ data class WatchLaterPage(
 @Immutable
 data class WatchLaterItem(
     val key: String,
+    val aid: Long,
     val cardType: Int,
     val title: String,
     val intro: String?,

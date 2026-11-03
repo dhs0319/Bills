@@ -14,8 +14,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -44,6 +47,10 @@ class WatchLaterViewModel @Inject constructor(
     val uiState: StateFlow<WatchLaterUiState> = _uiState.asStateFlow()
 
     private val cache = mutableMapOf<WatchLaterCacheKey, WatchLaterCache>()
+    private val deletingItems = mutableSetOf<Long>()
+    private val removedItems = mutableMapOf<Long, Long>()
+    private val _actionMessage = MutableStateFlow<String?>(null)
+    val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
     private var currentStartKey = ""
     private var splitKey = ""
     private var loadJob: Job? = null
@@ -106,6 +113,12 @@ class WatchLaterViewModel @Inject constructor(
             countText = cached.countText,
             hasMore = cached.hasMore
         )
+    }
+
+    fun observeTab(tab: WatchLaterTab): Flow<WatchLaterUiState> {
+        return uiState.map { state ->
+            if (state.tab == tab) state else previewState(tab)
+        }.distinctUntilChanged()
     }
 
     fun selectSort(asc: Boolean) {
@@ -183,6 +196,42 @@ class WatchLaterViewModel @Inject constructor(
         }
     }
 
+    fun removeItem(item: WatchLaterItem) {
+        val aid = item.aid
+        if (aid <= 0L || !deletingItems.add(aid)) return
+        viewModelScope.launch {
+            try {
+                repo.removeVideo(aid)
+                removedItems[aid] = maxOf(
+                    removedItems[aid] ?: Long.MIN_VALUE,
+                    item.addedAtSec
+                )
+                cache.replaceAll { _, cached ->
+                    cached.copy(items = withoutRemovedItems(cached.items))
+                }
+                _uiState.update { it.copy(items = withoutRemovedItems(it.items)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "移出稍后再看失败" }
+                _actionMessage.value = e.message?.takeIf(String::isNotBlank) ?: "移出稍后再看失败"
+            } finally {
+                deletingItems.remove(aid)
+            }
+        }
+    }
+
+    fun consumeActionMessage() {
+        _actionMessage.value = null
+    }
+
+    private fun withoutRemovedItems(items: List<WatchLaterItem>): List<WatchLaterItem> {
+        return items.filter { item ->
+            val removedAt = removedItems[item.aid]
+            removedAt == null || item.addedAtSec > removedAt
+        }
+    }
+
     private suspend fun load(
         tab: WatchLaterTab,
         asc: Boolean,
@@ -198,7 +247,9 @@ class WatchLaterViewModel @Inject constructor(
             currentCoroutineContext().ensureActive()
             currentStartKey = page.cursor.startKey
             splitKey = page.cursor.splitKey
-            val items = if (reset) page.items else _uiState.value.items + page.items
+            val items = withoutRemovedItems(
+                if (reset) page.items else _uiState.value.items + page.items
+            )
             cache[WatchLaterCacheKey(tab, asc)] = WatchLaterCache(
                 items = items,
                 nextStartKey = currentStartKey,

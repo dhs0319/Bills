@@ -1,5 +1,6 @@
 package com.dhs0319.bills.core.designsystem.component
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,14 +18,23 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+@Composable
+fun rememberHorizontalVideoCardColumnCount(): Int {
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.smallestScreenWidthDp >= 600
+    return if (isTablet || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 2 else 1
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,17 +45,20 @@ fun HorizontalVideoCard(
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
+    cardWidth: Dp? = null,
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
     coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
+    val annotatedTitle = remember(title) { AnnotatedString(title) }
     HorizontalVideoCard(
-        title = AnnotatedString(title),
+        title = annotatedTitle,
         coverUrl = coverUrl,
         durationText = durationText,
         onClick = onClick,
         modifier = modifier,
         isTablet = isTablet,
+        cardWidth = cardWidth,
         coverOverlay = coverOverlay,
         coverBottomContent = coverBottomContent,
         metadata = metadata
@@ -61,65 +74,35 @@ fun HorizontalVideoCard(
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
+    cardWidth: Dp? = null,
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
     coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
-    val titleStyle = if (isTablet) MaterialTheme.typography.titleSmall
-        else MaterialTheme.typography.titleMedium
-
     val cardContent: @Composable () -> Unit = {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val cardWidth = maxWidth
-            val coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet)
-            val coverHeight = coverWidth / horizontalVideoCoverAspectRatio(isTablet)
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CoverImage(
-                    url = coverUrl,
-                    contentDescription = title.text,
-                    modifier = Modifier
-                        .width(coverWidth)
-                        .height(coverHeight),
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    durationText?.takeIf(String::isNotBlank)?.let { duration ->
-                        Text(
-                            text = duration,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(5.dp)
-                                .clip(MaterialTheme.shapes.extraSmall)
-                                .background(Color.Black.copy(alpha = 0.68f))
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                    coverOverlay?.invoke(this, coverWidth)
-                    coverBottomContent?.invoke(this)
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = coverHeight),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = title,
-                        style = titleStyle,
-                        minLines = 2,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    metadata(cardWidth)
-                }
+        if (cardWidth != null) {
+            HorizontalVideoCardContent(
+                title = title,
+                coverUrl = coverUrl,
+                durationText = durationText,
+                cardWidth = cardWidth,
+                isTablet = isTablet,
+                coverOverlay = coverOverlay,
+                coverBottomContent = coverBottomContent,
+                metadata = metadata
+            )
+        } else {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                HorizontalVideoCardContent(
+                    title = title,
+                    coverUrl = coverUrl,
+                    durationText = durationText,
+                    cardWidth = maxWidth,
+                    isTablet = isTablet,
+                    coverOverlay = coverOverlay,
+                    coverBottomContent = coverBottomContent,
+                    metadata = metadata
+                )
             }
         }
     }
@@ -148,16 +131,91 @@ fun HorizontalVideoCard(
 }
 
 @Composable
+private fun HorizontalVideoCardContent(
+    title: AnnotatedString,
+    coverUrl: String?,
+    durationText: String?,
+    cardWidth: Dp,
+    isTablet: Boolean,
+    coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)?,
+    coverBottomContent: (@Composable BoxScope.() -> Unit)?,
+    metadata: @Composable (cardWidth: Dp) -> Unit
+) {
+    val titleStyle = if (isTablet) MaterialTheme.typography.titleSmall
+        else MaterialTheme.typography.titleMedium
+    val coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet)
+    val coverHeight = coverWidth / horizontalVideoCoverAspectRatio(isTablet)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CoverImage(
+            url = coverUrl,
+            contentDescription = title.text,
+            modifier = Modifier
+                .width(coverWidth)
+                .height(coverHeight),
+            shape = MaterialTheme.shapes.small
+        ) {
+            durationText?.takeIf(String::isNotBlank)?.let { duration ->
+                Text(
+                    text = duration,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(5.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(Color.Black.copy(alpha = 0.68f))
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            coverOverlay?.invoke(this, coverWidth)
+            coverBottomContent?.invoke(this)
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = coverHeight),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = title,
+                style = titleStyle,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            metadata(cardWidth)
+        }
+    }
+}
+
+@Composable
 fun HorizontalVideoCardSkeleton(
     modifier: Modifier = Modifier,
-    isTablet: Boolean = false
+    isTablet: Boolean = false,
+    cardWidth: Dp? = null
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+    if (cardWidth != null) {
         VideoListCardSkeleton(
-            coverWidth = horizontalVideoCoverWidth(maxWidth, isTablet),
+            modifier = modifier,
+            coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet),
             coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet),
             contentPadding = 8.dp
         )
+    } else {
+        BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+            VideoListCardSkeleton(
+                coverWidth = horizontalVideoCoverWidth(maxWidth, isTablet),
+                coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet),
+                contentPadding = 8.dp
+            )
+        }
     }
 }
 
