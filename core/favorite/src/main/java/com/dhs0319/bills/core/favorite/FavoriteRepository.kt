@@ -82,6 +82,61 @@ class FavoriteRepository @Inject constructor(
         }
     }
 
+    suspend fun removeFromFavorites(item: FavoriteContentItem) {
+        check(item.oid > 0L && item.otype > 0) { "收藏内容信息无效" }
+        val accessToken = authStore.accessToken
+        check(accessToken.isNotBlank()) { "请先登录" }
+        val ts = System.currentTimeMillis() / 1000
+        val folderJson = restClient.getSigned(
+            url = "${BiliConstants.BASE_URL_API}$FAVORITE_FOLDERS_FOR_CONTENT_ENDPOINT",
+            params = restParamBuilder.app(BiliRestProfile.APP, ts, accessToken) + mapOf(
+                "up_mid" to authStore.mid.toString(),
+                "type" to item.otype.toString(),
+                "rid" to item.oid.toString()
+            ),
+            profile = BiliRestProfile.APP
+        )
+        val folders = folderJson.optJSONObject("data")?.optJSONArray("list")
+        val selectedFolderIds = buildList {
+            if (folders == null) return@buildList
+            for (index in 0 until folders.length()) {
+                val folder = folders.optJSONObject(index) ?: continue
+                val id = folder.optLong("id")
+                if (id > 0L && folder.optInt("fav_state") > 0) add(id)
+            }
+        }
+        check(selectedFolderIds.isNotEmpty()) { "找不到该内容所在的收藏夹" }
+        removeFromFolders(item, selectedFolderIds, accessToken)
+    }
+
+    suspend fun removeFromFavoriteFolder(item: FavoriteContentItem, fid: Long) {
+        check(item.oid > 0L && item.otype > 0) { "收藏内容信息无效" }
+        check(fid > 0L) { "收藏夹不存在" }
+        val accessToken = authStore.accessToken
+        check(accessToken.isNotBlank()) { "请先登录" }
+        removeFromFolders(item, listOf(fid), accessToken)
+    }
+
+    private suspend fun removeFromFolders(
+        item: FavoriteContentItem,
+        folderIds: List<Long>,
+        accessToken: String
+    ) {
+        restClient.postSigned(
+            url = "${BiliConstants.BASE_URL_API}$FAVORITE_DEAL_ENDPOINT",
+            params = restParamBuilder.app(
+                profile = BiliRestProfile.APP,
+                ts = System.currentTimeMillis() / 1000,
+                accessKey = accessToken
+            ) + mapOf(
+                "rid" to item.oid.toString(),
+                "type" to item.otype.toString(),
+                "del_media_ids" to folderIds.joinToString(",")
+            ),
+            profile = BiliRestProfile.APP
+        )
+    }
+
     suspend fun fetchFavoriteFolderContents(
         fid: Long,
         page: Int
@@ -245,7 +300,9 @@ class FavoriteRepository @Inject constructor(
     private companion object {
         const val MY_FAV_ENDPOINT = "/x/v3/fav/tab/my_fav"
         const val FAV_CONTENT_ENDPOINT = "/x/v3/fav/tab/fav"
+        const val FAVORITE_FOLDERS_FOR_CONTENT_ENDPOINT = "/x/v3/fav/folder/created/list-all"
         const val FAV_FOLDER_RESOURCES_ENDPOINT = "/x/v3/fav/folder/resources"
+        const val FAVORITE_DEAL_ENDPOINT = "/medialist/gateway/coll/resource/deal"
         const val ALL_FAVORITE_TAB_ID = 101
         const val PAGE_TYPE = 1
         const val TYPE_UGC = 2

@@ -5,15 +5,22 @@ import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.favorite.FavoriteRepository
 import com.dhs0319.bills.core.model.FavoriteContentCursor
+import com.dhs0319.bills.core.model.FavoriteContentItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 @HiltViewModel
 class FavoriteViewModel @Inject constructor(
@@ -26,8 +33,26 @@ class FavoriteViewModel @Inject constructor(
     )
     val uiState: StateFlow<FavoriteUiState> = _uiState.asStateFlow()
 
+    fun observeSelectedTab() = uiState
+        .map { it.tab }
+        .distinctUntilChanged()
+
+    fun observeContentState() = uiState
+        .map { it.content }
+        .distinctUntilChanged()
+
+    fun observeFolderState() = uiState
+        .map { it.folder }
+        .distinctUntilChanged()
+
     private var contentJob: Job? = null
     private var folderJob: Job? = null
+    private val deletingContent = mutableSetOf<Pair<Int, Long>>()
+    private val removedContent = mutableSetOf<Pair<Int, Long>>()
+    private val _actionMessage = MutableStateFlow<String?>(null)
+    val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
+    private val folderPreviewJobs = mutableMapOf<Long, Job>()
+    private val folderPreviewSemaphore = Semaphore(3)
 
     init {
         loadContent(reset = true, refreshing = false)
@@ -37,8 +62,8 @@ class FavoriteViewModel @Inject constructor(
         val state = _uiState.value
         if (state.tab == tab) return
         val shouldLoad = when (tab) {
-            FavoriteTab.CONTENT -> state.content.items.isEmpty()
-            FavoriteTab.FOLDER -> state.folder.folders.isEmpty()
+            FavoriteTab.CONTENT -> !state.content.hasLoaded
+            FavoriteTab.FOLDER -> !state.folder.hasLoaded
         }
         _uiState.update { it.copy(tab = tab) }
         if (!shouldLoad) return
@@ -51,6 +76,7 @@ class FavoriteViewModel @Inject constructor(
     fun refresh() {
         when (_uiState.value.tab) {
             FavoriteTab.CONTENT -> {
+                removedContent.clear()
                 contentJob?.cancel()
                 loadContent(reset = true, refreshing = true)
             }
@@ -68,6 +94,82 @@ class FavoriteViewModel @Inject constructor(
         loadContent(reset = false, refreshing = false)
     }
 
+    fun removeContent(item: FavoriteContentItem) {
+        val identity = item.otype to item.oid
+        if (item.oid <= 0L || !deletingContent.add(identity)) return
+        viewModelScope.launch {
+            try {
+                repo.removeFromFavorites(item)
+                removedContent.add(identity)
+                _uiState.update { state ->
+                    state.copy(
+                        content = state.content.copy(
+                            items = withoutRemovedContent(state.content.items)
+                        ),
+                        folder = state.folder.copy(
+                            previews = state.folder.previews.mapValues { (_, items) ->
+                                withoutRemovedContent(items)
+                            }
+                        )
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "取消收藏失败" }
+                _actionMessage.value = e.message?.takeIf(String::isNotBlank) ?: "取消收藏失败"
+            } finally {
+                deletingContent.remove(identity)
+            }
+        }
+    }
+
+    fun consumeActionMessage() {
+        _actionMessage.value = null
+    }
+
+    private fun withoutRemovedContent(items: List<FavoriteContentItem>): List<FavoriteContentItem> {
+        return items.filterNot { (it.otype to it.oid) in removedContent }
+    }
+
+    fun loadFolderPreview(fid: Long) {
+        val state = _uiState.value.folder
+        val folder = state.folders.firstOrNull { it.fid == fid } ?: return
+        if (folder.mediaCount <= 0 || state.isRefreshing ||
+            state.previews.containsKey(fid) || folderPreviewJobs[fid]?.isActive == true
+        ) return
+
+        folderPreviewJobs[fid] = viewModelScope.launch {
+            try {
+                val items = try {
+                    folderPreviewSemaphore.withPermit {
+                        repo.fetchFavoriteFolderContents(fid = fid, page = 1)
+                            .items.take(FAVORITE_FOLDER_PREVIEW_COUNT)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Logger.e(TAG, e) { "加载收藏夹预览失败 fid=$fid" }
+                    emptyList()
+                }
+                ensureActive()
+                _uiState.update {
+                    it.copy(
+                        folder = it.folder.copy(
+                            previews = it.folder.previews + (
+                                fid to withoutRemovedContent(items)
+                            )
+                        )
+                    )
+                }
+            } finally {
+                if (folderPreviewJobs[fid] === coroutineContext[Job]) {
+                    folderPreviewJobs.remove(fid)
+                }
+            }
+        }
+    }
+
     private fun loadFolders(refreshing: Boolean) {
         if (folderJob?.isActive == true) return
         folderJob = viewModelScope.launch {
@@ -83,10 +185,15 @@ class FavoriteViewModel @Inject constructor(
             runCatching {
                 repo.fetchMyFavorites()
             }.onSuccess { page ->
+                folderPreviewJobs.values.toList().forEach { it.cancel() }
+                folderPreviewJobs.clear()
                 _uiState.update {
                     it.copy(
                         folder = it.folder.copy(
                             folders = page.folders,
+                            previews = emptyMap(),
+                            previewGeneration = it.folder.previewGeneration + 1,
+                            hasLoaded = true,
                             isLoading = false,
                             isRefreshing = false,
                             errorMessage = null
@@ -133,7 +240,10 @@ class FavoriteViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         content = it.content.copy(
-                            items = if (reset) page.items else it.content.items + page.items,
+                            items = withoutRemovedContent(
+                                if (reset) page.items else it.content.items + page.items
+                            ),
+                            hasLoaded = true,
                             cursor = page.cursor,
                             hasMore = page.hasMore,
                             isLoading = false,

@@ -5,6 +5,8 @@ import com.dhs0319.bills.core.model.FavoriteContentItem
 
 @Immutable
 data class FavoriteFolderDetailUiState(
+    val title: String = "收藏夹",
+    val createdAtSec: Long = 0L,
     val items: List<FavoriteContentItem> = emptyList(),
     val page: Int = 1,
     val totalCount: Int = 0,

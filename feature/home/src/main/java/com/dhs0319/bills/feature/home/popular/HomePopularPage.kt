@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.home.popular
 
-import android.content.res.Configuration
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +30,7 @@ import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.WatchLaterMoreMenu
+import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
 import com.dhs0319.bills.core.model.PopularVideoItem
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
@@ -49,11 +49,7 @@ fun HomePopularPage(
     val actionMessage = viewModel.actionMessage.collectAsStateWithLifecycle().value
     val configuration = LocalConfiguration.current
     val isTablet = configuration.smallestScreenWidthDp >= 600
-    val showTwoColumns = when (configuration.orientation) {
-        Configuration.ORIENTATION_PORTRAIT -> isTablet
-        Configuration.ORIENTATION_LANDSCAPE -> true
-        else -> false
-    }
+    val columns = rememberHorizontalVideoCardColumnCount()
     val context = LocalContext.current
 
     LaunchedEffect(actionMessage) {
@@ -78,8 +74,8 @@ fun HomePopularPage(
         onRetryLoadMore = viewModel::retryLoadMore,
         key = { _, item -> item.identityKey },
         contentType = { _, _ -> "popular_video" },
-        columns = if (showTwoColumns) 2 else 1,
-        estimatedRowHeight = if (showTwoColumns) 136.dp else 128.dp,
+        columns = columns,
+        estimatedRowHeight = if (columns == 2) 136.dp else 128.dp,
         loadingContent = {
             HorizontalVideoCardSkeleton(isTablet = isTablet)
         }

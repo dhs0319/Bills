@@ -40,6 +40,30 @@ class WatchLaterRepository @Inject constructor(
         )
     }
 
+    suspend fun removeVideo(aid: Long) {
+        check(aid > 0L) { "视频信息无效" }
+        val accessToken = authStore.accessToken
+        check(accessToken.isNotBlank()) { "请先登录" }
+        val csrf = authStore.getSavedCredential()
+            ?.cookies
+            ?.firstOrNull { it.name == CSRF_COOKIE_NAME }
+            ?.value
+            ?.takeIf(String::isNotBlank)
+            ?: error("登录凭证无效，请重新登录")
+        restClient.postSigned(
+            url = "${BiliConstants.BASE_URL_API}$WATCH_LATER_DELETE_ENDPOINT",
+            params = restParamBuilder.app(
+                profile = BiliRestProfile.APP,
+                ts = System.currentTimeMillis() / 1000,
+                accessKey = accessToken
+            ) + mapOf(
+                "aid" to aid.toString(),
+                "csrf" to csrf
+            ),
+            profile = BiliRestProfile.APP
+        )
+    }
+
     suspend fun fetchPage(
         tab: WatchLaterTab,
         asc: Boolean,
@@ -95,6 +119,7 @@ class WatchLaterRepository @Inject constructor(
         if (cardType != CARD_TYPE_VIDEO) {
             return WatchLaterItem(
                 key = key,
+                aid = aid,
                 cardType = cardType,
                 title = title,
                 intro = item.optString("desc").blankToNull(),
@@ -113,6 +138,7 @@ class WatchLaterRepository @Inject constructor(
         val bvid = item.optString("bvid").blankToNull()
         return WatchLaterItem(
             key = key,
+            aid = aid,
             cardType = cardType,
             title = title,
             intro = item.optString("desc").blankToNull(),
@@ -121,7 +147,8 @@ class WatchLaterRepository @Inject constructor(
             viewText = item.optString("left_text").blankToNull(),
             danmakuText = item.optString("right_text").blankToNull(),
             durationSec = item.optLong("duration").takeIf { it > 0L },
-            progressSec = item.optLong("progress").takeIf { it >= 0L },
+            // -1 表示已看完；保留该值供卡片展示完成状态。
+            progressSec = item.opt("progress")?.toString()?.toLongOrNull(),
             addedAtSec = item.optLong("add_at"),
             badge = item.optString("pgc_label").blankToNull(),
             target = buildTarget(
@@ -170,7 +197,9 @@ class WatchLaterRepository @Inject constructor(
 
     private companion object {
         const val WATCH_LATER_ADD_ENDPOINT = "/x/v2/history/toview/add"
+        const val WATCH_LATER_DELETE_ENDPOINT = "/x/v2/history/toview/del"
         const val WATCH_LATER_LIST_ENDPOINT = "/x/v2/history/toview/v2/list"
+        const val CSRF_COOKIE_NAME = "bili_jct"
         const val CARD_TYPE_VIDEO = 0
         val WATCH_LATER_VIDEO_SRC = VideoTargetTool.watchLater()
     }

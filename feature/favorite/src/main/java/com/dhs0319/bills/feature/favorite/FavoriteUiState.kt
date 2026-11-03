@@ -5,6 +5,8 @@ import com.dhs0319.bills.core.model.FavoriteContentCursor
 import com.dhs0319.bills.core.model.FavoriteContentItem
 import com.dhs0319.bills.core.model.FavoriteFolder
 
+internal const val FAVORITE_FOLDER_PREVIEW_COUNT = 3
+
 enum class FavoriteTab(val title: String) {
     CONTENT("全部收藏"),
     FOLDER("收藏夹")
@@ -13,6 +15,7 @@ enum class FavoriteTab(val title: String) {
 @Immutable
 data class FavoriteContentUiState(
     val items: List<FavoriteContentItem> = emptyList(),
+    val hasLoaded: Boolean = false,
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
@@ -31,6 +34,9 @@ data class FavoriteContentUiState(
 @Immutable
 data class FavoriteFolderUiState(
     val folders: List<FavoriteFolder> = emptyList(),
+    val previews: Map<Long, List<FavoriteContentItem>> = emptyMap(),
+    val previewGeneration: Int = 0,
+    val hasLoaded: Boolean = false,
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null
