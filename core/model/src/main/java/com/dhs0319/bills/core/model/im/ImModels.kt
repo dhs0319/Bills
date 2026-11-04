@@ -68,6 +68,15 @@ data class ImConversationPage(
 )
 
 @Immutable
+data class ImUploadedImage(
+    val url: String,
+    val width: Int,
+    val height: Int,
+    val imageType: String,
+    val sizeKb: Double
+)
+
+@Immutable
 object ImMsgType {
     const val TEXT = 1
     const val IMAGE = 2

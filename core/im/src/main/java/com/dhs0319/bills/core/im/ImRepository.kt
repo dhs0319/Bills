@@ -55,6 +55,7 @@ import com.dhs0319.bills.core.common.media.httpsImageUrlOrNull
 import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.ImConversationPage
 import com.dhs0319.bills.core.model.ImMessage
+import com.dhs0319.bills.core.model.ImUploadedImage
 import com.dhs0319.bills.core.model.ImPage
 import com.dhs0319.bills.core.model.ImPaginationOffset
 import com.dhs0319.bills.core.model.ImPaginationParams
@@ -198,22 +199,36 @@ class ImRepository @Inject constructor(
         talkerId: Long,
         sessionType: Int,
         text: String
+    ): ImMessage = sendConversationContent(talkerId, sessionType, ImMsgType.TEXT, encodeImTextContent(text))
+
+    suspend fun sendConversationImage(
+        talkerId: Long,
+        sessionType: Int,
+        image: ImUploadedImage
+    ): ImMessage = sendConversationContent(talkerId, sessionType, ImMsgType.IMAGE, image.toMessageContent())
+
+    private suspend fun sendConversationContent(
+        talkerId: Long,
+        sessionType: Int,
+        msgType: Int,
+        content: String
     ): ImMessage {
         val mid = authProvider.mid
         require(mid > 0L) { "请先登录" }
+        require(talkerId > 0L && sessionType > 0) { "会话信息无效" }
         val cliMsgId = buildCliMsgId()
+        val message = Msg.newBuilder()
+            .setSenderUid(mid)
+            .setReceiverType(sessionType)
+            .setReceiverId(talkerId)
+            .setCliMsgId(cliMsgId)
+            .setMsgType(msgType)
+            .setContent(content)
+            .setTimestamp(System.currentTimeMillis() / 1000L)
+            .setNewFaceVersion(1)
+            .build()
         val req = ReqSendMsg.newBuilder()
-            .setMsg(
-                Msg.newBuilder()
-                    .setSenderUid(mid)
-                    .setReceiverType(sessionType)
-                    .setReceiverId(talkerId)
-                    .setCliMsgId(cliMsgId)
-                    .setMsgType(ImMsgType.TEXT)
-                    .setContent("""{"content":"$text"}""")
-                    .setNewFaceVersion(1)
-                    .build()
-            )
+            .setMsg(message)
             .setCookie("")
             .setCookie2("")
             .setErrorCode(0)
@@ -226,11 +241,7 @@ class ImRepository @Inject constructor(
         )
         notifySessionListChanged()
         return withContext(Dispatchers.Default) {
-            reply.toSentMessage(
-                talkerId = talkerId,
-                fallbackText = text,
-                cliMsgId = cliMsgId
-            )
+            reply.toSentMessage(message, cliMsgId)
         }
     }
 
@@ -698,20 +709,14 @@ class ImRepository @Inject constructor(
     }
 
     private fun RspSendMsg.toSentMessage(
-        talkerId: Long,
-        fallbackText: String,
+        sent: Msg,
         cliMsgId: Long
     ): ImMessage {
-        return ImMessage(
-            key = msgKey.takeIf { it > 0L } ?: cliMsgId,
-            seqNo = seqno.takeIf { it > 0L } ?: cliMsgId,
-            senderUid = authProvider.mid,
-            receiverId = talkerId,
-            msgType = ImMsgType.TEXT,
-            content = fallbackText,
-            timestampSec = System.currentTimeMillis() / 1000L,
-            isSelf = true,
-            isRecalled = false
+        return mapMessage(
+            sent.toBuilder()
+                .setMsgKey(msgKey.takeIf { it > 0L } ?: cliMsgId)
+                .setMsgSeqno(seqno.takeIf { it > 0L } ?: cliMsgId)
+                .build()
         )
     }
 

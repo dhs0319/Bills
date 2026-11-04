@@ -39,27 +39,46 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
+import com.dhs0319.bills.core.model.CommentEmote
 
 @Composable
 internal fun CommentEmotePanel(
     state: CommentEmotePanelState,
     enabled: Boolean,
-    onAction: (CommentEditorAction) -> Unit
+    onAction: (CommentEditorAction) -> Unit,
+    modifier: Modifier = Modifier
+) = EmotePicker(
+    state = state,
+    enabled = enabled,
+    onReload = { onAction(CommentEditorAction.ReloadEmotes) },
+    onSelectPackage = { onAction(CommentEditorAction.SelectPackage(it)) },
+    onInsert = { onAction(CommentEditorAction.InsertEmote(it)) },
+    onDelete = { onAction(CommentEditorAction.DeleteText) },
+    modifier = modifier
+)
+
+/** Shared by the comment editor and private-message composer. */
+@Composable
+fun EmotePicker(
+    state: CommentEmotePanelState,
+    enabled: Boolean,
+    onReload: () -> Unit,
+    onSelectPackage: (Long) -> Unit,
+    onInsert: (CommentEmote) -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val selected = state.packages.firstOrNull { it.id == state.selectedPackageId }
     val isRecent = state.selectedPackageId == -1L
     val emotes = if (isRecent) state.recent else selected?.emotes.orEmpty()
     val gridState = rememberLazyGridState()
     LaunchedEffect(state.selectedPackageId) { gridState.scrollToItem(0) }
-    val panelHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.4f).coerceIn(200.dp, 360.dp)
-
-    Column(modifier = Modifier.fillMaxWidth().height(panelHeight)) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -70,7 +89,7 @@ internal fun CommentEmotePanel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = { onAction(CommentEditorAction.ReloadEmotes) }, enabled = enabled && !state.loading) {
+            IconButton(onClick = onReload, enabled = enabled && !state.loading) {
                 Icon(Icons.Outlined.Refresh, "刷新表情", modifier = Modifier.size(18.dp))
             }
         }
@@ -79,7 +98,7 @@ internal fun CommentEmotePanel(
                 state.loading && emotes.isEmpty() -> CircularProgressIndicator(modifier = Modifier.size(28.dp))
                 state.error != null && emotes.isEmpty() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(state.error, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                    TextButton(onClick = { onAction(CommentEditorAction.ReloadEmotes) }) { Text("重试") }
+                    TextButton(onClick = onReload, enabled = enabled) { Text("重试") }
                 }
                 emotes.isEmpty() -> Text(
                     if (isRecent) "使用过的表情会出现在这里" else "暂无表情",
@@ -92,31 +111,8 @@ internal fun CommentEmotePanel(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    items(emotes, key = { it.text }) { emote ->
-                        Box(
-                            modifier = Modifier.height(48.dp)
-                                .alpha(if (emote.available) 1f else 0.4f)
-                                .clickable(enabled = enabled && emote.available, role = Role.Button) {
-                                    onAction(CommentEditorAction.InsertEmote(emote))
-                                }
-                                .padding(6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (emote.url.isBlank()) {
-                                Text(emote.text, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            } else {
-                                BiliAsyncImage(
-                                    url = emote.url,
-                                    contentDescription = emote.text,
-                                    modifier = Modifier.size(if (emote.size > 1L) 36.dp else 30.dp),
-                                    variant = BiliImageVariant.Original,
-                                    contentScale = ContentScale.Fit
-                                )
-                            }
-                            if (!emote.available) {
-                                Icon(Icons.Outlined.Lock, "未解锁", modifier = Modifier.align(Alignment.BottomEnd).size(12.dp))
-                            }
-                        }
+                    items(emotes, key = { it.text }, contentType = { it.url.isBlank() }) { emote ->
+                        CommentEmoteCell(emote, enabled, onInsert)
                     }
                 }
             }
@@ -129,12 +125,12 @@ internal fun CommentEmotePanel(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 item(key = "recent") {
-                    EmotePackageTab(selected = isRecent, enabled = enabled, onClick = { onAction(CommentEditorAction.SelectPackage(-1L)) }) {
+                    EmotePackageTab(selected = isRecent, enabled = enabled, onClick = { onSelectPackage(-1L) }) {
                         Icon(Icons.Outlined.History, "最近使用", modifier = Modifier.size(24.dp))
                     }
                 }
                 items(state.packages, key = { it.id }) { pack ->
-                    EmotePackageTab(selected = pack.id == state.selectedPackageId, enabled = enabled, onClick = { onAction(CommentEditorAction.SelectPackage(pack.id)) }) {
+                    EmotePackageTab(selected = pack.id == state.selectedPackageId, enabled = enabled, onClick = { onSelectPackage(pack.id) }) {
                         if (pack.iconUrl.isBlank()) {
                             Text(pack.name, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         } else {
@@ -143,9 +139,37 @@ internal fun CommentEmotePanel(
                     }
                 }
             }
-            IconButton(onClick = { onAction(CommentEditorAction.DeleteText) }, enabled = enabled) {
+            IconButton(onClick = onDelete, enabled = enabled) {
                 Icon(Icons.AutoMirrored.Outlined.Backspace, "删除")
             }
+        }
+    }
+}
+
+@Composable
+private fun CommentEmoteCell(emote: CommentEmote, enabled: Boolean, onInsert: (CommentEmote) -> Unit) {
+    Box(
+        modifier = Modifier.height(48.dp)
+            .alpha(if (emote.available) 1f else 0.4f)
+            .clickable(enabled = enabled && emote.available, role = Role.Button) {
+                onInsert(emote)
+            }
+            .padding(6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (emote.url.isBlank()) {
+            Text(emote.text, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        } else {
+            BiliAsyncImage(
+                url = emote.url,
+                contentDescription = emote.text,
+                modifier = Modifier.size(if (emote.size > 1L) 36.dp else 30.dp),
+                variant = BiliImageVariant.Original,
+                contentScale = ContentScale.Fit
+            )
+        }
+        if (!emote.available) {
+            Icon(Icons.Outlined.Lock, "未解锁", modifier = Modifier.align(Alignment.BottomEnd).size(12.dp))
         }
     }
 }

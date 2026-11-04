@@ -96,9 +96,20 @@ class CommentEmoteRepository @Inject constructor(
     }
 
     fun recordRecent(emote: CommentEmote, packages: List<CommentEmotePackage>): List<CommentEmote> {
-        val items = (listOf(emote) + recent(packages)).distinctBy { it.text }.take(RECENT_LIMIT)
-        prefs.edit { putString("recent_${authProvider.mid}", JSONArray(items.map { it.text }).toString()) }
+        val items = updatedRecent(emote, recent(packages))
+        writeRecent(authProvider.mid, items)
         return items
+    }
+
+    fun updatedRecent(emote: CommentEmote, current: List<CommentEmote>): List<CommentEmote> =
+        (listOf(emote) + current).distinctBy { it.text }.take(RECENT_LIMIT)
+
+    suspend fun persistRecent(mid: Long, items: List<CommentEmote>) {
+        withContext(Dispatchers.IO) { writeRecent(mid, items) }
+    }
+
+    private fun writeRecent(mid: Long, items: List<CommentEmote>) {
+        prefs.edit { putString("recent_$mid", JSONArray(items.map { it.text }).toString()) }
     }
 
     private companion object {

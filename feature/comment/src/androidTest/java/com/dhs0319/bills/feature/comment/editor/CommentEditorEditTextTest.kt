@@ -60,6 +60,101 @@ class CommentEditorEditTextTest {
         }
     }
 
+    private fun imageCatalog(view: CommentEditorEditText) = listOf(
+        CommentEmote("[doge]", Uri.fromFile(File(view.context.cacheDir, "inline-emote-test.png")).toString())
+    )
+
+    @Test fun repeatedBindingsAndCursorChangesKeepTheExistingImageSpan() = onMain {
+        val view = editor("前[doge]后")
+        try {
+            val editable = view.text!!
+            val span = editable.getSpans(0, editable.length, EditorImageSpan::class.java).single()
+            val catalog = imageCatalog(view)
+            var changes = 0
+            repeat(100) { index ->
+                val cursor = if (index % 2 == 0) 0 else editable.length
+                view.bind(TextFieldValue(editable.toString(), TextRange(cursor)), catalog, emptyList(), 40, Color.BLUE) { changes++ }
+                assertSame(editable, view.text)
+                assertSame(span, editable.getSpans(0, editable.length, EditorImageSpan::class.java).single())
+                assertEquals(cursor, view.selectionStart)
+            }
+            assertEquals(0, changes)
+        } finally { view.releaseImages() }
+    }
+
+    @Test fun programmaticInsertionKeepsTheTextBufferAndUnaffectedImageSpan() = onMain {
+        val view = editor("[doge]")
+        try {
+            val editable = view.text!!
+            val span = editable.getSpans(0, editable.length, EditorImageSpan::class.java).single()
+            // Each update represents one insertion, first before the image and
+            // then after it; unrelated edits in one value need not reuse spans.
+            for (message in listOf("前[doge]", "前[doge]后")) {
+                view.bind(TextFieldValue(message, TextRange(message.length)), imageCatalog(view), emptyList(), 40, Color.BLUE) {}
+                assertSame(editable, view.text)
+                assertSame(span, editable.getSpans(0, editable.length, EditorImageSpan::class.java).single())
+                assertEquals(1, editable.getSpanStart(span))
+                assertEquals(7, editable.getSpanEnd(span))
+                assertEquals(message, editable.toString())
+                assertEquals(message.length, view.selectionStart)
+            }
+        } finally { view.releaseImages() }
+    }
+
+    @Test fun nativeTypingKeepsEarlierImagesAndReportsTheNewValueOnce() = onMain {
+        var changes = 0
+        var lastValue = TextFieldValue()
+        val view = editor("[doge]") { lastValue = it; changes++ }
+        try {
+            val editable = view.text!!
+            val span = editable.getSpans(0, editable.length, EditorImageSpan::class.java).single()
+            val connection = requireNotNull(view.onCreateInputConnection(EditorInfo()))
+            assertTrue(connection.commitText("后", 1))
+            assertSame(span, editable.getSpans(0, editable.length, EditorImageSpan::class.java).single())
+            assertEquals("[doge]后", lastValue.text)
+            assertEquals(TextRange(7), lastValue.selection)
+            assertEquals(1, changes)
+        } finally { view.releaseImages() }
+    }
+
+    @Test fun compositionChangesWithoutTextChangesStillUpdateImageSpans() = onMain {
+        val view = editor("[doge]")
+        try {
+            val connection = requireNotNull(view.onCreateInputConnection(EditorInfo()))
+            assertTrue(connection.setComposingRegion(0, 6))
+            assertTrue(view.text!!.getSpans(0, view.length(), EditorImageSpan::class.java).isEmpty())
+            assertTrue(connection.finishComposingText())
+            assertEquals(1, view.text!!.getSpans(0, view.length(), EditorImageSpan::class.java).size)
+            assertEquals("[doge]", view.text.toString())
+        } finally { view.releaseImages() }
+    }
+
+    @Test fun resizingImagesInvalidatesTheCachedSpanWithoutChangingTheMessage() = onMain {
+        val view = editor("[doge]")
+        try {
+            val previous = view.text!!.getSpans(0, view.length(), EditorImageSpan::class.java).single()
+            view.bind(TextFieldValue("[doge]", TextRange(6)), imageCatalog(view), emptyList(), 80, Color.BLUE) {}
+            val resized = view.text!!.getSpans(0, view.length(), EditorImageSpan::class.java).single()
+            assertNotSame(previous, resized)
+            assertEquals(80, resized.getSize(Paint(), "[doge]", 0, 6, null))
+            assertEquals("[doge]", view.text.toString())
+            assertEquals(6, view.selectionStart)
+        } finally { view.releaseImages() }
+    }
+
+    @Test fun editingInsideAnImageTokenRemovesOnlyTheInvalidImage() = onMain {
+        val view = editor("[doge][doge]")
+        try {
+            val editable = view.text!!
+            val remaining = editable.getSpans(0, editable.length, EditorImageSpan::class.java).last()
+            view.bind(TextFieldValue("[未知][doge]", TextRange(4)), imageCatalog(view), emptyList(), 40, Color.BLUE) {}
+            assertSame(remaining, editable.getSpans(0, editable.length, EditorImageSpan::class.java).single())
+            assertEquals(4, editable.getSpanStart(remaining))
+            assertEquals(10, editable.getSpanEnd(remaining))
+            assertEquals("[未知][doge]", editable.toString())
+        } finally { view.releaseImages() }
+    }
+
     @Test fun imageSpansPreserveTheMessageAndSnapSelectionToImageEdges() = onMain {
         val view = editor("前[doge][doge]后")
         try {

@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,10 +32,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -46,16 +51,12 @@ import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.designsystem.component.copyTextOnLongPress
-import com.dhs0319.bills.core.model.CommentEmote
-import com.dhs0319.bills.core.model.ImMessage
 import com.dhs0319.bills.core.model.ImMsgType
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoTargetTool
 import com.dhs0319.bills.feature.comment.component.CommentRichText
-import java.time.Instant
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
+import com.dhs0319.bills.feature.comment.component.CommentEmoteCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,27 +68,19 @@ fun ImConversationScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val rows = remember(state.messages) {
-        state.messages.toConversationRows(now = ZonedDateTime.now())
-    }
-    val shouldLoadMore by remember(
-        state.hasMoreHistory,
-        state.isLoadingMore,
-        rows.size,
-        listState
-    ) {
-        androidx.compose.runtime.derivedStateOf {
-            state.hasMoreHistory &&
-                rows.isNotEmpty() &&
-                !state.isLoadingMore &&
+    val rows = state.rows
+    val emoteCatalog = remember(state.emotes) { CommentEmoteCatalog(state.emotes) }
+
+    LaunchedEffect(listState, vm) {
+        snapshotFlow {
+            state.hasMoreHistory && state.rows.isNotEmpty() &&
+                !state.isLoading && !state.isRefreshing && !state.isLoadingMore &&
                 listState.isScrollInProgress &&
                 (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >=
                     listState.layoutInfo.totalItemsCount - 3
+        }.collect { shouldLoadMore ->
+            if (shouldLoadMore) vm.loadMore()
         }
-    }
-
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) vm.loadMore()
     }
 
     LaunchedEffect(state.lastSentMessageKey) {
@@ -97,6 +90,7 @@ fun ImConversationScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
                 title = { Text(state.title.ifBlank { "会话" }) },
@@ -111,17 +105,14 @@ fun ImConversationScreen(
             )
         },
         bottomBar = {
-            ImConversationComposer(
-                errorMessage = state.sendErrorMessage,
-                onClearError = vm::clearSendError,
-                onSend = { vm.sendMessage(it) }
-            )
+            ImConversationComposerRoute(vm)
         }
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
             when {
                 state.isLoading && rows.isEmpty() -> {
@@ -159,7 +150,7 @@ fun ImConversationScreen(
                                 is TimeDividerRow -> MessageTimeDivider(text = row.text)
                                 is MessageRow -> ImMessageBubble(
                                     item = row.item,
-                                    emotes = state.emotes,
+                                    emoteCatalog = emoteCatalog,
                                     avatar = state.avatar,
                                     selfAvatar = state.selfAvatar,
                                     title = state.title,
@@ -176,9 +167,24 @@ fun ImConversationScreen(
 }
 
 @Composable
+private fun ImConversationComposerRoute(vm: ImConversationViewModel) {
+    val state by vm.composerState.collectAsStateWithLifecycle()
+    ImConversationComposer(
+        state = state,
+        onInputChange = vm::updateInput,
+        onSelectImage = vm::selectImage,
+        onReloadEmotes = { vm.loadEmotes(force = true) },
+        onSelectEmotePackage = vm::selectEmotePackage,
+        onInsertEmote = vm::insertEmote,
+        onDeleteText = vm::deleteText,
+        onSend = vm::sendMessage
+    )
+}
+
+@Composable
 private fun ImMessageBubble(
     item: ConversationMessageItem,
-    emotes: List<CommentEmote>,
+    emoteCatalog: CommentEmoteCatalog,
     avatar: String?,
     selfAvatar: String?,
     title: String?,
@@ -209,7 +215,7 @@ private fun ImMessageBubble(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                MessageContent(item = item, emotes = emotes, onOpenVideo = onOpenVideo)
+                MessageContent(item = item, emoteCatalog = emoteCatalog, onOpenVideo = onOpenVideo)
                 SenderAvatar(
                     url = selfAvatar,
                     contentDescription = "我的头像",
@@ -226,7 +232,7 @@ private fun ImMessageBubble(
                     contentDescription = title ?: "头像",
                     onClick = onOpenSenderSpace
                 )
-                MessageContent(item = item, emotes = emotes, onOpenVideo = onOpenVideo)
+                MessageContent(item = item, emoteCatalog = emoteCatalog, onOpenVideo = onOpenVideo)
             }
         }
     }
@@ -260,7 +266,7 @@ private fun SenderAvatar(
 @Composable
 private fun MessageContent(
     item: ConversationMessageItem,
-    emotes: List<CommentEmote>,
+    emoteCatalog: CommentEmoteCatalog,
     onOpenVideo: ((VideoTarget) -> Unit)?
 ) {
     val message = item.message
@@ -444,7 +450,8 @@ private fun MessageContent(
                     ) {
                         CommentRichText(
                             text = item.displayText,
-                            emotes = emotes,
+                            emotes = emptyList(),
+                            emoteCatalog = emoteCatalog,
                             style = MaterialTheme.typography.bodyLarge.copy(color = bodyColor),
                             copyLabel = "消息"
                         )
@@ -515,99 +522,3 @@ private fun RecallFlag(
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
-
-@Immutable
-private sealed interface ConversationRow {
-    val key: Any
-    val contentType: String
-}
-
-@Immutable
-private data class MessageRow(val item: ConversationMessageItem) : ConversationRow {
-    override val key: Any get() = item.message.key
-    override val contentType: String get() = item.contentType
-}
-
-@Immutable
-private data class TimeDividerRow(val messageKey: Long, val text: String) : ConversationRow {
-    override val key: Any get() = "$CONTENT_TYPE_TIME$messageKey"
-    override val contentType: String get() = CONTENT_TYPE_TIME
-}
-
-@Immutable
-private data class ConversationMessageItem(
-    val message: ImMessage,
-    val displayText: String,
-    val timeText: String,
-    val imageRatio: Float,
-    val contentType: String
-)
-
-private fun List<ImMessage>.toConversationRows(now: ZonedDateTime): List<ConversationRow> {
-    val items = toConversationMessageItems(now)
-    val rows = ArrayList<ConversationRow>(items.size + 4)
-    items.forEachIndexed { index, item ->
-        rows += MessageRow(item)
-        val olderTimeText = items.getOrNull(index + 1)?.timeText
-        if (item.timeText.isNotEmpty() && item.timeText != olderTimeText) {
-            rows += TimeDividerRow(messageKey = item.message.key, text = item.timeText)
-        }
-    }
-    return rows
-}
-
-private fun List<ImMessage>.toConversationMessageItems(now: ZonedDateTime): List<ConversationMessageItem> {
-    return map { message ->
-        ConversationMessageItem(
-            message = message,
-            displayText = message.displayText(),
-            timeText = formatMessageTime(message.timestampSec, now),
-            imageRatio = message.imageRatio(),
-            contentType = when {
-                message.msgType == ImMsgType.SYSTEM_NOTICE -> CONTENT_TYPE_SYSTEM_NOTICE
-                message.msgType == ImMsgType.NOTICE -> CONTENT_TYPE_NOTICE
-                !message.shareCoverUrl.isNullOrBlank() -> CONTENT_TYPE_SHARE
-                !message.imageUrl.isNullOrBlank() -> CONTENT_TYPE_IMAGE
-                else -> CONTENT_TYPE_TEXT
-            }
-        )
-    }
-}
-
-private fun ImMessage.displayText(): String {
-    content.takeIf(String::isNotBlank)?.let { return it }
-    return when (msgType) {
-        ImMsgType.IMAGE -> "[图片]"
-        in ImMsgType.SHARE_TYPES -> "[分享]"
-        else -> "[暂不支持的消息类型 $msgType]"
-    }
-}
-
-private fun ImMessage.imageRatio(): Float {
-    if (imageWidth <= 0 || imageHeight <= 0) return 1f
-    return (imageWidth.toFloat() / imageHeight).coerceIn(0.45f, 1.8f)
-}
-
-private fun formatMessageTime(timestampSec: Long, now: ZonedDateTime): String {
-    if (timestampSec <= 0L) return ""
-    val time = Instant.ofEpochSecond(timestampSec).atZone(now.zone)
-    val date = time.toLocalDate()
-    return when {
-        date == now.toLocalDate() -> time.format(TIME_FORMAT_HM)
-        date == now.toLocalDate().minusDays(1L) -> "昨天 ${time.format(TIME_FORMAT_HM)}"
-        date.year == now.year -> time.format(TIME_FORMAT_MD_HM)
-        else -> time.format(TIME_FORMAT_YMD_HM)
-    }
-}
-
-private val TIME_FORMAT_HM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val TIME_FORMAT_MD_HM: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 HH:mm")
-private val TIME_FORMAT_YMD_HM: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm")
-
-private const val CONTENT_TYPE_SYSTEM_NOTICE = "system_notice"
-private const val CONTENT_TYPE_NOTICE = "notice"
-private const val CONTENT_TYPE_SHARE = "share"
-private const val CONTENT_TYPE_TEXT = "text"
-private const val CONTENT_TYPE_IMAGE = "image"
-private const val CONTENT_TYPE_TIME = "time"
-

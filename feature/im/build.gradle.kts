@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":feature:comment"))
     implementation(project(":core:auth"))
     implementation(project(":core:im"))
+    implementation(project(":core:comment"))
     implementation(project(":core:space"))
     implementation(project(":core:model"))
     implementation(project(":core:common"))
@@ -48,5 +49,6 @@ dependencies {
     implementation(libs.navigation.compose)
 
     implementation(libs.coil.compose)
+    implementation(libs.androidx.activity.compose)
     testImplementation(libs.junit)
 }

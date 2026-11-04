@@ -28,4 +28,32 @@ class CommentRichTextTest {
         assertEquals(text, parsed.text.text)
         assertTrue(parsed.emotes.isEmpty())
     }
+
+    @Test fun `one catalog parses multiple messages without carrying over inline entries`() {
+        val doge = CommentEmote("[doge]", "https://example.com/doge.png")
+        val smile = CommentEmote("[微笑]", "https://example.com/smile.png")
+        val catalog = CommentEmoteCatalog(listOf(doge, smile, CommentEmote("[文字]", "")))
+        val first = parseCommentText("[doge][doge] [未知]", catalog)
+        val second = parseCommentText("[微笑] [文字]", catalog)
+        val plain = parseCommentText("普通消息 @小明", catalog)
+
+        assertEquals("[doge][doge] [未知]", first.text.text)
+        assertEquals(listOf(doge), first.emotes.map { it.emote })
+        assertEquals("[微笑] [文字]", second.text.text)
+        assertEquals(listOf(smile), second.emotes.map { it.emote })
+        assertEquals("普通消息 @小明", plain.text.text)
+        assertTrue(plain.emotes.isEmpty())
+        assertTrue(plain.text.getStringAnnotations("comment_mention", 0, plain.text.length).isEmpty())
+    }
+
+    @Test fun `shared catalog keeps mention positions after repeated emotes`() {
+        val catalog = CommentEmoteCatalog(listOf(CommentEmote("[doge]", "https://example.com/a.png")))
+        val text = "[doge] [doge] @小明"
+        val parsed = parseCommentText(text, catalog, listOf(CommentUser(42, "小明")))
+
+        val mention = parsed.text.getStringAnnotations("comment_mention", 0, text.length).single()
+        assertEquals(text.indexOf('@'), mention.start)
+        assertEquals(text.length, mention.end)
+        assertEquals("42", mention.item)
+    }
 }

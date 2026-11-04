@@ -46,6 +46,11 @@ internal data class ParsedCommentEmote(
     val emote: CommentEmote
 )
 
+/** Build once for a conversation and share the lookup across its message bubbles. */
+class CommentEmoteCatalog(emotes: List<CommentEmote>) {
+    internal val byToken: Map<String, CommentEmote> = emotes.filter { it.url.isNotBlank() }.associateBy(CommentEmote::text)
+}
+
 @Composable
 @Suppress("DEPRECATION")
 fun CommentRichText(
@@ -58,11 +63,13 @@ fun CommentRichText(
     copyLabel: String = "评论",
     onTap: (() -> Unit)? = null,
     mentions: List<CommentUser> = emptyList(),
-    onOpenUser: ((CommentUser) -> Unit)? = null
+    onOpenUser: ((CommentUser) -> Unit)? = null,
+    emoteCatalog: CommentEmoteCatalog? = null
 ) {
     val mentionColor = MaterialTheme.colorScheme.primary
-    val parsed = remember(text, emotes, mentions, mentionColor) {
-        parseCommentText(text, emotes, mentions, mentionColor)
+    val catalog = emoteCatalog ?: remember(emotes) { CommentEmoteCatalog(emotes) }
+    val parsed = remember(text, catalog, mentions, mentionColor) {
+        parseCommentText(text, catalog, mentions, mentionColor)
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val clipboard = LocalClipboardManager.current
@@ -122,8 +129,18 @@ internal fun parseCommentText(
     emotes: List<CommentEmote>,
     mentions: List<CommentUser> = emptyList(),
     mentionColor: Color = Color.Unspecified
+): ParsedCommentText = parseCommentText(text, CommentEmoteCatalog(emotes), mentions, mentionColor)
+
+internal fun parseCommentText(
+    text: String,
+    catalog: CommentEmoteCatalog,
+    mentions: List<CommentUser> = emptyList(),
+    mentionColor: Color = Color.Unspecified
 ): ParsedCommentText {
-    val emoteMap = emotes.filter { it.url.isNotBlank() }.associateBy(CommentEmote::text)
+    val emoteMap = catalog.byToken
+    if ((emoteMap.isEmpty() || '[' !in text) && mentions.isEmpty()) {
+        return ParsedCommentText(AnnotatedString(text), emptyList())
+    }
     val builder = AnnotatedString.Builder()
     val parsedEmotes = mutableListOf<ParsedCommentEmote>()
     val seenEmoteIds = mutableSetOf<String>()
@@ -144,7 +161,7 @@ internal fun parseCommentText(
         builder.append(text.substring(lastIndex))
     }
     val users = mentions.filter { it.mid > 0L && it.name.isNotBlank() }.sortedByDescending { it.name.length }
-    var mentionIndex = text.indexOf('@')
+    var mentionIndex = if (users.isEmpty()) -1 else text.indexOf('@')
     while (mentionIndex >= 0) {
         val start = mentionIndex
         val user = users.firstOrNull { user ->
