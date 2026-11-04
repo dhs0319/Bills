@@ -1,6 +1,5 @@
 ## 高质量自用AI中转站
-- [吉吉 API](https://www.jiji.cc/register?aff=N648HZ6QQ5KX)
-- [LiBwrt API](https://api.zipimg.cn/register?aff=EHA435WA4J6H)
+[吉吉 API](https://www.jiji.cc/register?aff=N648HZ6QQ5KX) · [LiBwrt API](https://api.zipimg.cn/register?aff=EHA435WA4J6H)
 
 <h2 align="center">Bills</h2>
 
