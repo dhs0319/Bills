@@ -9,10 +9,13 @@ import com.dhs0319.bills.core.history.WatchLaterRepository
 import com.dhs0319.bills.core.model.DynamicCursor
 import com.dhs0319.bills.core.model.DynamicItem
 import com.dhs0319.bills.core.model.DynamicRefresh
+import com.dhs0319.bills.core.model.DynamicUpItem
+import com.dhs0319.bills.core.model.DynamicUpList
 import com.dhs0319.bills.core.space.SpaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +41,10 @@ class DynamicViewModel @Inject constructor(
     val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
     private val addingToWatchLater = mutableSetOf<Long>()
     private val unfollowingMids = mutableSetOf<Long>()
+    private val visitedUpMids = mutableSetOf<Long>()
+    private val pendingUpVisits = mutableMapOf<Long, PendingUpVisit>()
+    private var upListRefreshJob: Job? = null
+    private var upListRequestId = 0L
     private var authVersion = 0L
 
     init {
@@ -45,22 +52,86 @@ class DynamicViewModel @Inject constructor(
             authRepo.currentMidFlow.collect { mid ->
                 authVersion += 1L
                 _actionMessage.value = null
-                if (mid > 0) {
-                    _uiState.update {
-                        it.copy(
-                            currentMid = mid,
-                            isLoggedIn = true,
-                            errorMessage = null,
-                            loadMoreError = null
-                        )
-                    }
-                    if (_uiState.value.items.isNotEmpty()) return@collect
-                    refresh()
-                } else {
-                    _uiState.value = DynamicUiState(isLoggedIn = false)
-                }
+                upListRefreshJob?.cancel()
+                pendingUpVisits.values.forEach { it.job?.cancel() }
+                pendingUpVisits.clear()
+                visitedUpMids.clear()
+                _uiState.value = DynamicUiState(currentMid = mid, isLoggedIn = mid > 0L)
+                if (mid > 0L) refresh()
             }
         }
+    }
+
+    fun visitUp(mid: Long) {
+        val state = _uiState.value
+        if (!state.isLoggedIn) return
+        val upList = state.upList ?: return
+        val item = upList.items.firstOrNull { it.uid == mid && it.hasUpdate } ?: return
+        upListRequestId++
+        visitedUpMids.add(mid)
+        _uiState.update {
+            it.copy(upList = it.upList?.copy(items = it.upList.items.map { up ->
+                if (up.uid == mid) up.copy(hasUpdate = false) else up
+            }))
+        }
+        val visit = PendingUpVisit(item, upList.footprint)
+        pendingUpVisits[mid] = visit
+        syncUpVisit(visit, authVersion)
+    }
+
+    fun refreshVisitedUps() {
+        if (!_uiState.value.isLoggedIn ||
+            (visitedUpMids.isEmpty() && pendingUpVisits.isEmpty()) ||
+            upListRefreshJob?.isActive == true
+        ) return
+        val version = authVersion
+        val visits = pendingUpVisits.values.toList()
+        upListRefreshJob = viewModelScope.launch {
+            try {
+                visits.forEach { visit ->
+                    visit.job?.join()
+                    if (version != authVersion) return@launch
+                    if (pendingUpVisits[visit.item.uid] === visit) {
+                        syncUpVisit(visit, version).join()
+                    }
+                }
+                val requestId = ++upListRequestId
+                val upList = repo.fetchUpList() ?: return@launch
+                if (version != authVersion || requestId != upListRequestId) return@launch
+                val updated = upList.withVisitedBadges()
+                _uiState.update { it.copy(upList = updated) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "刷新最近访问角标失败" }
+            }
+        }
+    }
+
+    private fun syncUpVisit(visit: PendingUpVisit, version: Long): Job {
+        val job = viewModelScope.launch {
+            try {
+                repo.markUpVisited(visit.item, visit.footprint)
+                if (version == authVersion && pendingUpVisits[visit.item.uid] === visit) {
+                    pendingUpVisits.remove(visit.item.uid)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "同步最近访问已读状态失败" }
+            }
+        }
+        visit.job = job
+        return job
+    }
+
+    private fun DynamicUpList.withVisitedBadges(): DynamicUpList {
+        // Keep the local dismissal until the server confirms the previous update is read.
+        items.filter { !it.hasUpdate && it.uid !in pendingUpVisits }
+            .forEach { visitedUpMids.remove(it.uid) }
+        return copy(items = items.map { item ->
+            if (item.uid in visitedUpMids) item.copy(hasUpdate = false) else item
+        })
     }
 
     fun refresh() {
@@ -151,15 +222,22 @@ class DynamicViewModel @Inject constructor(
     ) {
         val state = _uiState.value
         val version = authVersion
+        val requestId = ++upListRequestId
         try {
             val page = repo.fetchAll(
                 cursor = if (reset) DEFAULT_CURSOR else state.cursor,
                 refresh = refresh
             )
+            if (version != authVersion) return
+            val upList = if (requestId == upListRequestId) {
+                page.upList?.withVisitedBadges()
+            } else {
+                null
+            }
             _uiState.update {
                 if (version != authVersion || !it.isLoggedIn) return@update it
                 it.copy(
-                    upList = page.upList ?: it.upList,
+                    upList = upList ?: it.upList,
                     items = if (reset) page.items else it.items.mergePage(page.items),
                     cursor = page.cursor,
                     isLoading = false,
@@ -170,6 +248,8 @@ class DynamicViewModel @Inject constructor(
                     loadMoreError = null
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (version != authVersion) return
             Logger.e(TAG, e) { "加载动态失败" }
@@ -210,6 +290,12 @@ class DynamicViewModel @Inject constructor(
             }
         }
     }
+
+    private class PendingUpVisit(
+        val item: DynamicUpItem,
+        val footprint: String,
+        var job: Job? = null
+    )
 
     private companion object {
         const val TAG = "DynamicViewModel"

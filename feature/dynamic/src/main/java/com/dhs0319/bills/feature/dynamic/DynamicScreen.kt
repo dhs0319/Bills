@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
@@ -43,6 +45,9 @@ fun DynamicScreen(
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val listState = rememberLazyListState()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshVisitedUps()
+    }
     val shouldLoadMore by remember(
         state.items.size,
         state.canLoadMore,
@@ -139,6 +144,7 @@ fun DynamicScreen(
                         onRetryLoadMore = viewModel::loadMore,
                         onOpenVideo = onOpenVideo,
                         onOpenSpace = onOpenSpace,
+                        onVisitUp = viewModel::visitUp,
                         onOpenLive = onOpenLive,
                         onOpenDynamic = onOpenDynamic,
                         onAddToWatchLater = viewModel::addToWatchLater,

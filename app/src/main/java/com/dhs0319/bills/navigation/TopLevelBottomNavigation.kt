@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -24,12 +23,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.model.ImUnreadBadge
 
 @Composable
 internal fun TopLevelBottomNavigation(
     currentTab: TopLevelRoute,
     hidden: Boolean,
     onTabChange: (TopLevelRoute) -> Unit,
+    messageUnreadBadge: ImUnreadBadge,
     modifier: Modifier = Modifier,
     onHeightChanged: (Dp) -> Unit = {}
 ) {
@@ -60,8 +61,10 @@ internal fun TopLevelBottomNavigation(
                 selected = selected,
                 onClick = { onTabChange(tab) },
                 icon = {
-                    Icon(
-                        imageVector = if (selected) tab.selectedIcon else tab.icon,
+                    TopLevelNavigationIcon(
+                        tab = tab,
+                        selected = selected,
+                        messageUnreadBadge = messageUnreadBadge,
                         contentDescription = null
                     )
                 },

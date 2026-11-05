@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +68,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
@@ -81,6 +81,7 @@ import com.dhs0319.bills.core.designsystem.theme.buildNavTransitions
 import com.dhs0319.bills.core.model.FavoriteContentTarget
 import com.dhs0319.bills.core.model.HistoryTarget
 import com.dhs0319.bills.core.model.ImSessionItem
+import com.dhs0319.bills.core.model.ImUnreadBadge
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.StreamPlaybackTarget
@@ -470,7 +471,11 @@ private fun MainTabsScaffold(
     var homeRefreshRequest by remember { mutableIntStateOf(0) }
     var dynamicRefreshRequest by remember { mutableIntStateOf(0) }
     var messageRefreshRequest by remember { mutableIntStateOf(0) }
+    val messageUnreadViewModel: MessageUnreadViewModel = hiltViewModel()
     val selectTab: (TopLevelRoute) -> Unit = { tab ->
+        if (tab == TopLevelRoute.MESSAGE) {
+            messageUnreadViewModel.dismissBadge()
+        }
         if (tab != currentTab) {
             when (currentTab) {
                 TopLevelRoute.HOME -> homeRefreshRequest = 0
@@ -490,6 +495,11 @@ private fun MainTabsScaffold(
     }
     val userViewModel: UserViewModel = hiltViewModel()
     val userState by userViewModel.uiState.collectAsStateWithLifecycle()
+    val messageUnreadBadge by messageUnreadViewModel.badge.collectAsStateWithLifecycle()
+    LifecycleStartEffect(messageUnreadViewModel) {
+        messageUnreadViewModel.setActive(true)
+        onStopOrDispose { messageUnreadViewModel.setActive(false) }
+    }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val density = LocalDensity.current
@@ -577,6 +587,7 @@ private fun MainTabsScaffold(
         ) {
             TopLevelSideNavigation(
                 currentTab = currentTab,
+                messageUnreadBadge = messageUnreadBadge,
                 profileAvatar = userState.user?.avatar,
                 onTabChange = selectTab,
                 onNavigateToSearch = onNavigateToSearch
@@ -615,6 +626,7 @@ private fun MainTabsScaffold(
                 TopLevelBottomNavigation(
                     modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f),
                     currentTab = currentTab,
+                    messageUnreadBadge = messageUnreadBadge,
                     hidden = navVisibilityController.hidden,
                     onTabChange = selectTab,
                     onHeightChanged = { topLevelNavSpace = it }
@@ -631,6 +643,7 @@ private fun MainTabsScaffold(
                         )
                         .zIndex(1f),
                     currentTab = currentTab,
+                    messageUnreadBadge = messageUnreadBadge,
                     visibilityController = navVisibilityController,
                     startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
                     onTabChange = selectTab,
@@ -645,6 +658,7 @@ private fun MainTabsScaffold(
 @Composable
 private fun TopLevelSideNavigation(
     currentTab: TopLevelRoute,
+    messageUnreadBadge: ImUnreadBadge,
     profileAvatar: String?,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit
@@ -690,6 +704,7 @@ private fun TopLevelSideNavigation(
                 TopLevelSideNavigationItem(
                     tab = tab,
                     selected = currentTab == tab,
+                    messageUnreadBadge = messageUnreadBadge,
                     onClick = { onTabChange(tab) }
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -703,6 +718,7 @@ private fun TopLevelSideNavigation(
 private fun TopLevelSideNavigationItem(
     tab: TopLevelRoute,
     selected: Boolean,
+    messageUnreadBadge: ImUnreadBadge,
     onClick: () -> Unit
 ) {
     Surface(
@@ -728,10 +744,11 @@ private fun TopLevelSideNavigationItem(
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (selected) tab.selectedIcon else tab.icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
+            TopLevelNavigationIcon(
+                tab = tab,
+                selected = selected,
+                messageUnreadBadge = messageUnreadBadge,
+                contentDescription = null
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -748,6 +765,7 @@ private fun TopLevelSideNavigationItem(
 private fun TopLevelFloatingNavigation(
     modifier: Modifier = Modifier,
     currentTab: TopLevelRoute,
+    messageUnreadBadge: ImUnreadBadge,
     visibilityController: TopLevelNavVisibilityController,
     startPadding: Dp,
     onTabChange: (TopLevelRoute) -> Unit,
@@ -777,6 +795,7 @@ private fun TopLevelFloatingNavigation(
             TopLevelFloatingNavigationItem(
                 tab = tab,
                 selected = currentTab == tab,
+                messageUnreadBadge = messageUnreadBadge,
                 onClick = { onTabChange(tab) }
             )
         }
@@ -816,24 +835,16 @@ private fun TopLevelFloatingNavigation(
 private fun TopLevelFloatingNavigationItem(
     tab: TopLevelRoute,
     selected: Boolean,
+    messageUnreadBadge: ImUnreadBadge,
     onClick: () -> Unit
 ) {
-    if (selected) {
-        FilledIconButton(onClick = onClick) {
-            Icon(
-                imageVector = tab.selectedIcon,
-                contentDescription = tab.label
-            )
-        }
-    } else {
-        IconButton(onClick = onClick) {
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = tab.label,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    TopLevelNavigationIcon(
+        tab = tab,
+        selected = selected,
+        messageUnreadBadge = messageUnreadBadge,
+        tint = if (selected) null else MaterialTheme.colorScheme.onSurfaceVariant,
+        onClick = onClick
+    )
 }
 
 @Stable

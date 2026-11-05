@@ -2,6 +2,8 @@ package com.dhs0319.bills.core.dynamic
 
 import com.bapis.bilibili.app.dynamic.v2.AdParam
 import com.bapis.bilibili.app.dynamic.v2.Config
+import com.bapis.bilibili.app.dynamic.v2.DynAllPersonalReply
+import com.bapis.bilibili.app.dynamic.v2.DynAllPersonalReq
 import com.bapis.bilibili.app.dynamic.v2.DynAllReply
 import com.bapis.bilibili.app.dynamic.v2.DynAllReq
 import com.bapis.bilibili.app.dynamic.v2.DynSpaceReq
@@ -69,6 +71,33 @@ class DynamicRepository @Inject constructor(
         return withContext(Dispatchers.Default) {
             mapReply(reply, cursor)
         }
+    }
+
+    suspend fun fetchUpList(): DynamicUpList? {
+        val reply = grpcClient.call(
+            endpoint = ENDPOINT,
+            requestBytes = buildRequest(DynamicCursor(), DynamicRefresh.NEW).toByteArray(),
+            parser = DynAllReply.parser()
+        )
+        return withContext(Dispatchers.Default) { mapUpList(reply) }
+    }
+
+    suspend fun markUpVisited(item: DynamicUpItem, footprint: String) {
+        require(item.uid > 0L)
+        // A non-preloaded personal feed request also updates this UP's read progress.
+        val request = DynAllPersonalReq.newBuilder()
+            .setHostUid(item.uid)
+            .setPage(1)
+            .setIsPreload(0)
+            .setLocalTime(localTime())
+            .setFootprint(footprint)
+            .setPersonalExtra(item.personalExtra)
+            .build()
+        grpcClient.call(
+            endpoint = PERSONAL_ENDPOINT,
+            requestBytes = request.toByteArray(),
+            parser = DynAllPersonalReply.parser()
+        )
     }
 
     // TODO: 考虑后续将动态详情接口从 OpusDetailReq 迁移到 DynDetailReq ???
@@ -257,13 +286,15 @@ class DynamicRepository @Inject constructor(
                 name = name,
                 face = item.face.blankToNull().httpsImageUrlOrNull(),
                 hasUpdate = item.hasUpdate,
-                trackId = item.trackId.blankToNull()
+                trackId = item.trackId.blankToNull(),
+                personalExtra = item.personalExtra
             )
         }
         if (items.isEmpty()) return null
         return DynamicUpList(
             title = upList.title.blankToNull(),
-            items = items
+            items = items,
+            footprint = upList.footprint
         )
     }
 
@@ -824,6 +855,7 @@ class DynamicRepository @Inject constructor(
 
     private companion object {
         const val ENDPOINT = "bilibili.app.dynamic.v2.Dynamic/DynAll"
+        const val PERSONAL_ENDPOINT = "bilibili.app.dynamic.v2.Dynamic/DynAllPersonal"
         const val OPUS_DETAIL_ENDPOINT = "bilibili.app.dynamic.v2.Opus/OpusDetail"
         const val SPACE_ENDPOINT = "bilibili.app.dynamic.v2.Dynamic/DynSpace"
         const val DEFAULT_QN = 80L

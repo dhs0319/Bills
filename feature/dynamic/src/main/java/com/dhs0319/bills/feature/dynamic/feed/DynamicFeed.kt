@@ -69,6 +69,7 @@ fun DynamicFeed(
     onRetryLoadMore: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    onVisitUp: (Long) -> Unit,
     onOpenLive: (LiveRoute) -> Unit,
     onOpenDynamic: (String) -> Unit,
     onAddToWatchLater: (Long) -> Unit,
@@ -92,7 +93,9 @@ fun DynamicFeed(
                     key = { it.uid },
                     name = { it.name },
                     face = { it.face },
+                    hasUpdate = { it.hasUpdate },
                     onClick = { item ->
+                        onVisitUp(item.uid)
                         onOpenSpace(SpaceRoute(mid = item.uid, name = item.name))
                     }
                 )
