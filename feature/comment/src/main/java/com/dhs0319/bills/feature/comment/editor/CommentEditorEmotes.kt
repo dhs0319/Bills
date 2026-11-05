@@ -9,6 +9,11 @@ private val EDITOR_EMOTE_REGEX = Regex("\\[[^]\\r\\n]+]")
 
 internal fun findEditorEmotes(text: String, catalog: List<CommentEmote>): List<CommentEditorEmote> {
     val byToken = catalog.filter { it.url.isNotBlank() }.associateBy { it.text }
+    return findEditorEmotes(text, byToken)
+}
+
+internal fun findEditorEmotes(text: String, byToken: Map<String, CommentEmote>): List<CommentEditorEmote> {
+    if (byToken.isEmpty() || '[' !in text) return emptyList()
     return EDITOR_EMOTE_REGEX.findAll(text).mapNotNull { match ->
         byToken[match.value]?.let { CommentEditorEmote(TextRange(match.range.first, match.range.last + 1), it) }
     }.toList()

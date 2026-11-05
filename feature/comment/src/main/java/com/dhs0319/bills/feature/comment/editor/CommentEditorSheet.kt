@@ -7,7 +7,6 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.BackHandler
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -15,12 +14,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,7 +32,6 @@ import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.SentimentSatisfied
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Button
@@ -44,9 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -89,7 +84,6 @@ internal fun CommentEditorFab(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CommentEditorSheet(
     state: CommentEditorState,
@@ -101,8 +95,9 @@ internal fun CommentEditorSheet(
     onAction: (CommentEditorAction) -> Unit
 ) {
     if (!state.visible) return
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val busy = state.loading || state.uploading
+    val emotesState = state.emotes
+    val emotesEnabled = !busy && state.panel == CommentEditorPanel.Emotes
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(maxItems = COMMENT_EDITOR_MAX_IMAGE_COUNT)
     ) { uris ->
@@ -111,18 +106,20 @@ internal fun CommentEditorSheet(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = {
-            if (!busy) {
-                onDismiss()
-            }
-        },
-        sheetState = sheetState,
-        contentWindowInsets = { WindowInsets.navigationBars }
-    ) {
-        BackHandler(enabled = state.panel != CommentEditorPanel.Keyboard) {
-            onAction(CommentEditorAction.ShowKeyboard)
+    CommentEditorDialog(
+        panel = state.panel,
+        busy = busy,
+        onDismiss = onDismiss,
+        onAction = onAction,
+        emotes = { modifier ->
+            CommentEmotePanel(
+                emotesState,
+                enabled = emotesEnabled,
+                onAction = onAction,
+                modifier = modifier
+            )
         }
+    ) { onEditorAction ->
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -132,7 +129,7 @@ internal fun CommentEditorSheet(
             CommentEditorTextField(
                 state = state,
                 onValueChange = onValueChange,
-                onShowKeyboard = { onAction(CommentEditorAction.ShowKeyboard) },
+                onShowKeyboard = { onEditorAction(CommentEditorAction.ShowKeyboard) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
             )
             if (state.selectedImageUris.isNotEmpty()) {
@@ -181,7 +178,7 @@ internal fun CommentEditorSheet(
             ) {
                 val showEmotes = state.panel == CommentEditorPanel.Emotes
                 IconButton(
-                    onClick = { onAction(CommentEditorAction.ToggleEmotes) },
+                    onClick = { onEditorAction(CommentEditorAction.ToggleEmotes) },
                     enabled = !busy,
                     colors = IconButtonDefaults.iconButtonColors(
                         containerColor = if (showEmotes) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
@@ -198,7 +195,7 @@ internal fun CommentEditorSheet(
                 ) {
                     Icon(Icons.Outlined.Image, "添加图片")
                 }
-                IconButton(onClick = { onAction(CommentEditorAction.OpenMentions) }, enabled = !busy) {
+                IconButton(onClick = { onEditorAction(CommentEditorAction.OpenMentions) }, enabled = !busy) {
                     Icon(Icons.Outlined.AlternateEmail, "提及用户")
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -206,6 +203,7 @@ internal fun CommentEditorSheet(
                     onClick = onSubmit,
                     enabled = !busy && state.input.text.isNotBlank(),
                     modifier = Modifier.padding(end = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                     shape = MaterialTheme.shapes.extraLarge,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -222,9 +220,7 @@ internal fun CommentEditorSheet(
                 }
             }
             if (state.panel == CommentEditorPanel.Mentions) {
-                CommentMentionPanel(state.mentionPicker, onAction)
-            } else if (state.panel == CommentEditorPanel.Emotes) {
-                CommentEmotePanel(state.emotes, enabled = !busy, onAction = onAction)
+                CommentMentionPanel(state.mentionPicker, onEditorAction)
             }
         }
     }

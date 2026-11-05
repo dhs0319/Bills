@@ -25,6 +25,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
@@ -51,32 +52,38 @@ internal fun CommentEditorTextField(
     val colors = MaterialTheme.colorScheme
     val style = MaterialTheme.typography.bodyLarge
     val density = LocalDensity.current
-    val textSize = with(density) { style.fontSize.toPx() }
-    val lineHeight = with(density) { style.lineHeight.toPx() }
-    val padding = with(density) { 16.dp.roundToPx() }
+    val appearance = remember(colors, style, density) {
+        CommentEditorAppearance(
+            textColor = colors.onSurface.toArgb(),
+            hintColor = colors.onSurfaceVariant.copy(alpha = 0.6f).toArgb(),
+            highlightColor = colors.primary.copy(alpha = 0.3f).toArgb(),
+            cursorColor = colors.primary.toArgb(),
+            textSize = with(density) { style.fontSize.toPx() },
+            lineHeight = with(density) { style.lineHeight.toPx() },
+            padding = with(density) { 16.dp.roundToPx() }
+        )
+    }
+    val catalog = remember(state.emotes.packages, state.emotes.recent) {
+        state.emotes.packages.flatMap { it.emotes } + state.emotes.recent
+    }
+    val hint = remember(state.target) {
+        state.target.parentName?.takeIf(String::isNotBlank)?.let { "回复 @$it" }
+            ?: if (state.target.isReply) "输入回复内容" else "发一条友善的评论"
+    }
     AndroidView(
         factory = { CommentEditorEditText(it) },
         modifier = modifier,
         onRelease = { it.releaseImages() },
         update = { view ->
-            view.setTextColor(colors.onSurface.toArgb())
-            view.setHintTextColor(colors.onSurfaceVariant.toArgb())
-            view.highlightColor = colors.primary.copy(alpha = 0.3f).toArgb()
-            if (view.textSize != textSize) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize)
-            view.setLineSpacing((lineHeight - view.paint.fontSpacing).coerceAtLeast(0f), 1f)
-            view.setPadding(padding, padding, padding, padding)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                view.textCursorDrawable?.setTint(colors.primary.toArgb())
-            }
-            view.hint = state.target.parentName?.takeIf(String::isNotBlank)?.let { "回复 @$it" }
-                ?: if (state.target.isReply) "输入回复内容" else "发一条友善的评论"
+            view.applyAppearance(appearance)
+            if (view.hint != hint) view.hint = hint
             view.isEnabled = !state.loading && !state.uploading
             view.onShowKeyboard = onShowKeyboard
             view.bind(
                 value = state.input,
-                catalog = state.emotes.packages.flatMap { it.emotes } + state.emotes.recent,
+                catalog = catalog,
                 mentions = state.mentions,
-                emoteSize = lineHeight.toInt(),
+                emoteSize = appearance.lineHeight.toInt(),
                 mentionColor = colors.primary.toArgb(),
                 onChange = onValueChange
             )
@@ -86,6 +93,16 @@ internal fun CommentEditorTextField(
         }
     )
 }
+
+internal data class CommentEditorAppearance(
+    val textColor: Int,
+    val hintColor: Int,
+    val highlightColor: Int,
+    val cursorColor: Int,
+    val textSize: Float,
+    val lineHeight: Float,
+    val padding: Int
+)
 
 /** ImageSpan preserves the raw tokens for IME, clipboard and publication without an offset map. */
 internal class CommentEditorEditText(
@@ -100,12 +117,18 @@ internal class CommentEditorEditText(
     private var released = false
     private var keyboardRequested: Boolean? = null
     private var catalog: List<CommentEmote> = emptyList()
+    private var emotesByToken: Map<String, CommentEmote> = emptyMap()
     private var mentions: List<CommentEditorMention> = emptyList()
     private var emotes: List<CommentEditorEmote> = emptyList()
     private var emoteSize = 1
     private var mentionColor = 0
+    private var appearance: CommentEditorAppearance? = null
+    private var spansDirty = true
+    private var renderedComposingStart = -1
+    private var renderedComposingEnd = -1
     private var lastValue = TextFieldValue()
     private val images = mutableMapOf<String, EmoteImage>()
+    private val imageDrawables = mutableSetOf<Drawable>()
     private var imageRedrawPosted = false
     private val imageRedrawMarker = object : UpdateAppearance {}
     private val redrawImages = Runnable {
@@ -138,9 +161,22 @@ internal class CommentEditorEditText(
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
                 changingText = false
+                spansDirty = true
                 if (!updating && imeEditDepth == 0) refreshAndNotify()
             }
         })
+    }
+
+    fun applyAppearance(value: CommentEditorAppearance) {
+        if (appearance == value) return
+        appearance = value
+        setTextColor(value.textColor)
+        setHintTextColor(value.hintColor)
+        highlightColor = value.highlightColor
+        if (textSize != value.textSize) setTextSize(TypedValue.COMPLEX_UNIT_PX, value.textSize)
+        setLineSpacing((value.lineHeight - paint.fontSpacing).coerceAtLeast(0f), 1f)
+        setPadding(value.padding, value.padding, value.padding, value.padding)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) textCursorDrawable?.setTint(value.cursorColor)
     }
 
     fun bind(
@@ -152,13 +188,20 @@ internal class CommentEditorEditText(
         onChange: (TextFieldValue) -> Unit
     ) {
         this.onChange = onChange
+        if (this.catalog !== catalog && this.catalog != catalog) {
+            emotesByToken = catalog.filter { it.url.isNotBlank() }.associateBy { it.text }
+            spansDirty = true
+        }
+        if (this.mentions != mentions || this.emoteSize != emoteSize.coerceAtLeast(1) || this.mentionColor != mentionColor) {
+            spansDirty = true
+        }
         this.catalog = catalog
         this.mentions = mentions
         this.emoteSize = emoteSize.coerceAtLeast(1)
         this.mentionColor = mentionColor
         updating = true
         try {
-            if (text.toString() != value.text) setText(value.text)
+            replaceChangedText(value.text)
             renderSpans()
             val selection = snapEditorTokenSelection(value.selection, atomicRanges())
             if (selectionStart != selection.start || selectionEnd != selection.end) setSelection(selection.start, selection.end)
@@ -167,6 +210,25 @@ internal class CommentEditorEditText(
             updating = false
         }
         notifyValue()
+    }
+
+    private fun replaceChangedText(value: String) {
+        val editable = text ?: return setText(value)
+        val previous = editable.toString()
+        if (previous == value) return
+        var start = 0
+        val sharedLength = minOf(previous.length, value.length)
+        while (start < sharedLength && previous[start] == value[start]) start++
+        var oldEnd = previous.length
+        var newEnd = value.length
+        while (oldEnd > start && newEnd > start && previous[oldEnd - 1] == value[newEnd - 1]) {
+            oldEnd--
+            newEnd--
+        }
+        // Programmatic insertions finish composition, but keep the Editable and
+        // unaffected spans instead of replacing the whole text buffer.
+        BaseInputConnection.removeComposingSpans(editable)
+        editable.replace(start, oldEnd, value, start, newEnd)
     }
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
@@ -182,16 +244,16 @@ internal class CommentEditorEditText(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN && isEnabled && !showSoftInputOnFocus) onShowKeyboard?.invoke()
+        if (event.actionMasked == MotionEvent.ACTION_DOWN && isEnabled && keyboardRequested != true) onShowKeyboard?.invoke()
         return super.onTouchEvent(event)
     }
 
-    fun updateKeyboard(show: Boolean) {
-        showSoftInputOnFocus = show
+    fun updateKeyboard(show: Boolean?) {
+        showSoftInputOnFocus = show != false
         if (keyboardRequested == show) return
         keyboardRequested = show
         val manager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        if (show) {
+        if (show == true) {
             post {
                 if (!released && keyboardRequested == true) {
                     requestFocus()
@@ -200,6 +262,7 @@ internal class CommentEditorEditText(
             }
         } else {
             manager.hideSoftInputFromWindow(windowToken, 0)
+            if (show == null) clearFocus()
         }
     }
 
@@ -254,8 +317,10 @@ internal class CommentEditorEditText(
         return true
     }
 
-    private fun atomicRanges(): List<TextRange> = emotes.map { it.range } +
-        mentions.filter { it.isValidIn(text.toString()) }.map { it.range }
+    private fun atomicRanges(): List<TextRange> {
+        val currentText = text.toString()
+        return emotes.map { it.range } + mentions.filter { it.isValidIn(currentText) }.map { it.range }
+    }
 
     private fun deleteEmote(before: Int, after: Int, codePoints: Boolean): Boolean {
         val editable = text ?: return false
@@ -307,11 +372,22 @@ internal class CommentEditorEditText(
 
     private fun renderSpans() {
         val editable = text ?: return
-        editable.getSpans(0, editable.length, EditorImageSpan::class.java).forEach(editable::removeSpan)
-        editable.getSpans(0, editable.length, EditorMentionSpan::class.java).forEach(editable::removeSpan)
         val composingStart = BaseInputConnection.getComposingSpanStart(editable)
         val composingEnd = BaseInputConnection.getComposingSpanEnd(editable)
-        emotes = findEditorEmotes(editable.toString(), catalog).filter {
+        if (!spansDirty && composingStart == renderedComposingStart && composingEnd == renderedComposingEnd) return
+        spansDirty = false
+        renderedComposingStart = composingStart
+        renderedComposingEnd = composingEnd
+        val currentText = editable.toString()
+        val oldImages = editable.getSpans(0, editable.length, EditorImageSpan::class.java)
+            .associateByTo(mutableMapOf<TextRange, EditorImageSpan>()) {
+                TextRange(editable.getSpanStart(it), editable.getSpanEnd(it))
+            }
+        val oldMentions = editable.getSpans(0, editable.length, EditorMentionSpan::class.java)
+            .associateByTo(mutableMapOf<TextRange, EditorMentionSpan>()) {
+                TextRange(editable.getSpanStart(it), editable.getSpanEnd(it))
+            }
+        emotes = findEditorEmotes(currentText, emotesByToken).filter {
             composingStart < 0 || it.range.end <= composingStart || it.range.start >= composingEnd
         }
         val activeImages = mutableSetOf<String>()
@@ -320,17 +396,38 @@ internal class CommentEditorEditText(
             val key = "${item.emote.url}@$size"
             activeImages += key
             val image = images[key] ?: loadImage(key, item.emote, size)
-            if (!image.failed) editable.setSpan(EditorImageSpan(image.drawable, size), item.range.start, item.range.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            val previous = oldImages.remove(item.range)
+            if (image.failed || previous?.drawable !== image.drawable) {
+                previous?.let(editable::removeSpan)
+                if (!image.failed) {
+                    editable.setSpan(EditorImageSpan(image.drawable, size), item.range.start, item.range.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
         }
-        images.keys.filter { it !in activeImages }.forEach { images.remove(it)?.release() }
-        mentions.filter { it.isValidIn(editable.toString()) }.forEach {
-            editable.setSpan(EditorMentionSpan(mentionColor), it.range.start, it.range.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        oldImages.values.forEach(editable::removeSpan)
+        val iterator = images.iterator()
+        while (iterator.hasNext()) {
+            val (key, image) = iterator.next()
+            if (key !in activeImages) {
+                iterator.remove()
+                imageDrawables.remove(image.drawable)
+                image.release()
+            }
         }
+        mentions.filter { it.isValidIn(currentText) }.forEach {
+            val previous = oldMentions.remove(it.range)
+            if (previous?.foregroundColor != mentionColor) {
+                previous?.let(editable::removeSpan)
+                editable.setSpan(EditorMentionSpan(mentionColor), it.range.start, it.range.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        oldMentions.values.forEach(editable::removeSpan)
     }
 
     private fun loadImage(key: String, emote: CommentEmote, size: Int): EmoteImage {
         val image = EmoteImage(EditorEmoteDrawable(size, currentHintTextColor).apply { callback = this@CommentEditorEditText })
         images[key] = image
+        imageDrawables += image.drawable
         image.request = imageLoader.enqueue(
             ImageRequest.Builder(context).data(originImageUrl(emote.url)).size(size, size).allowHardware(false)
                 .listener(
@@ -342,6 +439,7 @@ internal class CommentEditorEditText(
                     onError = { _, _ ->
                         if (!released && images[key] === image) {
                             image.failed = true
+                            spansDirty = true
                             refreshAndNotify()
                             requestLayout()
                         }
@@ -352,10 +450,10 @@ internal class CommentEditorEditText(
     }
 
     override fun verifyDrawable(who: Drawable): Boolean =
-        (onChange != null && images.values.any { it.drawable === who }) || super.verifyDrawable(who)
+        (onChange != null && who in imageDrawables) || super.verifyDrawable(who)
 
     override fun invalidateDrawable(drawable: Drawable) {
-        if (onChange != null && images.values.any { it.drawable === drawable }) {
+        if (onChange != null && drawable in imageDrawables) {
             // Coalesce loaded images and animation frames; never edit spans from
             // inside Drawable.draw(), which can also trigger this callback.
             if (!released && !imageRedrawPosted) {
@@ -374,13 +472,14 @@ internal class CommentEditorEditText(
         onShowKeyboard = null
         images.values.forEach { it.release() }
         images.clear()
+        imageDrawables.clear()
     }
 
     private class EmoteImage(val drawable: EditorEmoteDrawable, var request: Disposable? = null, var failed: Boolean = false) {
         fun release() {
             request?.dispose()
-            drawable.setImage(null)
             drawable.callback = null
+            drawable.setImage(null)
         }
     }
 }
