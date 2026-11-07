@@ -15,11 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.SaveAlt
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,6 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Download
+import com.composables.icons.materialsymbols.outlined.History
+import com.composables.icons.materialsymbols.outlined.Schedule
+import com.composables.icons.materialsymbols.outlined.Star
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.User
@@ -262,7 +262,7 @@ private fun EntryPanel(
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             EntryTile(
-                icon = Icons.Outlined.SaveAlt,
+                icon = MaterialSymbols.Outlined.Download,
                 title = "离线缓存",
                 subtitle = "本地视频",
                 color = palette.tilePrimary,
@@ -270,7 +270,7 @@ private fun EntryPanel(
                 modifier = Modifier.weight(1f)
             )
             EntryTile(
-                icon = Icons.Outlined.History,
+                icon = MaterialSymbols.Outlined.History,
                 title = "观看记录",
                 subtitle = "继续观看",
                 color = palette.tileSurface,
@@ -280,7 +280,7 @@ private fun EntryPanel(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             EntryTile(
-                icon = Icons.Outlined.StarBorder,
+                icon = MaterialSymbols.Outlined.Star,
                 title = "我的收藏",
                 subtitle = "收藏夹",
                 color = palette.tileSecondary,
@@ -288,7 +288,7 @@ private fun EntryPanel(
                 modifier = Modifier.weight(1f)
             )
             EntryTile(
-                icon = Icons.Outlined.WatchLater,
+                icon = MaterialSymbols.Outlined.Schedule,
                 title = "稍后再看",
                 subtitle = "待看清单",
                 color = palette.tileHighlight,

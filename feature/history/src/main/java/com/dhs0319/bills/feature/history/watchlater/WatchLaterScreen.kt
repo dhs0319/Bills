@@ -21,16 +21,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.Subtitles
-import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,6 +54,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.Delete
+import com.composables.icons.materialsymbols.outlined.Play_circle
+import com.composables.icons.materialsymbols.outlined.Schedule
+import com.composables.icons.materialsymbols.outlined.Subtitles
+import com.composables.icons.materialsymbols.outlinedfilled.Arrow_drop_down
+import com.composables.icons.materialsymbols.outlinedfilled.Check
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
@@ -123,7 +123,7 @@ fun WatchLaterScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -219,7 +219,7 @@ private fun WatchLaterPage(
         ) {
             val hasError = pageState.errorMessage != null
             PageState(
-                icon = if (hasError) Icons.Outlined.CloudOff else Icons.Outlined.WatchLater,
+                icon = if (hasError) MaterialSymbols.Outlined.Cloud_off else MaterialSymbols.Outlined.Schedule,
                 title = when {
                     hasError -> "加载失败"
                     tab == WatchLaterTab.UNFINISHED -> "暂无未看完的内容"
@@ -340,7 +340,7 @@ private fun WatchLaterSortDropdown(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
+                    imageVector = MaterialSymbols.OutlinedFilled.Arrow_drop_down,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -360,7 +360,7 @@ private fun WatchLaterSortDropdown(
                     },
                     trailingIcon = {
                         if (option == asc) {
-                            Icon(Icons.Default.Check, contentDescription = null)
+                            Icon(MaterialSymbols.OutlinedFilled.Check, contentDescription = null)
                         }
                     },
                     modifier = Modifier.semantics { selected = option == asc }
@@ -486,7 +486,7 @@ private fun WatchLaterItemCard(
                         ) {
                             viewText?.let { text ->
                                 Icon(
-                                    imageVector = Icons.Outlined.PlayCircleOutline,
+                                    imageVector = MaterialSymbols.Outlined.Play_circle,
                                     contentDescription = "播放量",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp)
@@ -504,7 +504,7 @@ private fun WatchLaterItemCard(
                             }
                             danmakuText?.let { text ->
                                 Icon(
-                                    imageVector = Icons.Outlined.Subtitles,
+                                    imageVector = MaterialSymbols.Outlined.Subtitles,
                                     contentDescription = "弹幕数",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
@@ -542,7 +542,7 @@ private fun WatchLaterMoreMenu(onDelete: () -> Unit) {
             modifier = Modifier.size(24.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.MoreVert,
+                imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                 contentDescription = "更多操作",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
@@ -554,7 +554,7 @@ private fun WatchLaterMoreMenu(onDelete: () -> Unit) {
         ) {
             DropdownMenuItem(
                 text = { Text("删除") },
-                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                leadingIcon = { Icon(MaterialSymbols.Outlined.Delete, contentDescription = null) },
                 onClick = {
                     expanded = false
                     onDelete()

@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Visibility
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.designsystem.component.UpListRow
@@ -178,7 +178,7 @@ private fun LiveCoverMetadata(item: LiveRecommendItem, modifier: Modifier = Modi
             ) {
                 viewers?.let { text ->
                     Icon(
-                        imageVector = Icons.Outlined.Visibility,
+                        imageVector = MaterialSymbols.Outlined.Visibility,
                         contentDescription = "观看",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp)

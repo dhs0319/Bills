@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dhs0319.bills.feature.settings.errorlog.ErrorLogViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Delete
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.common.log.ErrorLog
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import java.text.SimpleDateFormat
@@ -62,13 +62,13 @@ fun ErrorLogScreen(
                 title = { Text("错误日志 (${logs.size})") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(MirroredSymbols.ArrowBack, contentDescription = null)
                     }
                 },
                 actions = {
                     if (logs.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clear() }) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Icon(MaterialSymbols.OutlinedFilled.Delete, contentDescription = null)
                         }
                     }
                 },

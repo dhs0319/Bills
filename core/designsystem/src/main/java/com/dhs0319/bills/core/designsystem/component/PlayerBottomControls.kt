@@ -13,11 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +26,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Fullscreen
+import com.composables.icons.materialsymbols.outlinedfilled.Fullscreen_exit
+import com.composables.icons.materialsymbols.outlinedfilled.Pause
+import com.composables.icons.materialsymbols.outlinedfilled.Play_arrow
 
 @Composable
 fun PlayerBottomControls(
@@ -109,7 +109,7 @@ fun PlayerBottomControls(
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        imageVector = if (isPlaying) MaterialSymbols.OutlinedFilled.Pause else MaterialSymbols.OutlinedFilled.Play_arrow,
                         contentDescription = playContentDescription,
                         tint = if (playEnabled) Color.White else Color.White.copy(alpha = 0.45f)
                     )
@@ -123,7 +123,7 @@ fun PlayerBottomControls(
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
-                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        imageVector = if (isFullscreen) MaterialSymbols.OutlinedFilled.Fullscreen_exit else MaterialSymbols.OutlinedFilled.Fullscreen,
                         contentDescription = fullscreenContentDescription,
                         tint = Color.White
                     )

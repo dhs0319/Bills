@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,6 +33,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
@@ -67,7 +67,7 @@ fun InterestScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -103,7 +103,7 @@ fun InterestScreen(
 
                 state.errorMessage != null && state.response == null -> {
                     PageState(
-                        icon = Icons.Outlined.CloudOff,
+                        icon = MaterialSymbols.Outlined.Cloud_off,
                         title = "加载失败",
                         description = state.errorMessage.orEmpty().ifBlank { "加载内容偏好失败" },
                         actionText = "重新加载",

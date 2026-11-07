@@ -14,11 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Keyboard
-import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -37,6 +32,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Image
+import com.composables.icons.materialsymbols.outlined.Keyboard
+import com.composables.icons.materialsymbols.outlined.Sentiment_satisfied
+import com.composables.icons.materialsymbols.outlinedfilled.Close
 import coil3.compose.AsyncImage
 import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.feature.comment.editor.EmotePicker
@@ -100,7 +100,7 @@ internal fun ImConversationComposer(
                                     contentColor = Color.White
                                 )
                             ) {
-                                Icon(Icons.Filled.Close, "移除图片", Modifier.size(18.dp))
+                                Icon(MaterialSymbols.OutlinedFilled.Close, "移除图片", Modifier.size(18.dp))
                             }
                         }
                     }
@@ -113,7 +113,7 @@ internal fun ImConversationComposer(
                             onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             enabled = !state.isSending
                         ) {
-                            Icon(Icons.Outlined.Image, if (state.selectedImageUri == null) "添加图片" else "更换图片")
+                            Icon(MaterialSymbols.Outlined.Image, if (state.selectedImageUri == null) "添加图片" else "更换图片")
                         }
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -139,7 +139,7 @@ internal fun ImConversationComposer(
                             )
                         ) {
                             Icon(
-                                if (showEmotes) Icons.Outlined.Keyboard else Icons.Outlined.SentimentSatisfied,
+                                if (showEmotes) MaterialSymbols.Outlined.Keyboard else MaterialSymbols.Outlined.Sentiment_satisfied,
                                 if (showEmotes) "切换键盘" else "选择表情"
                             )
                         }

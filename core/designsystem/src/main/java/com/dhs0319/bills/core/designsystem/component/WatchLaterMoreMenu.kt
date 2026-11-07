@@ -2,9 +2,6 @@ package com.dhs0319.bills.core.designsystem.component
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -18,6 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Schedule
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
 
 @Composable
 fun WatchLaterMoreMenu(onAddToWatchLater: () -> Unit) {
@@ -28,7 +28,7 @@ fun WatchLaterMoreMenu(onAddToWatchLater: () -> Unit) {
             modifier = Modifier.size(24.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.MoreVert,
+                imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                 contentDescription = "更多操作",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
@@ -40,7 +40,7 @@ fun WatchLaterMoreMenu(onAddToWatchLater: () -> Unit) {
         ) {
             DropdownMenuItem(
                 text = { Text("稍后再看") },
-                leadingIcon = { Icon(Icons.Outlined.WatchLater, contentDescription = null) },
+                leadingIcon = { Icon(MaterialSymbols.Outlined.Schedule, contentDescription = null) },
                 onClick = {
                     expanded = false
                     onAddToWatchLater()

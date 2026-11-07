@@ -3,9 +3,6 @@ package com.dhs0319.bills.feature.user
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,8 +14,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Contrast
+import com.composables.icons.materialsymbols.outlinedfilled.Manage_accounts
+import com.composables.icons.materialsymbols.outlinedfilled.Moon_stars
+import com.composables.icons.materialsymbols.outlinedfilled.Settings
+import com.composables.icons.materialsymbols.outlinedfilled.Wb_sunny
+import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.feature.user.collage.UserCollageSection
 import com.dhs0319.bills.feature.user.collage.rememberUserCollageBackgroundBrush
@@ -38,6 +43,8 @@ fun UserScreen(
     onNavigateToSettings: () -> Unit,
     onNavigate: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit = {},
     vm: UserViewModel = hiltViewModel()
 ) {
@@ -56,11 +63,15 @@ fun UserScreen(
                     scrolledContainerColor = Color.Transparent
                 ),
                 actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
-                    }
+                    ThemeModeSelector(
+                        selected = themeMode,
+                        onSelect = onThemeModeChange
+                    )
                     IconButton(onClick = onNavigateToAccount) {
-                        Icon(Icons.Default.Person, contentDescription = "账号管理")
+                        Icon(MaterialSymbols.OutlinedFilled.Manage_accounts, contentDescription = "账号管理")
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(MaterialSymbols.OutlinedFilled.Settings, contentDescription = "设置")
                     }
                 }
             )
@@ -81,5 +92,35 @@ fun UserScreen(
 
     if (state.showAccountExpiredDialog) {
         AccountExpiredDialog(onDismiss = vm::dismissAccountExpiredDialog)
+    }
+}
+
+@Composable
+private fun ThemeModeSelector(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -> Unit
+) {
+    val (icon, label) = when (selected) {
+        ThemeMode.LIGHT -> MaterialSymbols.OutlinedFilled.Wb_sunny to "浅色主题"
+        ThemeMode.DARK -> MaterialSymbols.OutlinedFilled.Moon_stars to "深色主题"
+        ThemeMode.SYSTEM -> MaterialSymbols.OutlinedFilled.Contrast to "跟随系统主题"
+    }
+
+    IconButton(
+        onClick = {
+            onSelect(
+                when (selected) {
+                    ThemeMode.LIGHT -> ThemeMode.DARK
+                    ThemeMode.DARK -> ThemeMode.SYSTEM
+                    ThemeMode.SYSTEM -> ThemeMode.LIGHT
+                }
+            )
+        },
+        modifier = Modifier.padding(end = 4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = "$label，点击切换"
+        )
     }
 }

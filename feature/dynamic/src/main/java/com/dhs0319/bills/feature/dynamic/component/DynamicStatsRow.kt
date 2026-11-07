@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.ThumbUpOffAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +17,10 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Chat_bubble
+import com.composables.icons.materialsymbols.outlined.Thumb_up
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.model.DynamicStats
 
@@ -40,13 +40,13 @@ internal fun DynamicStatsRow(
     ) {
         val itemModifier = if (distributeEvenly) Modifier.weight(1f) else Modifier
         if (showZeroCounts || stats.repost > 0) {
-            DynamicStat(Icons.AutoMirrored.Outlined.OpenInNew, "转发", stats.repost, itemModifier, distributeEvenly)
+            DynamicStat(MirroredSymbols.OpenInNew, "转发", stats.repost, itemModifier, distributeEvenly)
         }
         if (showZeroCounts || stats.reply > 0) {
-            DynamicStat(Icons.Outlined.ChatBubbleOutline, "评论", stats.reply, itemModifier, distributeEvenly)
+            DynamicStat(MaterialSymbols.Outlined.Chat_bubble, "评论", stats.reply, itemModifier, distributeEvenly)
         }
         if (showZeroCounts || stats.like > 0) {
-            DynamicStat(Icons.Outlined.ThumbUpOffAlt, "点赞", stats.like, itemModifier, distributeEvenly)
+            DynamicStat(MaterialSymbols.Outlined.Thumb_up, "点赞", stats.like, itemModifier, distributeEvenly)
         }
     }
 }

@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +36,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Close
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.common.UserAgentBuilder
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.LiveRouteTool
@@ -202,18 +202,18 @@ fun WebViewScreen(
                 navigationIcon = {
                     if (canGoBack) {
                         IconButton(onClick = { webView.goBack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            Icon(MirroredSymbols.ArrowBack, contentDescription = "返回")
                         }
                     } else {
                         IconButton(onClick = currentOnBack) {
-                            Icon(Icons.Default.Close, contentDescription = "关闭")
+                            Icon(MaterialSymbols.OutlinedFilled.Close, contentDescription = "关闭")
                         }
                     }
                 },
                 actions = {
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                            Icon(MaterialSymbols.OutlinedFilled.More_vert, contentDescription = "更多")
                         }
                         DropdownMenu(
                             expanded = showMenu,

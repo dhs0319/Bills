@@ -25,13 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Keyboard
-import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Button
@@ -55,6 +48,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Alternate_email
+import com.composables.icons.materialsymbols.outlined.Image
+import com.composables.icons.materialsymbols.outlined.Keyboard
+import com.composables.icons.materialsymbols.outlined.Sentiment_satisfied
+import com.composables.icons.materialsymbols.outlinedfilled.Close
+import com.composables.icons.materialsymbols.outlinedfilled.Edit
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -78,7 +78,7 @@ internal fun CommentEditorFab(
         )
     ) {
         Icon(
-            imageVector = Icons.Default.Edit,
+            imageVector = MaterialSymbols.OutlinedFilled.Edit,
             contentDescription = contentDescription
         )
     }
@@ -160,7 +160,7 @@ internal fun CommentEditorSheet(
                                         .size(20.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Close,
+                                        imageVector = MaterialSymbols.OutlinedFilled.Close,
                                         contentDescription = "移除图片",
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(14.dp)
@@ -185,7 +185,7 @@ internal fun CommentEditorSheet(
                     )
                 ) {
                     Icon(
-                        if (showEmotes) Icons.Outlined.Keyboard else Icons.Outlined.SentimentSatisfied,
+                        if (showEmotes) MaterialSymbols.Outlined.Keyboard else MaterialSymbols.Outlined.Sentiment_satisfied,
                         contentDescription = if (showEmotes) "切换键盘" else "选择表情"
                     )
                 }
@@ -193,10 +193,10 @@ internal fun CommentEditorSheet(
                     onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     enabled = !busy && state.selectedImageUris.size < COMMENT_EDITOR_MAX_IMAGE_COUNT
                 ) {
-                    Icon(Icons.Outlined.Image, "添加图片")
+                    Icon(MaterialSymbols.Outlined.Image, "添加图片")
                 }
                 IconButton(onClick = { onEditorAction(CommentEditorAction.OpenMentions) }, enabled = !busy) {
-                    Icon(Icons.Outlined.AlternateEmail, "提及用户")
+                    Icon(MaterialSymbols.Outlined.Alternate_email, "提及用户")
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Button(

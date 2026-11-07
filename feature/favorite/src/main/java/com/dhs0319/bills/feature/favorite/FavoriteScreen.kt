@@ -10,11 +10,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Bookmarks
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +26,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Bookmarks
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.Folder_open
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
@@ -94,7 +94,7 @@ fun FavoriteScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -279,7 +279,7 @@ private fun FavoriteContentBody(
 
         state.items.isEmpty() && state.errorMessage != null -> {
             PageState(
-                icon = Icons.Outlined.CloudOff,
+                icon = MaterialSymbols.Outlined.Cloud_off,
                 title = "加载失败",
                 description = state.errorMessage.ifBlank { "加载收藏失败" },
                 actionText = "重新加载",
@@ -289,7 +289,7 @@ private fun FavoriteContentBody(
 
         state.items.isEmpty() -> {
             PageState(
-                icon = Icons.Outlined.Bookmarks,
+                icon = MaterialSymbols.Outlined.Bookmarks,
                 title = "暂无收藏内容",
                 description = "收藏喜欢的内容，方便下次找到"
             )
@@ -329,7 +329,7 @@ private fun FavoriteFolderBody(
 
         state.folders.isEmpty() && state.errorMessage != null -> {
             PageState(
-                icon = Icons.Outlined.CloudOff,
+                icon = MaterialSymbols.Outlined.Cloud_off,
                 title = "加载失败",
                 description = state.errorMessage.ifBlank { "加载收藏失败" },
                 actionText = "重新加载",
@@ -339,7 +339,7 @@ private fun FavoriteFolderBody(
 
         state.folders.isEmpty() -> {
             PageState(
-                icon = Icons.Outlined.FolderOpen,
+                icon = MaterialSymbols.Outlined.Folder_open,
                 title = "暂无收藏夹",
                 description = "创建收藏夹，整理你喜欢的内容"
             )

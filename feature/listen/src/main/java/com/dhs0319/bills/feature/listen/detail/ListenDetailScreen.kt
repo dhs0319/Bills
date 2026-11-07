@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,6 +37,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Play_arrow
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.designsystem.icon.AppIcons
 
@@ -67,7 +67,7 @@ fun ListenDetailScreen(
                 title = { Text("听视频") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(MirroredSymbols.ArrowBack, contentDescription = "返回")
                     }
                 }
             )
@@ -163,7 +163,7 @@ fun ListenDetailScreen(
                         CircularProgressIndicator(modifier = Modifier.size(20.dp))
                     } else {
                         Icon(
-                            imageVector = if (state.isPlaying) AppIcons.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (state.isPlaying) AppIcons.Pause else MaterialSymbols.OutlinedFilled.Play_arrow,
                             contentDescription = if (state.isPlaying) "暂停" else "播放",
                             modifier = Modifier.size(24.dp)
                         )

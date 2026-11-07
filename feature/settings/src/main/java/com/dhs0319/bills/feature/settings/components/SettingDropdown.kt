@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -39,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Arrow_drop_down
 import kotlin.math.roundToInt
 
 @Composable
@@ -103,7 +103,7 @@ fun <T> SettingDropdown(
                     Text(optionLabel(selected))
                 },
                 trailingContent = {
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = "选择$title")
+                    Icon(MaterialSymbols.OutlinedFilled.Arrow_drop_down, contentDescription = "选择$title")
                 },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
             )

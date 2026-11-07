@@ -19,11 +19,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Backspace
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -42,6 +37,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.History
+import com.composables.icons.materialsymbols.outlined.Lock
+import com.composables.icons.materialsymbols.outlined.Refresh
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.model.CommentEmote
@@ -90,7 +90,7 @@ fun EmotePicker(
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = onReload, enabled = enabled && !state.loading) {
-                Icon(Icons.Outlined.Refresh, "刷新表情", modifier = Modifier.size(18.dp))
+                Icon(MaterialSymbols.Outlined.Refresh, "刷新表情", modifier = Modifier.size(18.dp))
             }
         }
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -126,7 +126,7 @@ fun EmotePicker(
             ) {
                 item(key = "recent") {
                     EmotePackageTab(selected = isRecent, enabled = enabled, onClick = { onSelectPackage(-1L) }) {
-                        Icon(Icons.Outlined.History, "最近使用", modifier = Modifier.size(24.dp))
+                        Icon(MaterialSymbols.Outlined.History, "最近使用", modifier = Modifier.size(24.dp))
                     }
                 }
                 items(state.packages, key = { it.id }) { pack ->
@@ -140,7 +140,7 @@ fun EmotePicker(
                 }
             }
             IconButton(onClick = onDelete, enabled = enabled) {
-                Icon(Icons.AutoMirrored.Outlined.Backspace, "删除")
+                Icon(MirroredSymbols.Backspace, "删除")
             }
         }
     }
@@ -169,7 +169,7 @@ private fun CommentEmoteCell(emote: CommentEmote, enabled: Boolean, onInsert: (C
             )
         }
         if (!emote.available) {
-            Icon(Icons.Outlined.Lock, "未解锁", modifier = Modifier.align(Alignment.BottomEnd).size(12.dp))
+            Icon(MaterialSymbols.Outlined.Lock, "未解锁", modifier = Modifier.align(Alignment.BottomEnd).size(12.dp))
         }
     }
 }

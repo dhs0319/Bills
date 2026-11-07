@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Search
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 
 @Composable
@@ -38,7 +38,7 @@ internal fun CommentMentionPanel(state: CommentMentionPickerState, onAction: (Co
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(MaterialSymbols.OutlinedFilled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(
                 text = if (state.query.isBlank()) {
                     "直接在评论输入框中输入昵称搜索"

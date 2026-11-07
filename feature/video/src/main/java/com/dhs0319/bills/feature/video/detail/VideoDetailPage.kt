@@ -45,22 +45,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.outlined.Subtitles
-import androidx.compose.material.icons.outlined.ThumbDownOffAlt
-import androidx.compose.material.icons.outlined.ThumbUpOffAlt
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -101,6 +85,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Chat_bubble
+import com.composables.icons.materialsymbols.outlined.Chevron_right
+import com.composables.icons.materialsymbols.outlined.Download
+import com.composables.icons.materialsymbols.outlined.Open_in_new
+import com.composables.icons.materialsymbols.outlined.Play_circle
+import com.composables.icons.materialsymbols.outlined.Star as SymbolOutlinedStar
+import com.composables.icons.materialsymbols.outlined.Subtitles
+import com.composables.icons.materialsymbols.outlined.Thumb_down as SymbolOutlinedThumbdown
+import com.composables.icons.materialsymbols.outlined.Thumb_up as SymbolOutlinedThumbup
+import com.composables.icons.materialsymbols.outlinedfilled.Check
+import com.composables.icons.materialsymbols.outlinedfilled.Keyboard_arrow_down
+import com.composables.icons.materialsymbols.outlinedfilled.Keyboard_arrow_up
+import com.composables.icons.materialsymbols.outlinedfilled.Star as SymbolOutlinedFilledStar
+import com.composables.icons.materialsymbols.outlinedfilled.Thumb_down as SymbolOutlinedFilledThumbdown
+import com.composables.icons.materialsymbols.outlinedfilled.Thumb_up as SymbolOutlinedFilledThumbup
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
@@ -1017,9 +1017,9 @@ private fun VideoInfoBlock(
                 )
                 Icon(
                     imageVector = if (infoExpanded) {
-                        Icons.Default.KeyboardArrowUp
+                        MaterialSymbols.OutlinedFilled.Keyboard_arrow_up
                     } else {
-                        Icons.Default.KeyboardArrowDown
+                        MaterialSymbols.OutlinedFilled.Keyboard_arrow_down
                     },
                     contentDescription = if (infoExpanded) "收起视频信息" else "展开视频信息",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1066,19 +1066,19 @@ private fun VideoMetaRow(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         MetaItem(
-            icon = Icons.Outlined.PlayCircleOutline,
+            icon = MaterialSymbols.Outlined.Play_circle,
             text = stat?.view,
             showSkeleton = showSkeleton,
             skeletonWidth = 48.dp
         )
         MetaItem(
-            icon = Icons.Outlined.Subtitles,
+            icon = MaterialSymbols.Outlined.Subtitles,
             text = stat?.danmaku,
             showSkeleton = showSkeleton,
             skeletonWidth = 40.dp
         )
         MetaItem(
-            icon = Icons.Outlined.ChatBubbleOutline,
+            icon = MaterialSymbols.Outlined.Chat_bubble,
             text = stat?.reply,
             showSkeleton = showSkeleton,
             skeletonWidth = 40.dp,
@@ -1255,7 +1255,7 @@ private fun ActionCapsule(
         verticalAlignment = Alignment.CenterVertically
     ) {
         ActionItem(
-            icon = if (state.liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUpOffAlt,
+            icon = if (state.liked) MaterialSymbols.OutlinedFilled.SymbolOutlinedFilledThumbup else MaterialSymbols.Outlined.SymbolOutlinedThumbup,
             label = "点赞",
             value = stat?.like?.let { compactCount(adjustedCount(it, state.likeCountDelta)) } ?: "-",
             selected = state.liked,
@@ -1264,7 +1264,7 @@ private fun ActionCapsule(
             modifier = Modifier.weight(1f)
         )
         ActionItem(
-            icon = if (state.disliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDownOffAlt,
+            icon = if (state.disliked) MaterialSymbols.OutlinedFilled.SymbolOutlinedFilledThumbdown else MaterialSymbols.Outlined.SymbolOutlinedThumbdown,
             label = "不喜欢",
             selected = state.disliked,
             enabled = state.initialized && !state.dislikeBusy,
@@ -1283,7 +1283,7 @@ private fun ActionCapsule(
             modifier = Modifier.weight(1f)
         )
         ActionItem(
-            icon = if (state.favorited) Icons.Filled.Star else Icons.Outlined.StarBorder,
+            icon = if (state.favorited) MaterialSymbols.OutlinedFilled.SymbolOutlinedFilledStar else MaterialSymbols.Outlined.SymbolOutlinedStar,
             label = "收藏",
             value = stat?.fav?.let { compactCount(adjustedCount(it, state.favoriteCountDelta)) } ?: "-",
             selected = state.favorited,
@@ -1292,14 +1292,14 @@ private fun ActionCapsule(
             modifier = Modifier.weight(1f)
         )
         ActionItem(
-            icon = Icons.Outlined.OpenInNew,
+            icon = MaterialSymbols.Outlined.Open_in_new,
             label = "分享",
             value = stat?.share?.let(::compactCount) ?: "-",
             onClick = onOpenShare,
             modifier = Modifier.weight(1f)
         )
         ActionItem(
-            icon = Icons.Outlined.Download,
+            icon = MaterialSymbols.Outlined.Download,
             label = "下载",
             onClick = onDownloadClick,
             modifier = Modifier.weight(1f)
@@ -1643,7 +1643,7 @@ private fun FavoriteSelectionIndicator(selected: Boolean) {
     ) {
         if (selected) {
             Icon(
-                imageVector = Icons.Default.Check,
+                imageVector = MaterialSymbols.OutlinedFilled.Check,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onPrimary
@@ -1900,7 +1900,7 @@ private fun DetailEntryRow(
                 modifier = Modifier.padding(start = 6.dp)
             )
             Icon(
-                imageVector = Icons.Rounded.ChevronRight,
+                imageVector = MaterialSymbols.Outlined.Chevron_right,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -2226,7 +2226,7 @@ private fun RelateRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (viewText != null) {
                     Icon(
-                        imageVector = Icons.Outlined.PlayCircleOutline,
+                        imageVector = MaterialSymbols.Outlined.Play_circle,
                         contentDescription = "播放量",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(15.dp)
@@ -2241,7 +2241,7 @@ private fun RelateRow(
                 }
                 if (danmakuText != null) {
                     Icon(
-                        imageVector = Icons.Outlined.Subtitles,
+                        imageVector = MaterialSymbols.Outlined.Subtitles,
                         contentDescription = "弹幕数",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
@@ -2328,7 +2328,7 @@ internal fun QualityOptionItem(
         }
         if (isSelected) {
             Icon(
-                imageVector = Icons.Default.Check,
+                imageVector = MaterialSymbols.OutlinedFilled.Check,
                 contentDescription = "已选择",
                 tint = MaterialTheme.colorScheme.primary
             )

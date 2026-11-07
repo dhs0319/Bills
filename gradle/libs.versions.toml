@@ -8,6 +8,7 @@ lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.13.0"
 kotlin = "2.2.21"
 composeBom = "2026.06.00"
+materialSymbols = "2.2.1"
 
 # Dependency Injection
 hilt = "2.58"
@@ -76,8 +77,8 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
-androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+compose-material-symbols-outlined = { group = "com.composables", name = "icons-material-symbols-outlined-cmp", version.ref = "materialSymbols" }
+compose-material-symbols-filled = { group = "com.composables", name = "icons-material-symbols-outlined-filled-cmp", version.ref = "materialSymbols" }
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
 google-material = { group = "com.google.android.material", name = "material", version.ref = "googleMaterial" }
 danmakuFlameMaster = { group = "com.github.naaammme", name = "DanmakuFlameMaster", version.ref = "danmakuFlameMaster" }

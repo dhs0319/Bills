@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +38,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.Folder_open
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.model.FavoriteContentTarget
@@ -75,7 +75,7 @@ fun FavoriteFolderDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -112,7 +112,7 @@ fun FavoriteFolderDetailScreen(
 
                             state.errorMessage != null -> {
                                 FavoriteFolderStatus(
-                                    icon = Icons.Outlined.CloudOff,
+                                    icon = MaterialSymbols.Outlined.Cloud_off,
                                     title = "暂时无法加载",
                                     description = state.errorMessage.orEmpty().ifBlank { "请稍后重试" },
                                     onRetry = viewModel::refresh
@@ -121,7 +121,7 @@ fun FavoriteFolderDetailScreen(
 
                             else -> {
                                 FavoriteFolderStatus(
-                                    icon = Icons.Outlined.FolderOpen,
+                                    icon = MaterialSymbols.Outlined.Folder_open,
                                     title = if (state.hasInvalid) "暂无可用内容" else "还没有收藏内容",
                                     description = if (state.hasInvalid) {
                                         "收藏夹中的内容暂时无法查看"

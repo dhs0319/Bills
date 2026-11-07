@@ -19,16 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.CropFree
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +59,16 @@ import androidx.media3.ui.R as Media3UiR
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Subtitles
+import com.composables.icons.materialsymbols.outlined.Subtitles_off
+import com.composables.icons.materialsymbols.outlinedfilled.Aspect_ratio
+import com.composables.icons.materialsymbols.outlinedfilled.Crop_free
+import com.composables.icons.materialsymbols.outlinedfilled.Home
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.composables.icons.materialsymbols.outlinedfilled.Open_in_full
+import com.composables.icons.materialsymbols.outlinedfilled.Replay
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.PlaybackOption
@@ -483,7 +483,7 @@ internal fun VideoPlayerPane(
                                 modifier = Modifier.size(40.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    imageVector = MirroredSymbols.ArrowBack,
                                     contentDescription = "返回",
                                     tint = Color.White
                                 )
@@ -494,7 +494,7 @@ internal fun VideoPlayerPane(
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Home,
+                                        imageVector = MaterialSymbols.OutlinedFilled.Home,
                                         contentDescription = "首页",
                                         tint = Color.White
                                     )
@@ -537,9 +537,9 @@ internal fun VideoPlayerPane(
                                 ) {
                                     Icon(
                                         imageVector = when (currentResizeMode) {
-                                            PlayerVideoResizeMode.Fit -> Icons.Default.AspectRatio
-                                            PlayerVideoResizeMode.Zoom -> Icons.Default.CropFree
-                                            PlayerVideoResizeMode.Fill -> Icons.Default.OpenInFull
+                                            PlayerVideoResizeMode.Fit -> MaterialSymbols.OutlinedFilled.Aspect_ratio
+                                            PlayerVideoResizeMode.Zoom -> MaterialSymbols.OutlinedFilled.Crop_free
+                                            PlayerVideoResizeMode.Fill -> MaterialSymbols.OutlinedFilled.Open_in_full
                                         },
                                         contentDescription = "画面尺寸：${videoResizeModeText(currentResizeMode)}，点击切换为${videoResizeModeText(nextResizeMode)}",
                                         tint = Color.White
@@ -557,9 +557,9 @@ internal fun VideoPlayerPane(
                             ) {
                                 Icon(
                                     imageVector = if (danmakuOn) {
-                                        Icons.Default.Subtitles
+                                        MaterialSymbols.Outlined.Subtitles
                                     } else {
-                                        Icons.Default.SubtitlesOff
+                                        MaterialSymbols.Outlined.Subtitles_off
                                     },
                                     contentDescription = if (danmakuOn) "关闭弹幕" else "开启弹幕",
                                     tint = Color.White
@@ -574,7 +574,7 @@ internal fun VideoPlayerPane(
                                 modifier = Modifier.size(40.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.MoreVert,
+                                    imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                                     contentDescription = "更多信息",
                                     tint = Color.White
                                 )
@@ -633,7 +633,7 @@ internal fun VideoPlayerPane(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Replay,
+                            imageVector = MaterialSymbols.OutlinedFilled.Replay,
                             contentDescription = "重播",
                             tint = Color.White,
                             modifier = Modifier.size(44.dp)

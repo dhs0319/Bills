@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Account_circle
 
 /** A page-level placeholder. State selection and navigation belong to the caller. */
 @Composable
@@ -106,7 +106,7 @@ fun LoginRequiredState(
     modifier: Modifier = Modifier
 ) {
     PageState(
-        icon = Icons.Outlined.AccountCircle,
+        icon = MaterialSymbols.Outlined.Account_circle,
         title = "登录后查看",
         description = description,
         actionText = "去登录",

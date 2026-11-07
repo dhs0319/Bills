@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.DynamicFeed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -26,6 +23,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.Dynamic_feed
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
 import com.dhs0319.bills.core.designsystem.component.PageState
@@ -125,7 +125,7 @@ fun DynamicScreen(
 
                 state.errorMessage != null && state.items.isEmpty() -> {
                     PageState(
-                        icon = Icons.Outlined.CloudOff,
+                        icon = MaterialSymbols.Outlined.Cloud_off,
                         title = "加载失败",
                         description = state.errorMessage.orEmpty().ifBlank { "加载动态失败" },
                         actionText = "重新加载",
@@ -136,7 +136,7 @@ fun DynamicScreen(
 
                 state.items.isEmpty() -> {
                     PageState(
-                        icon = Icons.Outlined.DynamicFeed,
+                        icon = MaterialSymbols.Outlined.Dynamic_feed,
                         title = "暂无动态",
                         description = "关注 UP 主后，新的动态会出现在这里",
                         modifier = Modifier.padding(bottom = topLevelNavSpace)

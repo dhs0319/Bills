@@ -10,11 +10,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +27,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.History
+import com.composables.icons.materialsymbols.outlinedfilled.Search
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
@@ -91,7 +91,7 @@ fun HistoryScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -105,7 +105,7 @@ fun HistoryScreen(
                         }
                     }) {
                         Icon(
-                            imageVector = Icons.Default.Search,
+                            imageVector = MaterialSymbols.OutlinedFilled.Search,
                             contentDescription = "搜索历史记录"
                         )
                     }
@@ -182,7 +182,7 @@ private fun HistoryPage(
         ) {
             val hasError = pageState.errorMessage != null
             PageState(
-                icon = if (hasError) Icons.Outlined.CloudOff else Icons.Outlined.History,
+                icon = if (hasError) MaterialSymbols.Outlined.Cloud_off else MaterialSymbols.Outlined.History,
                 title = when {
                     hasError -> "加载失败"
                     tab == HistoryTab.ALL -> "暂无观看历史"

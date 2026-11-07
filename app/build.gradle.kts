@@ -139,8 +139,6 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.core.ktx)

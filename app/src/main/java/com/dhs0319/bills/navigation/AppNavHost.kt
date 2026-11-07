@@ -37,8 +37,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -76,9 +74,12 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Search
 import com.dhs0319.bills.core.designsystem.component.roundScreenSafePadding
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.theme.ThemeConfig
+import com.dhs0319.bills.core.designsystem.theme.ThemeMode
 import com.dhs0319.bills.core.designsystem.theme.buildNavTransitions
 import com.dhs0319.bills.core.model.FavoriteContentTarget
 import com.dhs0319.bills.core.model.HistoryTarget
@@ -303,6 +304,7 @@ fun AppNavHost(
             composable(MAIN_ROUTE) {
                 MainTabsScaffold(
                     currentTab = currentTab,
+                    themeMode = themeConfig.themeMode,
                     onTabChange = { currentTab = it },
                     onNavigateToSearch = { rootNavController.navigateToSearch() },
                     onNavigateToSettings = { rootNavController.navigate(SETTINGS_ROUTE) },
@@ -507,6 +509,7 @@ fun AppNavHost(
 @Composable
 private fun MainTabsScaffold(
     currentTab: TopLevelRoute,
+    themeMode: ThemeMode,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -626,6 +629,8 @@ private fun MainTabsScaffold(
                             onNavigateToSettings = onNavigateToSettings,
                             onNavigate = onNavigateFromUser,
                             onNavigateToDownload = onNavigateToDownload,
+                            themeMode = themeMode,
+                            onThemeModeChange = settingsViewModel::updateThemeMode,
                             onOpenSpace = onNavigateToSpace
                         )
                     }
@@ -754,7 +759,7 @@ private fun TopLevelSideNavigation(
             }
             IconButton(onClick = onNavigateToSearch) {
                 Icon(
-                    imageVector = Icons.Default.Search,
+                    imageVector = MaterialSymbols.OutlinedFilled.Search,
                     contentDescription = "搜索",
                     modifier = Modifier.size(26.dp)
                 )
@@ -869,7 +874,7 @@ private fun TopLevelFloatingNavigation(
             elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Search,
+                imageVector = MaterialSymbols.OutlinedFilled.Search,
                 contentDescription = "搜索"
             )
         }
