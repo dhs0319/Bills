@@ -38,13 +38,15 @@ fun NavController.navigateToFavoriteFolder(folder: FavoriteFolder) {
 fun NavGraphBuilder.favoriteScreen(
     onBack: () -> Unit,
     onOpenContent: (FavoriteContentTarget) -> Unit,
-    onOpenFolder: (FavoriteFolder) -> Unit
+    onOpenFolder: (FavoriteFolder) -> Unit,
+    onLogin: () -> Unit
 ) {
     composable(FAVORITE_ROUTE) {
         FavoriteScreen(
             onBack = onBack,
             onOpenContent = onOpenContent,
-            onOpenFolder = onOpenFolder
+            onOpenFolder = onOpenFolder,
+            onLogin = onLogin
         )
     }
     composable(

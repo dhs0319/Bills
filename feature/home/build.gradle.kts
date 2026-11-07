@@ -27,6 +27,7 @@ android {
 
 dependencies {
     implementation(project(":core:article"))
+    implementation(project(":core:auth"))
     implementation(project(":core:feed"))
     implementation(project(":core:history"))
     implementation(project(":core:listen"))

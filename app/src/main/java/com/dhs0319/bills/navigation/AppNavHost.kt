@@ -1,6 +1,7 @@
 package com.dhs0319.bills.navigation
 
 import android.content.res.Configuration
+import android.os.Bundle
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.os.bundleOf
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -143,6 +145,7 @@ import com.dhs0319.bills.playback.PlaybackHost
 import com.dhs0319.bills.playback.PlaybackHostViewModel
 
 private const val MAIN_ROUTE = "main"
+private const val PENDING_CONVERSATION_KEY = "pending_conversation"
 private val topLevelNavEdgePadding = 16.dp
 private val topLevelNavGap = 8.dp
 private val topLevelNavScrollThreshold = 72.dp
@@ -154,6 +157,59 @@ fun AppNavHost(
     onAppLinkConsumed: () -> Unit = {}
 ) {
     val rootNavController = rememberNavController()
+    val navigationViewModel: AppNavigationViewModel = hiltViewModel()
+    val openLogin: () -> Unit = {
+        rootNavController.navigate(SMS_LOGIN_ROUTE) { launchSingleTop = true }
+    }
+    val openConversation: (ImSessionItem) -> Unit = openConversation@{ item ->
+        val talkerId = item.talkerId ?: return@openConversation
+        val sessionType = item.sessionType ?: return@openConversation
+        if (navigationViewModel.isLoggedIn) {
+            rootNavController.navigateToImConversation(item)
+        } else {
+            openLogin()
+            // Keep the destination with this login entry so cancelling login discards it.
+            rootNavController.currentBackStackEntry?.savedStateHandle?.set(
+                PENDING_CONVERSATION_KEY,
+                bundleOf(
+                    "talkerId" to talkerId,
+                    "sessionType" to sessionType,
+                    "name" to item.name,
+                    "avatar" to item.avatar,
+                    "autoReply" to item.latestMessageIsAutoReply
+                )
+            )
+        }
+    }
+    val completeLogin: () -> Unit = {
+        val pending = rootNavController.currentBackStackEntry?.savedStateHandle
+            ?.remove<Bundle>(PENDING_CONVERSATION_KEY)
+        rootNavController.popBackStack()
+        if (pending != null && navigationViewModel.isLoggedIn) {
+            val talkerId = pending.getLong("talkerId")
+            rootNavController.navigateToImConversation(
+                ImSessionItem(
+                    key = "login:$talkerId",
+                    talkerId = talkerId,
+                    sessionType = pending.getInt("sessionType"),
+                    name = pending.getString("name").orEmpty(),
+                    avatar = pending.getString("avatar"),
+                    latestMessageIsAutoReply = pending.getBoolean("autoReply")
+                )
+            )
+        }
+    }
+    val switchLoginMethod: (String, String) -> Unit = { fromRoute, toRoute ->
+        val pending = rootNavController.currentBackStackEntry?.savedStateHandle
+            ?.get<Bundle>(PENDING_CONVERSATION_KEY)
+        rootNavController.navigate(toRoute) {
+            popUpTo(fromRoute) { inclusive = true }
+        }
+        if (pending != null) {
+            rootNavController.currentBackStackEntry?.savedStateHandle
+                ?.set(PENDING_CONVERSATION_KEY, pending)
+        }
+    }
     val roundSafePadding = roundScreenSafePadding(themeConfig.roundScreenSafePaddingScale)
     var currentTab by rememberSaveable { mutableStateOf(TopLevelRoute.HOME) }
     val downloadViewModel: DownloadViewModel = hiltViewModel()
@@ -251,6 +307,7 @@ fun AppNavHost(
                     onNavigateToSearch = { rootNavController.navigateToSearch() },
                     onNavigateToSettings = { rootNavController.navigate(SETTINGS_ROUTE) },
                     onNavigateToAccount = { rootNavController.navigate(ACCOUNT_ROUTE) },
+                    onNavigateToLogin = openLogin,
                     onNavigateFromUser = { dest ->
                         when (dest) {
                             UserDest.History -> rootNavController.navigateToHistory()
@@ -268,9 +325,7 @@ fun AppNavHost(
                     onNavigateToMsgFeed = { rootNavController.navigateToMsgFeed() },
                     onNavigateToReceivedLikes = { rootNavController.navigateToReceivedLikes() },
                     onNavigateToNewFollowers = { rootNavController.navigateToNewFollowers() },
-                    onNavigateToImConversation = { item ->
-                        rootNavController.navigateToImConversation(item)
-                    }
+                    onNavigateToImConversation = openConversation
                 )
             }
 
@@ -289,22 +344,18 @@ fun AppNavHost(
             )
 
             loginScreen(
-                onLoginSuccess = { rootNavController.popBackStack() },
+                onLoginSuccess = completeLogin,
                 onBack = { rootNavController.popBackStack() },
                 onSwitchToSms = {
-                    rootNavController.navigate(SMS_LOGIN_ROUTE) {
-                        popUpTo(LOGIN_ROUTE) { inclusive = true }
-                    }
+                    switchLoginMethod(LOGIN_ROUTE, SMS_LOGIN_ROUTE)
                 }
             )
 
             smsLoginScreen(
-                onLoginSuccess = { rootNavController.popBackStack() },
+                onLoginSuccess = completeLogin,
                 onBack = { rootNavController.popBackStack() },
                 onSwitchToQr = {
-                    rootNavController.navigate(LOGIN_ROUTE) {
-                        popUpTo(SMS_LOGIN_ROUTE) { inclusive = true }
-                    }
+                    switchLoginMethod(SMS_LOGIN_ROUTE, LOGIN_ROUTE)
                 }
             )
 
@@ -323,7 +374,8 @@ fun AppNavHost(
             historyScreen(
                 onBack = { rootNavController.popBackStack() },
                 onSearch = { tab -> rootNavController.navigateToHistorySearch(tab) },
-                onOpenHistoryTarget = openHistoryTarget
+                onOpenHistoryTarget = openHistoryTarget,
+                onLogin = openLogin
             )
             historySearchScreen(
                 onBack = { rootNavController.popBackStack() },
@@ -331,7 +383,8 @@ fun AppNavHost(
             )
             watchLaterScreen(
                 onBack = { rootNavController.popBackStack() },
-                onOpenVideo = openVideo
+                onOpenVideo = openVideo,
+                onLogin = openLogin
             )
             favoriteScreen(
                 onBack = { rootNavController.popBackStack() },
@@ -345,10 +398,14 @@ fun AppNavHost(
                 },
                 onOpenFolder = { folder ->
                     rootNavController.navigateToFavoriteFolder(folder)
-                }
+                },
+                onLogin = openLogin
             )
             composable(HOME_INTEREST_ROUTE) {
-                InterestScreen(onBack = { rootNavController.popBackStack() })
+                InterestScreen(
+                    onBack = { rootNavController.popBackStack() },
+                    onLogin = openLogin
+                )
             }
             spaceScreen(
                 onBack = { rootNavController.popBackStack() },
@@ -358,7 +415,7 @@ fun AppNavHost(
                 },
                 onOpenLive = openLive,
                 onOpenIm = { mid, name, avatar ->
-                    rootNavController.navigateToImConversation(
+                    openConversation(
                         ImSessionItem(
                             key = "space:$mid",
                             talkerId = mid,
@@ -454,6 +511,7 @@ private fun MainTabsScaffold(
     onNavigateToSearch: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToAccount: () -> Unit,
+    onNavigateToLogin: () -> Unit,
     onNavigateFromUser: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
     onNavigateToVideo: (VideoTarget) -> Unit,
@@ -552,10 +610,12 @@ private fun MainTabsScaffold(
                             onOpenSpace = onNavigateToSpace,
                             onOpenLive = onNavigateToLive,
                             onOpenDynamic = onNavigateToDynamicDetail,
+                            onLogin = onNavigateToLogin,
                             refreshRequest = dynamicRefreshRequest
                         )
                         TopLevelRoute.MESSAGE -> ImScreen(
                             onOpenConversation = onNavigateToImConversation,
+                            onLogin = onNavigateToLogin,
                             onOpenMsgFeed = onNavigateToMsgFeed,
                             onOpenReceivedLikes = onNavigateToReceivedLikes,
                             onOpenNewFollowers = onNavigateToNewFollowers,

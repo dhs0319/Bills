@@ -2,6 +2,7 @@ package com.dhs0319.bills.feature.history.watchlater
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dhs0319.bills.core.auth.AuthRepository
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.history.WatchLaterRepository
 import com.dhs0319.bills.core.model.WatchLaterCursor
@@ -32,18 +33,22 @@ data class WatchLaterUiState(
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = false,
     val errorMessage: String? = null,
-    val errorOnLoadMore: Boolean = false
+    val errorOnLoadMore: Boolean = false,
+    val isLoggedIn: Boolean = false
 ) {
     val canLoadMore: Boolean
-        get() = hasMore && !isLoading && !isRefreshing && !isLoadingMore
+        get() = isLoggedIn && hasMore && !isLoading && !isRefreshing && !isLoadingMore
 }
 
 @HiltViewModel
 class WatchLaterViewModel @Inject constructor(
-    private val repo: WatchLaterRepository
+    private val repo: WatchLaterRepository,
+    private val authRepo: AuthRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(WatchLaterUiState())
+    private val _uiState = MutableStateFlow(
+        WatchLaterUiState(isLoggedIn = authRepo.currentMidFlow.value > 0L)
+    )
     val uiState: StateFlow<WatchLaterUiState> = _uiState.asStateFlow()
 
     private val cache = mutableMapOf<WatchLaterCacheKey, WatchLaterCache>()
@@ -54,14 +59,33 @@ class WatchLaterViewModel @Inject constructor(
     private var currentStartKey = ""
     private var splitKey = ""
     private var loadJob: Job? = null
+    private var authVersion = 0L
 
     init {
-        refresh()
+        viewModelScope.launch {
+            authRepo.currentMidFlow.collect { mid ->
+                authVersion += 1L
+                loadJob?.cancel()
+                cache.clear()
+                deletingItems.clear()
+                removedItems.clear()
+                currentStartKey = ""
+                splitKey = ""
+                _actionMessage.value = null
+                val state = _uiState.value
+                _uiState.value = WatchLaterUiState(tab = state.tab, asc = state.asc, isLoggedIn = mid > 0L)
+                if (mid > 0L) refresh()
+            }
+        }
     }
 
     fun selectTab(tab: WatchLaterTab) {
         val state = _uiState.value
         if (state.tab == tab) return
+        if (!state.isLoggedIn) {
+            _uiState.update { it.copy(tab = tab) }
+            return
+        }
         loadJob?.cancel()
         val key = WatchLaterCacheKey(tab, state.asc)
         val cached = cache[key]
@@ -104,14 +128,16 @@ class WatchLaterViewModel @Inject constructor(
     fun previewState(tab: WatchLaterTab): WatchLaterUiState {
         val state = _uiState.value
         if (state.tab == tab) return state
+        if (!state.isLoggedIn) return WatchLaterUiState(tab = tab, asc = state.asc)
         val cached = cache[WatchLaterCacheKey(tab, state.asc)]
-            ?: return WatchLaterUiState(tab = tab, asc = state.asc, isLoading = true)
+            ?: return WatchLaterUiState(tab = tab, asc = state.asc, isLoading = true, isLoggedIn = true)
         return WatchLaterUiState(
             tab = tab,
             asc = state.asc,
             items = cached.items,
             countText = cached.countText,
-            hasMore = cached.hasMore
+            hasMore = cached.hasMore,
+            isLoggedIn = true
         )
     }
 
@@ -123,7 +149,7 @@ class WatchLaterViewModel @Inject constructor(
 
     fun selectSort(asc: Boolean) {
         val state = _uiState.value
-        if (state.asc == asc || state.isLoading || state.isRefreshing || state.isLoadingMore) return
+        if (!state.isLoggedIn || state.asc == asc || state.isLoading || state.isRefreshing || state.isLoadingMore) return
         val key = WatchLaterCacheKey(state.tab, asc)
         val cached = cache[key]
         if (cached != null) {
@@ -160,7 +186,7 @@ class WatchLaterViewModel @Inject constructor(
 
     fun refresh() {
         val state = _uiState.value
-        if (state.isLoading || state.isRefreshing || state.isLoadingMore) return
+        if (!state.isLoggedIn || state.isLoading || state.isRefreshing || state.isLoadingMore) return
         val hasItems = state.items.isNotEmpty()
         currentStartKey = ""
         splitKey = ""
@@ -197,11 +223,14 @@ class WatchLaterViewModel @Inject constructor(
     }
 
     fun removeItem(item: WatchLaterItem) {
+        if (!_uiState.value.isLoggedIn) return
         val aid = item.aid
         if (aid <= 0L || !deletingItems.add(aid)) return
+        val version = authVersion
         viewModelScope.launch {
             try {
                 repo.removeVideo(aid)
+                if (version != authVersion) return@launch
                 removedItems[aid] = maxOf(
                     removedItems[aid] ?: Long.MIN_VALUE,
                     item.addedAtSec
@@ -213,10 +242,11 @@ class WatchLaterViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (version != authVersion) return@launch
                 Logger.e(TAG, e) { "移出稍后再看失败" }
                 _actionMessage.value = e.message?.takeIf(String::isNotBlank) ?: "移出稍后再看失败"
             } finally {
-                deletingItems.remove(aid)
+                if (version == authVersion) deletingItems.remove(aid)
             }
         }
     }
@@ -273,6 +303,7 @@ class WatchLaterViewModel @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             Logger.e(TAG, e) { "加载稍后再看失败" }
             _uiState.update {
                 if (it.tab != tab || it.asc != asc) return@update it

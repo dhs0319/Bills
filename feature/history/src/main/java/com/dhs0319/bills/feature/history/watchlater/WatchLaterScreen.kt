@@ -27,8 +27,10 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -65,10 +67,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
+import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
+import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
 import com.dhs0319.bills.core.model.VideoTarget
@@ -82,6 +87,7 @@ import com.dhs0319.bills.feature.history.component.formatVideoDuration
 fun WatchLaterScreen(
     onBack: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
+    onLogin: () -> Unit,
     viewModel: WatchLaterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -127,7 +133,7 @@ fun WatchLaterScreen(
                         asc = state.asc,
                         onSelect = onSelectSort,
                         modifier = Modifier.padding(end = 4.dp),
-                        enabled = !state.isLoading && !state.isRefreshing &&
+                        enabled = state.isLoggedIn && !state.isLoading && !state.isRefreshing &&
                             !state.isLoadingMore && !pagerState.isScrollInProgress
                     )
                 },
@@ -156,6 +162,7 @@ fun WatchLaterScreen(
                     columns = columns,
                     isTablet = isTablet,
                     viewModel = viewModel,
+                    onLogin = onLogin,
                     onOpenVideo = onOpenVideo
                 )
             }
@@ -172,6 +179,7 @@ private fun WatchLaterPage(
     columns: Int,
     isTablet: Boolean,
     viewModel: WatchLaterViewModel,
+    onLogin: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit
 ) {
     val pageStates = remember(viewModel, tab) { viewModel.observeTab(tab) }
@@ -194,6 +202,40 @@ private fun WatchLaterPage(
     }
     val onLoadMore = remember(viewModel) { viewModel::loadMore }
     val onRemoveItem = remember(viewModel) { viewModel::removeItem }
+
+    if (!pageState.isLoggedIn) {
+        LoginRequiredState(
+            description = "登录后，查看你保存的待看视频",
+            onLogin = onLogin
+        )
+        return
+    }
+
+    if (pageState.items.isEmpty() && !pageState.isLoading && !pageState.isRefreshing) {
+        BiliPullToRefreshBox(
+            isRefreshing = false,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val hasError = pageState.errorMessage != null
+            PageState(
+                icon = if (hasError) Icons.Outlined.CloudOff else Icons.Outlined.WatchLater,
+                title = when {
+                    hasError -> "加载失败"
+                    tab == WatchLaterTab.UNFINISHED -> "暂无未看完的内容"
+                    else -> "暂无稍后再看内容"
+                },
+                description = if (hasError) {
+                    pageState.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" }
+                } else {
+                    "将感兴趣的视频加入稍后再看，留待有空时观看"
+                },
+                actionText = if (hasError) "重新加载" else null,
+                onAction = if (hasError) onRefresh else null
+            )
+        }
+        return
+    }
 
     AdaptiveMediaGrid(
         items = pageState.items,
@@ -232,16 +274,6 @@ private fun WatchLaterPage(
         },
         loadMoreContent = {
             WatchLaterLoadingRows(columns = columns, isTablet = isTablet)
-        },
-        emptyContent = {
-            StateMessageCard(
-                text = pageState.errorMessage?.ifBlank { "加载稍后再看失败" }
-                    ?: "暂无${pageState.tab.title}内容",
-                isError = pageState.errorMessage != null,
-                actionText = pageState.errorMessage?.let { "重试" },
-                onAction = pageState.errorMessage?.let { onRefresh },
-                modifier = Modifier.padding(vertical = 48.dp)
-            )
         }
     ) { item ->
         WatchLaterItemCard(

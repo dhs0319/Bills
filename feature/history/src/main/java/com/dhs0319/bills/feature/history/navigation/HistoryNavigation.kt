@@ -34,13 +34,15 @@ fun NavController.navigateToWatchLater() {
 fun NavGraphBuilder.historyScreen(
     onBack: () -> Unit,
     onSearch: (HistoryTab) -> Unit,
-    onOpenHistoryTarget: (HistoryTarget?) -> Unit
+    onOpenHistoryTarget: (HistoryTarget?) -> Unit,
+    onLogin: () -> Unit
 ) {
     composable(HISTORY_ROUTE) {
         HistoryScreen(
             onBack = onBack,
             onSearch = onSearch,
-            onOpenHistoryTarget = onOpenHistoryTarget
+            onOpenHistoryTarget = onOpenHistoryTarget,
+            onLogin = onLogin
         )
     }
 }
@@ -66,12 +68,14 @@ fun NavGraphBuilder.historySearchScreen(
 
 fun NavGraphBuilder.watchLaterScreen(
     onBack: () -> Unit,
-    onOpenVideo: (VideoTarget) -> Unit
+    onOpenVideo: (VideoTarget) -> Unit,
+    onLogin: () -> Unit
 ) {
     composable(WATCH_LATER_ROUTE) {
         WatchLaterScreen(
             onBack = onBack,
-            onOpenVideo = onOpenVideo
+            onOpenVideo = onOpenVideo,
+            onLogin = onLogin
         )
     }
 }

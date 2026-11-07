@@ -13,6 +13,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +35,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
+import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
+import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.model.HistoryTab
@@ -46,6 +51,7 @@ fun HistoryScreen(
     onBack: () -> Unit,
     onSearch: (HistoryTab) -> Unit,
     onOpenHistoryTarget: (HistoryTarget?) -> Unit,
+    onLogin: () -> Unit,
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
@@ -91,7 +97,13 @@ fun HistoryScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onSearch(HistoryTab.entries[pagerState.settledPage]) }) {
+                    IconButton(onClick = {
+                        if (viewModel.uiState.value.isLoggedIn) {
+                            onSearch(HistoryTab.entries[pagerState.settledPage])
+                        } else {
+                            onLogin()
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "搜索历史记录"
@@ -124,6 +136,7 @@ fun HistoryScreen(
                     columns = columns,
                     isTablet = isTablet,
                     viewModel = viewModel,
+                    onLogin = onLogin,
                     onOpenHistoryTarget = onOpenHistoryTarget
                 )
             }
@@ -140,6 +153,7 @@ private fun HistoryPage(
     columns: Int,
     isTablet: Boolean,
     viewModel: HistoryViewModel,
+    onLogin: () -> Unit,
     onOpenHistoryTarget: (HistoryTarget?) -> Unit
 ) {
     val pageStates = remember(viewModel, tab) { viewModel.observeTab(tab) }
@@ -150,6 +164,40 @@ private fun HistoryPage(
         derivedStateOf {
             !pagerState.isScrollInProgress && tab.ordinal == pagerState.settledPage
         }
+    }
+
+    if (!pageState.isLoggedIn) {
+        LoginRequiredState(
+            description = "登录后，查看你的观看历史",
+            onLogin = onLogin
+        )
+        return
+    }
+
+    if (pageState.items.isEmpty() && !pageState.isLoading && !pageState.isRefreshing) {
+        BiliPullToRefreshBox(
+            isRefreshing = false,
+            onRefresh = { if (isActivePage) viewModel.refresh() },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val hasError = pageState.errorMessage != null
+            PageState(
+                icon = if (hasError) Icons.Outlined.CloudOff else Icons.Outlined.History,
+                title = when {
+                    hasError -> "加载失败"
+                    tab == HistoryTab.ALL -> "暂无观看历史"
+                    else -> "暂无${tab.title}历史"
+                },
+                description = if (hasError) {
+                    pageState.errorMessage.orEmpty().ifBlank { "加载历史记录失败" }
+                } else {
+                    "你看过的内容会显示在这里"
+                },
+                actionText = if (hasError) "重新加载" else null,
+                onAction = if (hasError) ({ if (isActivePage) viewModel.refresh() }) else null
+            )
+        }
+        return
     }
 
     AdaptiveMediaGrid(
@@ -184,15 +232,6 @@ private fun HistoryPage(
         loadingPlaceholderCount = columns * 8,
         loadingContent = {
             HorizontalVideoCardSkeleton(isTablet = isTablet)
-        },
-        emptyContent = {
-            StateMessageCard(
-                text = pageState.errorMessage ?: "暂无${pageState.tab.title}历史",
-                isError = pageState.errorMessage != null,
-                actionText = pageState.errorMessage?.let { "重试" },
-                onAction = pageState.errorMessage?.let { { viewModel.refresh() } },
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 48.dp)
-            )
         }
     ) { item ->
         HistoryItemCard(

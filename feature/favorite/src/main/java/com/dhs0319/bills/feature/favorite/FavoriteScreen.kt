@@ -12,6 +12,9 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +35,8 @@ import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
-import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
+import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
 import com.dhs0319.bills.core.model.FavoriteContentItem
 import com.dhs0319.bills.core.model.FavoriteContentTarget
@@ -48,8 +52,13 @@ fun FavoriteScreen(
     onBack: () -> Unit,
     onOpenContent: (FavoriteContentTarget) -> Unit,
     onOpenFolder: (FavoriteFolder) -> Unit,
+    onLogin: () -> Unit,
     viewModel: FavoriteViewModel = hiltViewModel()
 ) {
+    val loginStateFlow = remember(viewModel) { viewModel.observeIsLoggedIn() }
+    val isLoggedIn by loginStateFlow.collectAsStateWithLifecycle(
+        initialValue = viewModel.uiState.value.isLoggedIn
+    )
     val selectedTabFlow = remember(viewModel) { viewModel.observeSelectedTab() }
     val selectedTab by selectedTabFlow.collectAsStateWithLifecycle(
         initialValue = viewModel.uiState.value.tab
@@ -110,6 +119,8 @@ fun FavoriteScreen(
             ) { page ->
                 when (FavoriteTab.entries[page]) {
                     FavoriteTab.CONTENT -> FavoriteContentPage(
+                        isLoggedIn = isLoggedIn,
+                        onLogin = onLogin,
                         selectedTab = selectedTab,
                         pagerState = pagerState,
                         gridState = contentGridState,
@@ -120,6 +131,8 @@ fun FavoriteScreen(
                     )
 
                     FavoriteTab.FOLDER -> FavoriteFolderPage(
+                        isLoggedIn = isLoggedIn,
+                        onLogin = onLogin,
                         selectedTab = selectedTab,
                         pagerState = pagerState,
                         gridState = folderGridState,
@@ -135,6 +148,8 @@ fun FavoriteScreen(
 
 @Composable
 private fun FavoriteContentPage(
+    isLoggedIn: Boolean,
+    onLogin: () -> Unit,
     selectedTab: FavoriteTab,
     pagerState: PagerState,
     gridState: LazyStaggeredGridState,
@@ -165,6 +180,14 @@ private fun FavoriteContentPage(
         }
     }
 
+    if (!isLoggedIn) {
+        LoginRequiredState(
+            description = "登录后，查看你的收藏内容和收藏夹",
+            onLogin = onLogin
+        )
+        return
+    }
+
     BiliPullToRefreshBox(
         isRefreshing = state.isRefreshing || state.isLoading,
         onRefresh = onRefresh,
@@ -184,6 +207,8 @@ private fun FavoriteContentPage(
 
 @Composable
 private fun FavoriteFolderPage(
+    isLoggedIn: Boolean,
+    onLogin: () -> Unit,
     selectedTab: FavoriteTab,
     pagerState: PagerState,
     gridState: LazyStaggeredGridState,
@@ -211,6 +236,14 @@ private fun FavoriteFolderPage(
                 viewModel.refresh()
             }
         }
+    }
+
+    if (!isLoggedIn) {
+        LoginRequiredState(
+            description = "登录后，查看你的收藏内容和收藏夹",
+            onLogin = onLogin
+        )
+        return
     }
 
     BiliPullToRefreshBox(
@@ -245,19 +278,20 @@ private fun FavoriteContentBody(
         }
 
         state.items.isEmpty() && state.errorMessage != null -> {
-            StateMessageCard(
-                text = state.errorMessage.ifBlank { "加载收藏失败" },
-                modifier = Modifier.fillMaxSize(),
-                isError = true,
-                actionText = "重试",
+            PageState(
+                icon = Icons.Outlined.CloudOff,
+                title = "加载失败",
+                description = state.errorMessage.ifBlank { "加载收藏失败" },
+                actionText = "重新加载",
                 onAction = onRetry
             )
         }
 
         state.items.isEmpty() -> {
-            StateMessageCard(
-                text = "暂无收藏内容",
-                modifier = Modifier.fillMaxSize()
+            PageState(
+                icon = Icons.Outlined.Bookmarks,
+                title = "暂无收藏内容",
+                description = "收藏喜欢的内容，方便下次找到"
             )
         }
 
@@ -294,19 +328,20 @@ private fun FavoriteFolderBody(
         }
 
         state.folders.isEmpty() && state.errorMessage != null -> {
-            StateMessageCard(
-                text = state.errorMessage.ifBlank { "加载收藏失败" },
-                modifier = Modifier.fillMaxSize(),
-                isError = true,
-                actionText = "重试",
+            PageState(
+                icon = Icons.Outlined.CloudOff,
+                title = "加载失败",
+                description = state.errorMessage.ifBlank { "加载收藏失败" },
+                actionText = "重新加载",
                 onAction = onRetry
             )
         }
 
         state.folders.isEmpty() -> {
-            StateMessageCard(
-                text = "暂无收藏夹",
-                modifier = Modifier.fillMaxSize()
+            PageState(
+                icon = Icons.Outlined.FolderOpen,
+                title = "暂无收藏夹",
+                description = "创建收藏夹，整理你喜欢的内容"
             )
         }
 
