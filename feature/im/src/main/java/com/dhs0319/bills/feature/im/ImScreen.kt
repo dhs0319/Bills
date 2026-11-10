@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
 import com.dhs0319.bills.core.model.ImSessionItem
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @Composable
 fun ImScreen(
     onOpenConversation: (ImSessionItem) -> Unit,
+    onLogin: () -> Unit,
     onOpenMsgFeed: () -> Unit = {},
     onOpenReceivedLikes: () -> Unit = {},
     onOpenNewFollowers: () -> Unit = {},
@@ -98,6 +100,14 @@ fun ImScreen(
             )
         }
     ) { padding ->
+        if (!state.isLoggedIn) {
+            LoginRequiredState(
+                description = "登录后，查看你的私信和互动消息",
+                onLogin = onLogin,
+                modifier = Modifier.padding(padding).padding(bottom = topLevelNavSpace)
+            )
+            return@Scaffold
+        }
         BiliPullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { vm.refresh() },
@@ -105,14 +115,6 @@ fun ImScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (!state.isLoggedIn) {
-                StateMessageCard(
-                    text = "请先登录后查看消息",
-                    modifier = Modifier.fillMaxSize().padding(16.dp)
-                )
-                return@BiliPullToRefreshBox
-            }
-
             Column(modifier = Modifier.fillMaxSize()) {
                 LaunchedEffect(
                     state.currentTab,

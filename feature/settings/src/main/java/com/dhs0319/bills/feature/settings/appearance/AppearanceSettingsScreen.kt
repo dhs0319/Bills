@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -22,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dhs0319.bills.feature.settings.SettingsViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Check
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.theme.AnimationSpeed
 import com.dhs0319.bills.core.designsystem.theme.CornerStyle
 import com.dhs0319.bills.core.designsystem.theme.DEFAULT_PULL_REFRESH_DISTANCE_DP
@@ -55,7 +55,7 @@ fun AppearanceSettingsScreen(
                 title = { Text("外观设置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(MirroredSymbols.ArrowBack, "返回")
                     }
                 }
             )
@@ -252,7 +252,7 @@ private fun ColorItem(
     ) {
         if (selected) {
             Icon(
-                Icons.Default.Check,
+                MaterialSymbols.OutlinedFilled.Check,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)

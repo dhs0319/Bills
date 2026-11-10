@@ -17,10 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.PersonRemove
-import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Person_remove
+import com.composables.icons.materialsymbols.outlined.Schedule
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CoverImage
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
@@ -69,6 +69,7 @@ fun DynamicFeed(
     onRetryLoadMore: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
+    onVisitUp: (Long) -> Unit,
     onOpenLive: (LiveRoute) -> Unit,
     onOpenDynamic: (String) -> Unit,
     onAddToWatchLater: (Long) -> Unit,
@@ -92,7 +93,9 @@ fun DynamicFeed(
                     key = { it.uid },
                     name = { it.name },
                     face = { it.face },
+                    hasUpdate = { it.hasUpdate },
                     onClick = { item ->
+                        onVisitUp(item.uid)
                         onOpenSpace(SpaceRoute(mid = item.uid, name = item.name))
                     }
                 )
@@ -305,7 +308,7 @@ private fun DynamicMoreMenu(
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
             Icon(
-                imageVector = Icons.Default.MoreVert,
+                imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                 contentDescription = "更多操作",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
@@ -315,7 +318,7 @@ private fun DynamicMoreMenu(
             watchLaterAid?.let { aid ->
                 DropdownMenuItem(
                     text = { Text("稍后再看") },
-                    leadingIcon = { Icon(Icons.Outlined.WatchLater, contentDescription = null) },
+                    leadingIcon = { Icon(MaterialSymbols.Outlined.Schedule, contentDescription = null) },
                     onClick = {
                         expanded = false
                         onAddToWatchLater(aid)
@@ -325,7 +328,7 @@ private fun DynamicMoreMenu(
             if (unfollowMid != null) {
                 DropdownMenuItem(
                     text = { Text("取消关注") },
-                    leadingIcon = { Icon(Icons.Outlined.PersonRemove, contentDescription = null) },
+                    leadingIcon = { Icon(MaterialSymbols.Outlined.Person_remove, contentDescription = null) },
                     onClick = {
                         expanded = false
                         confirmUnfollow = true

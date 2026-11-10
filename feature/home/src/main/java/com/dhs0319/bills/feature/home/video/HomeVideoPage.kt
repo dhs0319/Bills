@@ -17,11 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.Subtitles
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +43,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Play_circle
+import com.composables.icons.materialsymbols.outlined.Subtitles
+import com.composables.icons.materialsymbols.outlined.Visibility
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.feature.home.paging.HomePagingState
 import com.dhs0319.bills.core.designsystem.component.CoverImage
@@ -319,7 +319,7 @@ private fun FeedCoverMetadata(item: FeedItem, modifier: Modifier = Modifier) {
             ) {
                 views?.let {
                     CoverMetric(
-                        icon = if (item.target != null) Icons.Outlined.PlayCircleOutline else Icons.Outlined.Visibility,
+                        icon = if (item.target != null) MaterialSymbols.Outlined.Play_circle else MaterialSymbols.Outlined.Visibility,
                         label = if (item.target != null) "播放" else "观看",
                         value = it,
                         modifier = Modifier.weight(1.2f, fill = false)
@@ -327,7 +327,7 @@ private fun FeedCoverMetadata(item: FeedItem, modifier: Modifier = Modifier) {
                 }
                 danmaku?.let {
                     CoverMetric(
-                        icon = Icons.Outlined.Subtitles,
+                        icon = MaterialSymbols.Outlined.Subtitles,
                         label = "弹幕",
                         value = it,
                         modifier = Modifier.weight(1f, fill = false)
@@ -386,7 +386,7 @@ private fun MoreMenu(
         onClick = { show = true },
         modifier = Modifier.size(24.dp)
     ) {
-        Icon(Icons.Default.MoreVert, contentDescription = null)
+        Icon(MaterialSymbols.OutlinedFilled.More_vert, contentDescription = null)
     }
     if (show) {
         AlertDialog(

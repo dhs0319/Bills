@@ -7,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Close
 import android.graphics.drawable.ColorDrawable
 import kotlinx.coroutines.launch
 
@@ -154,7 +154,7 @@ fun PlaybackSidePanel(
                             ) {
                                 Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                                 IconButton(onClick = dismiss) {
-                                    Icon(Icons.Default.Close, contentDescription = "关闭面板")
+                                    Icon(MaterialSymbols.OutlinedFilled.Close, contentDescription = "关闭面板")
                                 }
                             }
                             Box(

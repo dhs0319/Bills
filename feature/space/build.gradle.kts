@@ -39,7 +39,6 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(platform(libs.androidx.compose.bom))
-    api(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.lifecycle.viewmodel.compose)

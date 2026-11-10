@@ -23,9 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -37,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.model.CommentSort
 import com.dhs0319.bills.feature.comment.component.CommentReplyAction
@@ -139,7 +137,7 @@ private fun CommentThreadContent(
             navigationIcon = {
                 IconButton(onClick = onDismiss) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector = MirroredSymbols.ArrowBack,
                         contentDescription = "返回"
                     )
                 }
@@ -148,7 +146,7 @@ private fun CommentThreadContent(
                 if (isDetailMode) {
                     IconButton(onClick = { onReplyAction(CommentReplyAction.OpenOriginalContent(state.root)) }) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            imageVector = MirroredSymbols.ExitToApp,
                             contentDescription = "前往原内容"
                         )
                     }

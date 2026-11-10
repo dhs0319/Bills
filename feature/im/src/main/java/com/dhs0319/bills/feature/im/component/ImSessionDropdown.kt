@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -28,6 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Arrow_drop_down
+import com.composables.icons.materialsymbols.outlinedfilled.Check
 import com.dhs0319.bills.core.model.ImSessionTab
 
 @Composable
@@ -59,7 +59,7 @@ internal fun ImSessionDropdown(
             ) {
                 Text(selectedTab.title, style = MaterialTheme.typography.bodyMedium)
                 Icon(
-                    Icons.Default.ArrowDropDown,
+                    MaterialSymbols.OutlinedFilled.Arrow_drop_down,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -79,7 +79,7 @@ internal fun ImSessionDropdown(
                     },
                     trailingIcon = {
                         if (tab == selectedTab) {
-                            Icon(Icons.Default.Check, contentDescription = null)
+                            Icon(MaterialSymbols.OutlinedFilled.Check, contentDescription = null)
                         }
                     },
                     modifier = Modifier.semantics { selected = tab == selectedTab }

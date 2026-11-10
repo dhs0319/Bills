@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Subtitles
+import com.composables.icons.materialsymbols.outlinedfilled.Subtitles_off
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
@@ -244,7 +244,7 @@ internal fun LivePlayerPane(
                     .size(40.dp)
             ) {
                 Icon(
-                    imageVector = if (danmakuOn) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                    imageVector = if (danmakuOn) MaterialSymbols.OutlinedFilled.Subtitles else MaterialSymbols.OutlinedFilled.Subtitles_off,
                     contentDescription = if (danmakuOn) "关闭弹幕" else "开启弹幕",
                     tint = Color.White
                 )

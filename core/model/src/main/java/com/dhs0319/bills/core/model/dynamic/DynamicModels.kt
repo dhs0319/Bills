@@ -27,7 +27,8 @@ data class DynamicPage(
 @Immutable
 data class DynamicUpList(
     val title: String?,
-    val items: List<DynamicUpItem>
+    val items: List<DynamicUpItem>,
+    val footprint: String = ""
 )
 
 @Immutable
@@ -36,7 +37,8 @@ data class DynamicUpItem(
     val name: String,
     val face: String?,
     val hasUpdate: Boolean,
-    val trackId: String?
+    val trackId: String?,
+    val personalExtra: String = ""
 )
 
 @Immutable

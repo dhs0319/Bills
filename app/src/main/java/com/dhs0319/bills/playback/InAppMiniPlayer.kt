@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +30,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Close
+import com.composables.icons.materialsymbols.outlinedfilled.Play_arrow
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.icon.AppIcons
@@ -161,14 +161,14 @@ fun InAppMiniPlayer(
                 ) {
                     IconButton(onClick = onTogglePlay) {
                         Icon(
-                            imageVector = if (sessionState.isPlaying) AppIcons.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (sessionState.isPlaying) AppIcons.Pause else MaterialSymbols.OutlinedFilled.Play_arrow,
                             contentDescription = if (sessionState.isPlaying) "暂停" else "播放",
                             tint = Color.White
                         )
                     }
                     IconButton(onClick = onClose) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            imageVector = MaterialSymbols.OutlinedFilled.Close,
                             contentDescription = "关闭",
                             tint = Color.White
                         )

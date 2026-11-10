@@ -33,8 +33,8 @@ dependencies {
     api(libs.androidx.compose.ui.graphics)
     api(libs.androidx.compose.ui.tooling.preview)
     api(libs.androidx.compose.material3)
-    api(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.material.icons.extended)
+    api(libs.compose.material.symbols.outlined)
+    api(libs.compose.material.symbols.filled)
     api(libs.androidx.compose.material3.adaptive)
     api(libs.androidx.compose.material3.adaptive.layout)
     api(libs.androidx.compose.material3.adaptive.navigation)
@@ -45,4 +45,5 @@ dependencies {
     implementation(libs.google.material)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
 }

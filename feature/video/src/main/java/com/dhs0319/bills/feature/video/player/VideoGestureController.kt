@@ -23,12 +23,6 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,6 +46,12 @@ import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Brightness_6
+import com.composables.icons.materialsymbols.outlinedfilled.Fast_forward
+import com.composables.icons.materialsymbols.outlinedfilled.Fast_rewind
+import com.composables.icons.materialsymbols.outlinedfilled.Play_arrow
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.icon.AppIcons
 import com.dhs0319.bills.core.model.PlayerInteractionPrefs
 import kotlin.math.abs
@@ -340,7 +340,7 @@ fun VideoGestureFeedback(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = if (isBrightness) Icons.Default.Brightness6 else Icons.AutoMirrored.Filled.VolumeUp,
+                        imageVector = if (isBrightness) MaterialSymbols.OutlinedFilled.Brightness_6 else MirroredSymbols.VolumeUp,
                         contentDescription = if (isBrightness) "亮度" else "音量",
                         tint = Color.White,
                         modifier = Modifier.size(28.dp)
@@ -435,7 +435,7 @@ fun VideoGestureFeedback(
                             .padding(16.dp)
                     ) {
                         Icon(
-                            imageVector = if (hint == DoubleTapHint.Pause) AppIcons.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (hint == DoubleTapHint.Pause) AppIcons.Pause else MaterialSymbols.OutlinedFilled.Play_arrow,
                             contentDescription = if (hint == DoubleTapHint.Pause) "暂停" else "播放",
                             tint = Color.White,
                             modifier = Modifier.size(32.dp)
@@ -453,9 +453,9 @@ fun VideoGestureFeedback(
                     ) {
                         Icon(
                             imageVector = if (hint == DoubleTapHint.Rewind) {
-                                Icons.Default.FastRewind
+                                MaterialSymbols.OutlinedFilled.Fast_rewind
                             } else {
-                                Icons.Default.FastForward
+                                MaterialSymbols.OutlinedFilled.Fast_forward
                             },
                             contentDescription = hintText,
                             tint = Color.White,
@@ -483,7 +483,7 @@ fun VideoGestureFeedback(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.FastForward,
+                    imageVector = MaterialSymbols.OutlinedFilled.Fast_forward,
                     contentDescription = "倍速播放",
                     tint = Color.White,
                     modifier = Modifier.size(24.dp)

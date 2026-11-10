@@ -19,11 +19,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.Dynamic_feed
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
-import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
+import com.dhs0319.bills.core.designsystem.component.PageState
+import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
@@ -36,6 +42,7 @@ fun DynamicScreen(
     onOpenSpace: (SpaceRoute) -> Unit,
     onOpenLive: (LiveRoute) -> Unit,
     onOpenDynamic: (String) -> Unit,
+    onLogin: () -> Unit,
     refreshRequest: Int = 0,
     viewModel: DynamicViewModel = hiltViewModel()
 ) {
@@ -43,6 +50,10 @@ fun DynamicScreen(
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val listState = rememberLazyListState()
+    val topLevelNavSpace = LocalTopLevelNavSpace.current
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshVisitedUps()
+    }
     val shouldLoadMore by remember(
         state.items.size,
         state.canLoadMore,
@@ -87,6 +98,14 @@ fun DynamicScreen(
             )
         }
     ) { padding ->
+        if (!state.isLoggedIn) {
+            LoginRequiredState(
+                description = "登录后，查看你关注的 UP 主动态",
+                onLogin = onLogin,
+                modifier = Modifier.padding(padding).padding(bottom = topLevelNavSpace)
+            )
+            return@Scaffold
+        }
         BiliPullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = viewModel::refresh,
@@ -95,13 +114,6 @@ fun DynamicScreen(
                 .padding(padding)
         ) {
             when {
-                !state.isLoggedIn -> {
-                    StateMessageCard(
-                        text = "请先登录后查看动态",
-                        modifier = Modifier.fillMaxSize().padding(16.dp)
-                    )
-                }
-
                 state.isLoading && state.items.isEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -112,17 +124,22 @@ fun DynamicScreen(
                 }
 
                 state.errorMessage != null && state.items.isEmpty() -> {
-                    StateMessageCard(
-                        text = state.errorMessage.orEmpty().ifBlank { "加载动态失败" },
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                        isError = true
+                    PageState(
+                        icon = MaterialSymbols.Outlined.Cloud_off,
+                        title = "加载失败",
+                        description = state.errorMessage.orEmpty().ifBlank { "加载动态失败" },
+                        actionText = "重新加载",
+                        onAction = viewModel::refresh,
+                        modifier = Modifier.padding(bottom = topLevelNavSpace)
                     )
                 }
 
                 state.items.isEmpty() -> {
-                    StateMessageCard(
-                        text = "暂无动态",
-                        modifier = Modifier.fillMaxSize().padding(16.dp)
+                    PageState(
+                        icon = MaterialSymbols.Outlined.Dynamic_feed,
+                        title = "暂无动态",
+                        description = "关注 UP 主后，新的动态会出现在这里",
+                        modifier = Modifier.padding(bottom = topLevelNavSpace)
                     )
                 }
 
@@ -139,6 +156,7 @@ fun DynamicScreen(
                         onRetryLoadMore = viewModel::loadMore,
                         onOpenVideo = onOpenVideo,
                         onOpenSpace = onOpenSpace,
+                        onVisitUp = viewModel::visitUp,
                         onOpenLive = onOpenLive,
                         onOpenDynamic = onOpenDynamic,
                         onAddToWatchLater = viewModel::addToWatchLater,

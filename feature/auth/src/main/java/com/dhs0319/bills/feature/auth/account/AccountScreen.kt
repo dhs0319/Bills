@@ -12,11 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -45,6 +40,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Add
+import com.composables.icons.materialsymbols.outlinedfilled.Check_circle
+import com.composables.icons.materialsymbols.outlinedfilled.Delete
+import com.composables.icons.materialsymbols.outlinedfilled.Person
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.model.LoginCredential
@@ -82,7 +83,7 @@ fun AccountScreen(
                 title = { Text("账号管理") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(MirroredSymbols.ArrowBack, contentDescription = "返回")
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -119,7 +120,7 @@ fun AccountScreen(
                 onClick = onAddAccount,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(MaterialSymbols.OutlinedFilled.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("添加账号")
             }
@@ -196,7 +197,7 @@ private fun GuestCard(
                 )
                 if (isCurrent) {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        MaterialSymbols.OutlinedFilled.Check_circle,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.primary
@@ -225,7 +226,7 @@ private fun GuestCard(
 //    ) {
 //        Column(horizontalAlignment = Alignment.CenterHorizontally) {
 //            Icon(
-//                Icons.Default.Person,
+//                MaterialSymbols.OutlinedFilled.Person,
 //                contentDescription = null,
 //                modifier = Modifier.size(64.dp),
 //                tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -286,7 +287,7 @@ private fun AccountCard(
                     )
                     if (isCurrent) {
                         Icon(
-                            Icons.Default.CheckCircle,
+                            MaterialSymbols.OutlinedFilled.Check_circle,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.primary
@@ -329,7 +330,7 @@ private fun AccountCard(
 
             IconButton(onClick = if (isCurrent) onLogout else onRemove) {
                 Icon(
-                    Icons.Default.Delete,
+                    MaterialSymbols.OutlinedFilled.Delete,
                     contentDescription = if (isCurrent) "退出登录" else "移除",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )

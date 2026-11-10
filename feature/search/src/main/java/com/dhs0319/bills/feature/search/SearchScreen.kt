@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +30,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Menu
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.FilledTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
@@ -337,7 +337,7 @@ private fun SearchFilterButton(
         )
     ) {
         Icon(
-            imageVector = Icons.Default.Menu,
+            imageVector = MaterialSymbols.OutlinedFilled.Menu,
             contentDescription = "筛选",
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
             tint = if (active) {

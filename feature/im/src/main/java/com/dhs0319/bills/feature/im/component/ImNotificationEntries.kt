@@ -9,10 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,6 +22,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.Person_add
+import com.composables.icons.materialsymbols.outlinedfilled.Thumb_up
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 
 @Composable
 internal fun ImNotificationEntries(
@@ -41,19 +41,19 @@ internal fun ImNotificationEntries(
     ) {
         ImNotificationEntry(
             label = "回复与@",
-            icon = Icons.AutoMirrored.Filled.Chat,
+            icon = MirroredSymbols.Chat,
             onClick = onOpenReplyAndMentions,
             modifier = Modifier.weight(1f)
         )
         ImNotificationEntry(
             label = "收到喜欢",
-            icon = Icons.Filled.ThumbUp,
+            icon = MaterialSymbols.OutlinedFilled.Thumb_up,
             onClick = onOpenReceivedLikes,
             modifier = Modifier.weight(1f)
         )
         ImNotificationEntry(
             label = "新增粉丝",
-            icon = Icons.Filled.PersonAdd,
+            icon = MaterialSymbols.OutlinedFilled.Person_add,
             onClick = onOpenNewFollowers,
             modifier = Modifier.weight(1f)
         )

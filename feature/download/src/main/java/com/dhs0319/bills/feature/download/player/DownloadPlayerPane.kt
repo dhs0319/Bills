@@ -14,11 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +37,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.composables.icons.materialsymbols.outlinedfilled.Subtitles
+import com.composables.icons.materialsymbols.outlinedfilled.Subtitles_off
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.DanmakuSettingsSection
 import com.dhs0319.bills.core.designsystem.component.PlaybackOption
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionBottomSheet
@@ -178,7 +178,7 @@ internal fun DownloadPlayerPane(
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector = MirroredSymbols.ArrowBack,
                         contentDescription = "返回",
                         tint = Color.White
                     )
@@ -198,9 +198,9 @@ internal fun DownloadPlayerPane(
                     ) {
                         Icon(
                             imageVector = if (danmakuConfig.enabled) {
-                                Icons.Default.Subtitles
+                                MaterialSymbols.OutlinedFilled.Subtitles
                             } else {
-                                Icons.Default.SubtitlesOff
+                                MaterialSymbols.OutlinedFilled.Subtitles_off
                             },
                             contentDescription = if (danmakuConfig.enabled) "关闭弹幕" else "开启弹幕",
                             tint = Color.White
@@ -215,7 +215,7 @@ internal fun DownloadPlayerPane(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.MoreVert,
+                            imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                             contentDescription = "更多设置",
                             tint = Color.White
                         )

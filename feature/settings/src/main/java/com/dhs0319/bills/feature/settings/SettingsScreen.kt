@@ -8,17 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Tv
+import com.composables.icons.materialsymbols.outlinedfilled.Auto_awesome
+import com.composables.icons.materialsymbols.outlinedfilled.Info
+import com.composables.icons.materialsymbols.outlinedfilled.Lock
+import com.composables.icons.materialsymbols.outlinedfilled.Palette
+import com.composables.icons.materialsymbols.outlinedfilled.Touch_app
+import com.composables.icons.materialsymbols.outlinedfilled.Tune
+import com.composables.icons.materialsymbols.outlinedfilled.Video_settings
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.CapsuleGroup
 import com.dhs0319.bills.core.designsystem.component.CapsuleListItem
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
@@ -90,49 +89,49 @@ fun SettingsScreen(
     }
     val homeItems = listOf(
             SettingsHomeItem(
-                icon = Icons.Default.Edit,
+                icon = MaterialSymbols.OutlinedFilled.Palette,
                 title = "外观设置",
                 subtitle = "主题 颜色 字体",
                 onClick = onNavigateToAppearance
             ),
             SettingsHomeItem(
-                icon = Icons.Default.Tv,
+                icon = MaterialSymbols.Outlined.Tv,
                 title = "显示设置",
                 subtitle = "刷新率和渲染策略",
                 onClick = onNavigateToPerformance
             ),
             SettingsHomeItem(
-                icon = Icons.Default.PlayArrow,
+                icon = MaterialSymbols.OutlinedFilled.Video_settings,
                 title = "播放器设置",
                 subtitle = "画质 音质 和编码格式",
                 onClick = onNavigateToAudioVideo
             ),
             SettingsHomeItem(
-                icon = Icons.Default.TouchApp,
+                icon = MaterialSymbols.OutlinedFilled.Touch_app,
                 title = "交互设置",
                 subtitle = "双击、长按与快进后退",
                 onClick = onNavigateToInteraction
             ),
             SettingsHomeItem(
-                icon = Icons.Default.AutoAwesome,
+                icon = MaterialSymbols.OutlinedFilled.Auto_awesome,
                 title = "内容推荐设置",
                 subtitle = "HD 推荐模式",
                 onClick = onNavigateToFeed
             ),
             SettingsHomeItem(
-                icon = Icons.Default.Tune,
+                icon = MaterialSymbols.OutlinedFilled.Tune,
                 title = "其他设置",
                 subtitle = "网络和其他选项",
                 onClick = onNavigateToOther
             ),
             SettingsHomeItem(
-                icon = Icons.Default.Lock,
+                icon = MaterialSymbols.OutlinedFilled.Lock,
                 title = "隐私安全",
                 subtitle = "历史记录和缓存管理",
                 onClick = onNavigateToPrivacy
             ),
             SettingsHomeItem(
-                icon = Icons.Default.Info,
+                icon = MaterialSymbols.OutlinedFilled.Info,
                 title = "关于",
                 subtitle = "版本信息和开源许可",
                 onClick = onNavigateToAbout
@@ -145,7 +144,7 @@ fun SettingsScreen(
                 title = { Text("设置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(MirroredSymbols.ArrowBack, contentDescription = "返回")
                     }
                 },
                 scrollBehavior = scrollBehavior

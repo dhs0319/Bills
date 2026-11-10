@@ -12,11 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +32,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Delete
+import com.composables.icons.materialsymbols.outlined.Play_circle
+import com.composables.icons.materialsymbols.outlined.Subtitles
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
@@ -253,7 +253,7 @@ private fun FavoriteContentCard(
                         ) {
                             viewText?.let { text ->
                                 Icon(
-                                    imageVector = Icons.Outlined.PlayCircleOutline,
+                                    imageVector = MaterialSymbols.Outlined.Play_circle,
                                     contentDescription = "播放量",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp)
@@ -271,7 +271,7 @@ private fun FavoriteContentCard(
                             }
                             danmakuText?.let { text ->
                                 Icon(
-                                    imageVector = Icons.Outlined.Subtitles,
+                                    imageVector = MaterialSymbols.Outlined.Subtitles,
                                     contentDescription = "弹幕数",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
@@ -311,7 +311,7 @@ private fun FavoriteContentMoreMenu(onRemoveContent: () -> Unit) {
             modifier = Modifier.size(24.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.MoreVert,
+                imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                 contentDescription = "更多操作",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
@@ -323,7 +323,7 @@ private fun FavoriteContentMoreMenu(onRemoveContent: () -> Unit) {
         ) {
             DropdownMenuItem(
                 text = { Text("取消收藏") },
-                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                leadingIcon = { Icon(MaterialSymbols.Outlined.Delete, contentDescription = null) },
                 onClick = {
                     expanded = false
                     onRemoveContent()

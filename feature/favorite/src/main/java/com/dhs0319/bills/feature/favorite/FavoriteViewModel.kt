@@ -2,6 +2,7 @@ package com.dhs0319.bills.feature.favorite
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dhs0319.bills.core.auth.AuthRepository
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.favorite.FavoriteRepository
 import com.dhs0319.bills.core.model.FavoriteContentCursor
@@ -24,14 +25,17 @@ import kotlinx.coroutines.sync.withPermit
 
 @HiltViewModel
 class FavoriteViewModel @Inject constructor(
-    private val repo: FavoriteRepository
+    private val repo: FavoriteRepository,
+    private val authRepo: AuthRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
-        FavoriteUiState(
-            content = FavoriteContentUiState(isLoading = true)
-        )
+        FavoriteUiState(isLoggedIn = authRepo.currentMidFlow.value > 0L)
     )
     val uiState: StateFlow<FavoriteUiState> = _uiState.asStateFlow()
+
+    fun observeIsLoggedIn() = uiState
+        .map { it.isLoggedIn }
+        .distinctUntilChanged()
 
     fun observeSelectedTab() = uiState
         .map { it.tab }
@@ -53,9 +57,29 @@ class FavoriteViewModel @Inject constructor(
     val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
     private val folderPreviewJobs = mutableMapOf<Long, Job>()
     private val folderPreviewSemaphore = Semaphore(3)
+    private var authVersion = 0L
 
     init {
-        loadContent(reset = true, refreshing = false)
+        viewModelScope.launch {
+            authRepo.currentMidFlow.collect { mid ->
+                authVersion += 1L
+                contentJob?.cancel()
+                folderJob?.cancel()
+                folderPreviewJobs.values.toList().forEach { it.cancel() }
+                folderPreviewJobs.clear()
+                deletingContent.clear()
+                removedContent.clear()
+                _actionMessage.value = null
+                val tab = _uiState.value.tab
+                _uiState.value = FavoriteUiState(tab = tab, isLoggedIn = mid > 0L)
+                if (mid > 0L) {
+                    when (tab) {
+                        FavoriteTab.CONTENT -> loadContent(reset = true, refreshing = false)
+                        FavoriteTab.FOLDER -> loadFolders(refreshing = false)
+                    }
+                }
+            }
+        }
     }
 
     fun selectTab(tab: FavoriteTab) {
@@ -66,7 +90,7 @@ class FavoriteViewModel @Inject constructor(
             FavoriteTab.FOLDER -> !state.folder.hasLoaded
         }
         _uiState.update { it.copy(tab = tab) }
-        if (!shouldLoad) return
+        if (!state.isLoggedIn || !shouldLoad) return
         when (tab) {
             FavoriteTab.CONTENT -> loadContent(reset = true, refreshing = false)
             FavoriteTab.FOLDER -> loadFolders(refreshing = false)
@@ -74,6 +98,7 @@ class FavoriteViewModel @Inject constructor(
     }
 
     fun refresh() {
+        if (!_uiState.value.isLoggedIn) return
         when (_uiState.value.tab) {
             FavoriteTab.CONTENT -> {
                 removedContent.clear()
@@ -89,17 +114,21 @@ class FavoriteViewModel @Inject constructor(
     }
 
     fun loadMore() {
+        if (!_uiState.value.isLoggedIn) return
         val state = _uiState.value.content
         if (!state.canLoadMore) return
         loadContent(reset = false, refreshing = false)
     }
 
     fun removeContent(item: FavoriteContentItem) {
+        if (!_uiState.value.isLoggedIn) return
         val identity = item.otype to item.oid
         if (item.oid <= 0L || !deletingContent.add(identity)) return
+        val version = authVersion
         viewModelScope.launch {
             try {
                 repo.removeFromFavorites(item)
+                if (version != authVersion) return@launch
                 removedContent.add(identity)
                 _uiState.update { state ->
                     state.copy(
@@ -116,10 +145,11 @@ class FavoriteViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (version != authVersion) return@launch
                 Logger.e(TAG, e) { "取消收藏失败" }
                 _actionMessage.value = e.message?.takeIf(String::isNotBlank) ?: "取消收藏失败"
             } finally {
-                deletingContent.remove(identity)
+                if (version == authVersion) deletingContent.remove(identity)
             }
         }
     }
@@ -133,6 +163,7 @@ class FavoriteViewModel @Inject constructor(
     }
 
     fun loadFolderPreview(fid: Long) {
+        if (!_uiState.value.isLoggedIn) return
         val state = _uiState.value.folder
         val folder = state.folders.firstOrNull { it.fid == fid } ?: return
         if (folder.mediaCount <= 0 || state.isRefreshing ||
@@ -171,7 +202,7 @@ class FavoriteViewModel @Inject constructor(
     }
 
     private fun loadFolders(refreshing: Boolean) {
-        if (folderJob?.isActive == true) return
+        if (!_uiState.value.isLoggedIn || folderJob?.isActive == true) return
         folderJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -185,6 +216,7 @@ class FavoriteViewModel @Inject constructor(
             runCatching {
                 repo.fetchMyFavorites()
             }.onSuccess { page ->
+                ensureActive()
                 folderPreviewJobs.values.toList().forEach { it.cancel() }
                 folderPreviewJobs.clear()
                 _uiState.update {
@@ -220,7 +252,7 @@ class FavoriteViewModel @Inject constructor(
         reset: Boolean,
         refreshing: Boolean
     ) {
-        if (contentJob?.isActive == true) return
+        if (!_uiState.value.isLoggedIn || contentJob?.isActive == true) return
         val reqCursor = if (reset) FavoriteContentCursor() else _uiState.value.content.cursor
         contentJob = viewModelScope.launch {
             _uiState.update {
@@ -237,6 +269,7 @@ class FavoriteViewModel @Inject constructor(
             runCatching {
                 repo.fetchFavoriteContents(reqCursor)
             }.onSuccess { page ->
+                ensureActive()
                 _uiState.update {
                     it.copy(
                         content = it.content.copy(

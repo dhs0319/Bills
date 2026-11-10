@@ -10,6 +10,7 @@ import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.ImSessionTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,31 +23,26 @@ class ImViewModel @Inject constructor(
     private val imRepo: ImRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ImUiState())
+    private val _uiState = MutableStateFlow(
+        ImUiState(isLoggedIn = authRepo.currentMidFlow.value > 0L)
+    )
     val uiState: StateFlow<ImUiState> = _uiState.asStateFlow()
     private val cache = mutableMapOf<ImSessionTab, ImTabCache>()
     private var reqId = 0L
+    private var authVersion = 0L
     private var handledSessionListVersion = 0L
 
     init {
         viewModelScope.launch {
             authRepo.currentMidFlow.collect { mid ->
                 reqId += 1L
-                if (mid > 0) {
-                    _uiState.update { state ->
-                        state.copy(
-                            isLoggedIn = true,
-                            errorMessage = null,
-                            loadMoreError = null
-                        )
-                    }
-                    val state = _uiState.value
-                    if (state.sessions.isNotEmpty() || cache.isNotEmpty()) return@collect
-                    refresh(forceLoading = true)
-                } else {
-                    cache.clear()
-                    _uiState.value = ImUiState(isLoggedIn = false)
-                }
+                authVersion += 1L
+                cache.clear()
+                _uiState.value = ImUiState(
+                    currentTab = _uiState.value.currentTab,
+                    isLoggedIn = mid > 0L
+                )
+                if (mid > 0L) refresh(forceLoading = true)
             }
         }
         viewModelScope.launch {
@@ -56,7 +52,7 @@ class ImViewModel @Inject constructor(
 
     fun selectTab(tab: ImSessionTab) {
         val state = _uiState.value
-        if (state.currentTab == tab || state.isLoading || state.isRefreshing || state.isLoadingMore) return
+        if (!state.isLoggedIn || state.currentTab == tab || state.isLoading || state.isRefreshing || state.isLoadingMore) return
         cache[tab]?.let { cached ->
             _uiState.value = state.copy(
                 tabs = ImSessionTab.entries,
@@ -124,17 +120,22 @@ class ImViewModel @Inject constructor(
     }
 
     fun togglePin(item: ImSessionItem) {
+        if (!_uiState.value.isLoggedIn) return
         val sessionId = item.sessionId ?: return
         val target = !item.isPinned
         if (target && !item.canPin) return
         if (!target && !item.canUnpin) return
         val tab = _uiState.value.currentTab
+        val version = authVersion
         _uiState.update { it.copy(actionError = null) }
         mutateSessions(tab) { list -> list.withPinned(item.key, target) }
         viewModelScope.launch {
             try {
                 imRepo.setSessionPinned(sessionId, target)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (version != authVersion) return@launch
                 mutateSessions(tab) { list -> list.withPinned(item.key, item.isPinned) }
                 _uiState.update { it.copy(actionError = e.userMessage(PIN_ERR)) }
             }
@@ -142,16 +143,21 @@ class ImViewModel @Inject constructor(
     }
 
     fun deleteSession(item: ImSessionItem) {
+        if (!_uiState.value.isLoggedIn) return
         val sessionId = item.sessionId ?: return
         if (!item.canDelete) return
         val tab = _uiState.value.currentTab
         val snapshot = _uiState.value.sessions
+        val version = authVersion
         _uiState.update { it.copy(actionError = null) }
         mutateSessions(tab) { list -> list.filterNot { it.key == item.key } }
         viewModelScope.launch {
             try {
                 imRepo.deleteSession(sessionId)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (version != authVersion) return@launch
                 cache[tab] = ImTabCache(snapshot, cache[tab]?.paginationParams)
                 if (_uiState.value.currentTab == tab) {
                     _uiState.update { it.copy(sessions = snapshot) }

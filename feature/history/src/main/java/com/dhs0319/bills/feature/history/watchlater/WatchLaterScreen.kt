@@ -21,14 +21,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,13 +54,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.composables.icons.materialsymbols.outlined.Delete
+import com.composables.icons.materialsymbols.outlined.Play_circle
+import com.composables.icons.materialsymbols.outlined.Schedule
+import com.composables.icons.materialsymbols.outlined.Subtitles
+import com.composables.icons.materialsymbols.outlinedfilled.Arrow_drop_down
+import com.composables.icons.materialsymbols.outlinedfilled.Check
+import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
+import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
+import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
 import com.dhs0319.bills.core.model.VideoTarget
@@ -82,6 +87,7 @@ import com.dhs0319.bills.feature.history.component.formatVideoDuration
 fun WatchLaterScreen(
     onBack: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
+    onLogin: () -> Unit,
     viewModel: WatchLaterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -117,7 +123,7 @@ fun WatchLaterScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -127,7 +133,7 @@ fun WatchLaterScreen(
                         asc = state.asc,
                         onSelect = onSelectSort,
                         modifier = Modifier.padding(end = 4.dp),
-                        enabled = !state.isLoading && !state.isRefreshing &&
+                        enabled = state.isLoggedIn && !state.isLoading && !state.isRefreshing &&
                             !state.isLoadingMore && !pagerState.isScrollInProgress
                     )
                 },
@@ -156,6 +162,7 @@ fun WatchLaterScreen(
                     columns = columns,
                     isTablet = isTablet,
                     viewModel = viewModel,
+                    onLogin = onLogin,
                     onOpenVideo = onOpenVideo
                 )
             }
@@ -172,6 +179,7 @@ private fun WatchLaterPage(
     columns: Int,
     isTablet: Boolean,
     viewModel: WatchLaterViewModel,
+    onLogin: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit
 ) {
     val pageStates = remember(viewModel, tab) { viewModel.observeTab(tab) }
@@ -194,6 +202,40 @@ private fun WatchLaterPage(
     }
     val onLoadMore = remember(viewModel) { viewModel::loadMore }
     val onRemoveItem = remember(viewModel) { viewModel::removeItem }
+
+    if (!pageState.isLoggedIn) {
+        LoginRequiredState(
+            description = "登录后，查看你保存的待看视频",
+            onLogin = onLogin
+        )
+        return
+    }
+
+    if (pageState.items.isEmpty() && !pageState.isLoading && !pageState.isRefreshing) {
+        BiliPullToRefreshBox(
+            isRefreshing = false,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val hasError = pageState.errorMessage != null
+            PageState(
+                icon = if (hasError) MaterialSymbols.Outlined.Cloud_off else MaterialSymbols.Outlined.Schedule,
+                title = when {
+                    hasError -> "加载失败"
+                    tab == WatchLaterTab.UNFINISHED -> "暂无未看完的内容"
+                    else -> "暂无稍后再看内容"
+                },
+                description = if (hasError) {
+                    pageState.errorMessage.orEmpty().ifBlank { "加载稍后再看失败" }
+                } else {
+                    "将感兴趣的视频加入稍后再看，留待有空时观看"
+                },
+                actionText = if (hasError) "重新加载" else null,
+                onAction = if (hasError) onRefresh else null
+            )
+        }
+        return
+    }
 
     AdaptiveMediaGrid(
         items = pageState.items,
@@ -232,16 +274,6 @@ private fun WatchLaterPage(
         },
         loadMoreContent = {
             WatchLaterLoadingRows(columns = columns, isTablet = isTablet)
-        },
-        emptyContent = {
-            StateMessageCard(
-                text = pageState.errorMessage?.ifBlank { "加载稍后再看失败" }
-                    ?: "暂无${pageState.tab.title}内容",
-                isError = pageState.errorMessage != null,
-                actionText = pageState.errorMessage?.let { "重试" },
-                onAction = pageState.errorMessage?.let { onRefresh },
-                modifier = Modifier.padding(vertical = 48.dp)
-            )
         }
     ) { item ->
         WatchLaterItemCard(
@@ -308,7 +340,7 @@ private fun WatchLaterSortDropdown(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
+                    imageVector = MaterialSymbols.OutlinedFilled.Arrow_drop_down,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -328,7 +360,7 @@ private fun WatchLaterSortDropdown(
                     },
                     trailingIcon = {
                         if (option == asc) {
-                            Icon(Icons.Default.Check, contentDescription = null)
+                            Icon(MaterialSymbols.OutlinedFilled.Check, contentDescription = null)
                         }
                     },
                     modifier = Modifier.semantics { selected = option == asc }
@@ -454,7 +486,7 @@ private fun WatchLaterItemCard(
                         ) {
                             viewText?.let { text ->
                                 Icon(
-                                    imageVector = Icons.Outlined.PlayCircleOutline,
+                                    imageVector = MaterialSymbols.Outlined.Play_circle,
                                     contentDescription = "播放量",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp)
@@ -472,7 +504,7 @@ private fun WatchLaterItemCard(
                             }
                             danmakuText?.let { text ->
                                 Icon(
-                                    imageVector = Icons.Outlined.Subtitles,
+                                    imageVector = MaterialSymbols.Outlined.Subtitles,
                                     contentDescription = "弹幕数",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
@@ -510,7 +542,7 @@ private fun WatchLaterMoreMenu(onDelete: () -> Unit) {
             modifier = Modifier.size(24.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.MoreVert,
+                imageVector = MaterialSymbols.OutlinedFilled.More_vert,
                 contentDescription = "更多操作",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
@@ -522,7 +554,7 @@ private fun WatchLaterMoreMenu(onDelete: () -> Unit) {
         ) {
             DropdownMenuItem(
                 text = { Text("删除") },
-                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                leadingIcon = { Icon(MaterialSymbols.Outlined.Delete, contentDescription = null) },
                 onClick = {
                     expanded = false
                     onDelete()

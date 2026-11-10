@@ -40,8 +40,6 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     implementation(platform(libs.androidx.compose.bom))
-    api(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.coil.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)

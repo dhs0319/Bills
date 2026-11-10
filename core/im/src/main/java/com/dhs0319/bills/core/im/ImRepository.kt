@@ -6,6 +6,8 @@ import com.bapis.bilibili.app.im.v1.CustomerId
 import com.bapis.bilibili.app.im.v1.DeleteSessionReply
 import com.bapis.bilibili.app.im.v1.DeleteSessionReq
 import com.bapis.bilibili.app.im.v1.FoldId
+import com.bapis.bilibili.app.im.v1.GetTotalUnreadReply
+import com.bapis.bilibili.app.im.v1.GetTotalUnreadReq
 import com.bapis.bilibili.app.im.v1.GroupId
 import com.bapis.bilibili.app.im.v1.MsgSummary
 import com.bapis.bilibili.app.im.v1.Offset
@@ -63,6 +65,7 @@ import com.dhs0319.bills.core.model.ImMsgType
 import com.dhs0319.bills.core.model.ImSessionId
 import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.ImSessionTab
+import com.dhs0319.bills.core.model.ImUnreadBadge
 import com.dhs0319.bills.infra.grpc.BiliGrpcClient
 import com.dhs0319.bills.infra.network.BiliRestClient
 import com.dhs0319.bills.infra.network.BiliRestParamBuilder
@@ -120,6 +123,16 @@ class ImRepository @Inject constructor(
 
     fun notifySessionListChanged() {
         _sessionListVersion.update { it + 1L }
+    }
+
+    suspend fun fetchTotalUnread(): ImUnreadBadge {
+        require(authProvider.mid > 0L) { "请先登录" }
+        val reply = grpcClient.call(
+            endpoint = TOTAL_UNREAD_ENDPOINT,
+            requestBytes = GetTotalUnreadReq.getDefaultInstance().toByteArray(),
+            parser = GetTotalUnreadReply.parser()
+        )
+        return reply.total.toImUnreadBadge()
     }
 
     suspend fun fetchSessions(
@@ -862,6 +875,7 @@ class ImRepository @Inject constructor(
     }
 
     private companion object {
+        const val TOTAL_UNREAD_ENDPOINT = "bilibili.app.im.v1.im/GetTotalUnread"
         const val MAIN_ENDPOINT = "bilibili.app.im.v1.im/SessionMain"
         const val SECONDARY_ENDPOINT = "bilibili.app.im.v1.im/SessionSecondary"
         const val PIN_SESSION_ENDPOINT = "bilibili.app.im.v1.im/PinSession"

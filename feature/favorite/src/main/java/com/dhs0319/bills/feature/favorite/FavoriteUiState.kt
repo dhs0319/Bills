@@ -46,7 +46,8 @@ data class FavoriteFolderUiState(
 data class FavoriteUiState(
     val tab: FavoriteTab = FavoriteTab.CONTENT,
     val content: FavoriteContentUiState = FavoriteContentUiState(),
-    val folder: FavoriteFolderUiState = FavoriteFolderUiState()
+    val folder: FavoriteFolderUiState = FavoriteFolderUiState(),
+    val isLoggedIn: Boolean = false
 ) {
     val isRefreshing: Boolean
         get() = when (tab) {

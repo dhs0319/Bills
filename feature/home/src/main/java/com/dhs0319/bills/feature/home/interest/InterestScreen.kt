@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,9 +33,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Cloud_off
+import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
-import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
+import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.model.DistributionAreaItem
 import com.dhs0319.bills.core.model.InterestAreaLabels
 import com.dhs0319.bills.core.model.InterestDistributionMaterial
@@ -47,6 +49,7 @@ import com.dhs0319.bills.core.model.InterestLabel
 @Composable
 fun InterestScreen(
     onBack: () -> Unit,
+    onLogin: () -> Unit,
     viewModel: InterestViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -64,7 +67,7 @@ fun InterestScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = MirroredSymbols.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -73,6 +76,14 @@ fun InterestScreen(
             )
         }
     ) { padding ->
+        if (!state.isLoggedIn) {
+            LoginRequiredState(
+                description = "登录后，查看和调整你的内容偏好",
+                onLogin = onLogin,
+                modifier = Modifier.padding(padding)
+            )
+            return@CollapsingTopBarScaffold
+        }
         BiliPullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = viewModel::refresh,
@@ -91,19 +102,13 @@ fun InterestScreen(
                 }
 
                 state.errorMessage != null && state.response == null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        StateMessageCard(
-                            text = state.errorMessage.orEmpty()
-                                .ifBlank { "加载兴趣标签失败" },
-                            modifier = Modifier.padding(16.dp),
-                            isError = true,
-                            actionText = "重试",
-                            onAction = viewModel::refresh
-                        )
-                    }
+                    PageState(
+                        icon = MaterialSymbols.Outlined.Cloud_off,
+                        title = "加载失败",
+                        description = state.errorMessage.orEmpty().ifBlank { "加载内容偏好失败" },
+                        actionText = "重新加载",
+                        onAction = viewModel::refresh
+                    )
                 }
 
                 else -> {
