@@ -103,6 +103,7 @@ internal enum class PlayerVideoResizeMode {
 }
 
 private enum class PlayerDialog {
+    Subtitle,
     Quality,
     Audio,
     Speed
@@ -138,6 +139,7 @@ internal fun VideoPlayerPane(
     val player by viewModel.player.collectAsStateWithLifecycle()
     val downloadSpeedBytesPerSecond by viewModel.downloadSpeedBytesPerSecond.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
+    val subtitleState by viewModel.subtitles.state.collectAsStateWithLifecycle()
     var activeDialog by remember { mutableStateOf<PlayerDialog?>(null) }
     var showPlaybackSheet by remember { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
@@ -195,7 +197,7 @@ internal fun VideoPlayerPane(
             }
         )
 
-        null -> null
+        PlayerDialog.Subtitle, null -> null
     }
     val topStatus = remember(showCtrl, isFull, downloadSpeedBytesPerSecond, settingsState.overlay) {
         if (showCtrl && isFull) {
@@ -370,6 +372,16 @@ internal fun VideoPlayerPane(
                 )
             }
 
+            if (!state.waitingForPlay && state.hasRenderedFirstFrame && subtitleState.primary != null &&
+                subtitleState.aid == state.ids.aid && subtitleState.cid == state.ids.cid) {
+                VideoSubtitleLayer(
+                    player = player,
+                    state = subtitleState,
+                    isFull = isFull,
+                    showControls = showCtrl
+                )
+            }
+
             if (!state.waitingForPlay) {
                 VideoPlayerOverlay(
                     viewModel = viewModel,
@@ -381,6 +393,12 @@ internal fun VideoPlayerPane(
                     activeDialog = activeDialog,
                     showPlaybackSheet = showPlaybackSheet,
                     onShowCtrlChange = { showCtrl = it },
+                    onShowSubtitle = {
+                        showCtrl = true
+                        activeDialog = PlayerDialog.Subtitle
+                        showPlaybackSheet = false
+                        viewModel.loadSubtitleTracks()
+                    },
                     onShowA = {
                         showCtrl = true
                         activeDialog = PlayerDialog.Audio
@@ -597,6 +615,22 @@ internal fun VideoPlayerPane(
             }
 
             if (useSidebar && !state.waitingForPlay) {
+                if (activeDialog == PlayerDialog.Subtitle) {
+                    VideoSubtitlePanel(
+                        state = subtitleState,
+                        onDismiss = { activeDialog = null },
+                        onSelectTrack = {
+                            viewModel.subtitles.selectTrack(it)
+                            activeDialog = null
+                        },
+                        onSelectSecondaryTrack = viewModel.subtitles::selectSecondaryTrack,
+                        onBilingualChange = viewModel.subtitles::setBilingual,
+                        onLargeTextChange = viewModel.subtitles::setLargeText,
+                        onRetry = viewModel.subtitles::retry,
+                        embedded = true,
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxSize()
+                    )
+                }
                 activeOptionPanel?.let { panel ->
                     PlaybackOptionSidebar(
                         embedded = true,
@@ -650,6 +684,20 @@ internal fun VideoPlayerPane(
         }
 
         if (!useSidebar && !state.waitingForPlay) {
+            if (activeDialog == PlayerDialog.Subtitle) {
+                VideoSubtitlePanel(
+                    state = subtitleState,
+                    onDismiss = { activeDialog = null },
+                    onSelectTrack = {
+                        viewModel.subtitles.selectTrack(it)
+                        activeDialog = null
+                    },
+                    onSelectSecondaryTrack = viewModel.subtitles::selectSecondaryTrack,
+                    onBilingualChange = viewModel.subtitles::setBilingual,
+                    onLargeTextChange = viewModel.subtitles::setLargeText,
+                    onRetry = viewModel.subtitles::retry
+                )
+            }
             activeOptionPanel?.let { panel ->
                 PlaybackOptionBottomSheet(
                     title = panel.title,
@@ -705,6 +753,7 @@ private fun VideoPlayerOverlay(
     activeDialog: PlayerDialog?,
     showPlaybackSheet: Boolean,
     onShowCtrlChange: (Boolean) -> Unit,
+    onShowSubtitle: () -> Unit,
     onShowA: () -> Unit,
     onShowQ: () -> Unit,
     onShowSp: () -> Unit,
@@ -844,6 +893,7 @@ private fun VideoPlayerOverlay(
                 gestureSeekMs = gestureState.dragSeekPosMs,
                 onDragMsChange = { dragMs = it },
                 onShowCtrlChange = onShowCtrlChange,
+                onShowSubtitle = onShowSubtitle,
                 onShowA = onShowA,
                 onShowQ = onShowQ,
                 onShowSp = onShowSp,
@@ -865,6 +915,7 @@ private fun PlayerCtrlBarHost(
     gestureSeekMs: Long?,
     onDragMsChange: (Long?) -> Unit,
     onShowCtrlChange: (Boolean) -> Unit,
+    onShowSubtitle: () -> Unit,
     onShowA: () -> Unit,
     onShowQ: () -> Unit,
     onShowSp: () -> Unit,
@@ -872,6 +923,7 @@ private fun PlayerCtrlBarHost(
     modifier: Modifier = Modifier
 ) {
     val progress by viewModel.playbackProgress.collectAsStateWithLifecycle()
+    val subtitles by viewModel.subtitles.state.collectAsStateWithLifecycle()
     val durationMs = player?.duration
         ?.takeIf { it > 0L }
         ?: progress.durationMs.takeIf { it > 0L }
@@ -916,6 +968,11 @@ private fun PlayerCtrlBarHost(
         },
         modifier = modifier,
         optionActions = {
+            PlayerControlTextButton(
+                label = "字幕",
+                text = if (subtitles.selectedTrackId == null) "关" else "开",
+                onClick = onShowSubtitle
+            )
             if ((state.playbackSource?.audios?.size ?: 0) > 1) {
                 PlayerControlTextButton(
                     label = "音频",

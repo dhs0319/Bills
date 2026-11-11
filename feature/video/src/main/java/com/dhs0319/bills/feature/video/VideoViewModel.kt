@@ -7,6 +7,8 @@ import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.history.WatchLaterRepository
 import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.playback.VideoPlaybackController
+import com.dhs0319.bills.core.playback.subtitle.VideoSubtitleRepository
+import com.dhs0319.bills.core.playback.subtitle.VideoSubtitleSession
 import com.dhs0319.bills.core.model.CommentSubject
 import com.dhs0319.bills.core.model.CommentSubjectTool
 import com.dhs0319.bills.core.model.DanmakuConfig
@@ -40,7 +42,8 @@ class VideoViewModel @Inject constructor(
     private val playbackController: VideoPlaybackController,
     private val playerSettings: AppSettings,
     private val videoActionRepository: VideoActionRepository,
-    private val watchLaterRepository: WatchLaterRepository
+    private val watchLaterRepository: WatchLaterRepository,
+    subtitleRepository: VideoSubtitleRepository
 ) : ViewModel() {
 
     private val _targetStack = MutableStateFlow<List<VideoTarget>>(emptyList())
@@ -53,11 +56,15 @@ class VideoViewModel @Inject constructor(
     val playbackProgress: StateFlow<PlaybackProgress> = playbackController.playbackProgress
     val downloadSpeedBytesPerSecond: StateFlow<Long> = playbackController.downloadSpeedBytesPerSecond
     val settingsState = playerSettings.state
+    internal val subtitles = VideoSubtitleSession(viewModelScope, subtitleRepository)
 
     internal val videoActions = VideoActionController(videoActionRepository, viewModelScope)
     internal val actionUiState: StateFlow<VideoActionUiState> = videoActions.state
 
     init {
+        viewModelScope.launch {
+            videoState.map { it.ids }.distinctUntilChanged().collect(subtitles::setSource)
+        }
         viewModelScope.launch {
             playbackController.currentTarget.collect { playbackTarget ->
                 val target = (playbackTarget as? StreamPlaybackTarget.Video)?.target
@@ -100,7 +107,7 @@ class VideoViewModel @Inject constructor(
 
     fun openRoot(target: VideoTarget) {
         _targetStack.value = listOf(target)
-        playbackController.openVideo(target)
+        openVideo(target)
     }
 
     fun openTarget(target: VideoTarget) {
@@ -111,7 +118,7 @@ class VideoViewModel @Inject constructor(
             current.isSameEntry(target) -> _targetStack.value.dropLast(1) + target
             else -> _targetStack.value + target
         }
-        playbackController.openVideo(target)
+        openVideo(target)
     }
 
     fun popPage(): Boolean {
@@ -120,7 +127,7 @@ class VideoViewModel @Inject constructor(
         val nextStack = stack.dropLast(1)
         val nextTarget = nextStack.last()
         _targetStack.value = nextStack
-        playbackController.openVideo(nextTarget)
+        openVideo(nextTarget)
         return true
     }
 
@@ -218,6 +225,20 @@ class VideoViewModel @Inject constructor(
         playbackController.switchVideoAudio(audioId)
     }
 
+    internal fun loadSubtitleTracks() {
+        subtitles.setSource(videoState.value.ids)
+        subtitles.loadTracks()
+    }
+
+    fun onVideoOpened() {
+        subtitles.onVideoOpened()
+    }
+
+    private fun openVideo(target: VideoTarget) {
+        onVideoOpened()
+        playbackController.openVideo(target)
+    }
+
     fun updateVideoCdnMode(mode: VideoCdnMode) {
         viewModelScope.launch {
             playerSettings.setVideoCdnMode(mode)
@@ -298,14 +319,14 @@ class VideoViewModel @Inject constructor(
             src = pageTarget.src
         )
         _targetStack.value = _targetStack.value.dropLast(1) + nextTarget
-        playbackController.openVideo(nextTarget)
+        openVideo(nextTarget)
     }
 
     fun switchEpisode(target: VideoTarget) {
         val cur = currentTarget() ?: return
         if (cur == target) return
         _targetStack.value = _targetStack.value.dropLast(1) + target
-        playbackController.openVideo(target)
+        openVideo(target)
     }
 
     fun currentDownloadRequest(

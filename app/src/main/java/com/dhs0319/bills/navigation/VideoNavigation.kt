@@ -114,6 +114,8 @@ fun NavGraphBuilder.videoScreen(
                     target.resumePosition != null && target.resumePosition != playingTarget?.resumePosition
                 if (!target.isSameEntry(playingTarget) || !samePart || resumeChangedBeforePlayback) {
                     videoViewModel.openRoot(target)
+                } else {
+                    videoViewModel.onVideoOpened()
                 }
                 entry.savedStateHandle[VIDEO_INITIALIZED_KEY] = true
             }
