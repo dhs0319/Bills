@@ -42,6 +42,12 @@
   <img src="images/shot2.png" alt="BBSpace screenshot player" width="240" />
 </p>
 
+## 下载与运行
+
+- 用户安装：前往 [Releases](https://github.com/dhs0319/Bills/releases) 下载最新 APK，64位请下载v8a安装包(v7a适用于老旧设备)
+- 系统要求：Android 7.0 及以上
+- 开发环境：JDK 17、Android SDK 36
+
 ## 当前功能
 
 ### 账号
@@ -93,11 +99,6 @@
 - `OkHttp` `Retrofit` `Protobuf` 负责网络和协议层
 - 实现 B 站 gRPC over HTTP/1.1 请求封装
 
-## 下载与运行
-
-- 用户安装：前往 [Releases](https://github.com/dhs0319/Bills/releases) 下载最新 APK
-- 系统要求：Android 7.0 及以上
-- 开发环境：JDK 17、Android SDK 36
 
 ## 说明
 
