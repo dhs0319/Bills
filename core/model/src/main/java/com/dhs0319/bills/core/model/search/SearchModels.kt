@@ -20,10 +20,26 @@ enum class SearchOrder {
     }
 }
 
-enum class SearchHistoryOrder {
-    TIME,
-    HOT
+enum class SearchSuggestionBadge {
+    NEW,
+    EXCLUSIVE,
+    PROMOTION,
+    LIVE
 }
+
+@Immutable
+data class SearchSuggestion(
+    val keyword: String,
+    val title: String,
+    val subtitle: String? = null,
+    val badge: SearchSuggestionBadge? = null
+)
+
+@Immutable
+data class SearchLandingData(
+    val trending: List<SearchSuggestion>,
+    val discovery: List<SearchSuggestion>
+)
 
 @Immutable
 data class SearchVideo(

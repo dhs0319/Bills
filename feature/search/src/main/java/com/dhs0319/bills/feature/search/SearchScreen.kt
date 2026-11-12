@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -32,7 +33,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlinedfilled.Menu
-import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.FilledTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
@@ -42,7 +42,7 @@ import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.search.result.SearchAuthorCard
 import com.dhs0319.bills.feature.search.filter.SearchFiltersSheet
-import com.dhs0319.bills.feature.search.history.SearchHistoryPanel
+import com.dhs0319.bills.feature.search.landing.SearchLandingPanel
 import com.dhs0319.bills.feature.search.result.SearchCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,8 +55,6 @@ fun SearchScreen(
 ) {
     val authors by viewModel.authors.collectAsStateWithLifecycle()
     val videos by viewModel.videos.collectAsStateWithLifecycle()
-    val histories by viewModel.histories.collectAsStateWithLifecycle()
-    val historyOrder by viewModel.currentHistoryOrder.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
     val hasItems = authors.isNotEmpty() || videos.isNotEmpty()
@@ -93,11 +91,12 @@ fun SearchScreen(
         }
     }
 
-    CollapsingTopBarScaffold(
+    Scaffold(
         contentWindowInsets = WindowInsets(0),
-        topBar = { scrollBehavior ->
+        topBar = {
             SearchTopBar(
                 text = viewModel.input,
+                placeholder = viewModel.landingState.searchPlaceholder ?: "搜索视频",
                 autoFocus = viewModel.keyword.isBlank() && viewModel.input.isBlank(),
                 onTextChange = viewModel::updateInput,
                 onBack = handleBack,
@@ -107,8 +106,7 @@ fun SearchScreen(
                 onOpenSpace = { uid ->
                     keyboard?.hide()
                     onOpenSpace(SpaceRoute(mid = uid))
-                },
-                scrollBehavior = scrollBehavior
+                }
             )
         }
     ) { innerPadding ->
@@ -178,18 +176,19 @@ fun SearchScreen(
                 }
 
                 viewModel.keyword.isBlank() -> {
-                    if (histories.isNotEmpty()) {
-                        SearchHistoryPanel(
-                            histories = histories,
-                            order = historyOrder,
-                            onSelectOrder = viewModel::selectHistoryOrder,
-                            onSearch = { keyword ->
-                                keyboard?.hide()
-                                viewModel.submitSearch(keyword)
-                            },
-                            onDelete = viewModel::deleteHistory
-                        )
-                    }
+                    val histories by viewModel.histories.collectAsStateWithLifecycle()
+                    SearchLandingPanel(
+                        state = viewModel.landingState,
+                        histories = histories,
+                        onSearch = { keyword ->
+                            keyboard?.hide()
+                            viewModel.submitSearch(keyword)
+                        },
+                        onDeleteHistory = viewModel::deleteHistory,
+                        onClearHistory = viewModel::clearHistory,
+                        onRetry = { viewModel.loadLanding(forceRefresh = true) },
+                        onRefreshDiscovery = viewModel::refreshDiscovery
+                    )
                 }
 
                 !hasItems -> StateMessageCard(

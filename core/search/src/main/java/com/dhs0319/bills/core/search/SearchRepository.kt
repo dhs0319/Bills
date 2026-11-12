@@ -15,7 +15,6 @@ import com.dhs0319.bills.core.common.media.httpsImageUrl
 import com.dhs0319.bills.core.model.SearchFeedbackItem as SearchFdItem
 import com.dhs0319.bills.core.model.SearchFeedbackSec
 import com.dhs0319.bills.core.model.SearchFilter
-import com.dhs0319.bills.core.model.SearchHistoryOrder
 import com.dhs0319.bills.core.model.SearchOp
 import com.dhs0319.bills.core.model.SearchOrder
 import com.dhs0319.bills.core.model.SearchPage
@@ -33,8 +32,10 @@ import dagger.hilt.components.SingletonComponent
 import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 @Singleton
 class SearchRepository @Inject constructor(
@@ -42,7 +43,7 @@ class SearchRepository @Inject constructor(
     private val searchHistoryDao: SearchHistoryDao
 ) {
 
-    suspend fun search(req: SearchReq): SearchPage {
+    suspend fun search(req: SearchReq): SearchPage = withContext(Dispatchers.Default) {
         val reqBody = SearchAllRequest.newBuilder()
             .setKeyword(req.keyword)
             .setOrder(req.order.toProto())
@@ -79,7 +80,7 @@ class SearchRepository @Inject constructor(
             mapVideo(item, resp.trackid)?.let(videos::add)
         }
 
-        return SearchPage(
+        SearchPage(
             keyword = resp.keyword.ifBlank { req.keyword },
             authors = authors,
             videos = videos,
@@ -103,14 +104,13 @@ class SearchRepository @Inject constructor(
         searchHistoryDao.deleteByKeyword(query)
     }
 
-    fun observeHistory(
-        order: SearchHistoryOrder
-    ): Flow<List<String>> {
-        val source = when (order) {
-            SearchHistoryOrder.TIME -> searchHistoryDao.observeTopKeywordsByTime()
-            SearchHistoryOrder.HOT -> searchHistoryDao.observeTopKeywordsByHot()
-        }
-        return source.map { list -> list.filter { it.isNotBlank() } }
+    suspend fun clearHistory() {
+        searchHistoryDao.clear()
+    }
+
+    fun observeHistory(): Flow<List<String>> {
+        return searchHistoryDao.observeTopKeywordsByTime()
+            .map { list -> list.filter { it.isNotBlank() } }
     }
 
     private fun mapVideo(

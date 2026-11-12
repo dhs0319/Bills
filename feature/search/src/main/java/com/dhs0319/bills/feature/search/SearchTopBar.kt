@@ -12,7 +12,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,12 +38,12 @@ import com.dhs0319.bills.core.designsystem.component.SearchCapsuleField
 @Composable
 internal fun SearchTopBar(
     text: String,
+    placeholder: String,
     autoFocus: Boolean,
     onTextChange: (String) -> Unit,
     onBack: () -> Unit,
     onSearch: () -> Unit,
-    onOpenSpace: (Long) -> Unit,
-    scrollBehavior: TopAppBarScrollBehavior
+    onOpenSpace: (Long) -> Unit
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -82,7 +81,7 @@ internal fun SearchTopBar(
             SearchCapsuleField(
                 value = text,
                 onValueChange = onTextChange,
-                placeholder = "搜索视频",
+                placeholder = placeholder,
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
@@ -142,7 +141,6 @@ internal fun SearchTopBar(
                     contentDescription = "返回"
                 )
             }
-        },
-        scrollBehavior = scrollBehavior
+        }
     )
 }
