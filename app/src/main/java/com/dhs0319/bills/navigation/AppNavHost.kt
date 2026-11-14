@@ -159,7 +159,7 @@ import com.dhs0319.bills.playback.PlaybackHostViewModel
 
 private const val MAIN_ROUTE = "main"
 private const val PENDING_CONVERSATION_KEY = "pending_conversation"
-private val topLevelNavEdgePadding = 16.dp
+private val topLevelNavEdgePadding = 4.dp
 private val topLevelNavGap = 8.dp
 private val topLevelNavScrollThreshold = 72.dp
 private const val topLevelNavAnimationDurationMillis = 220
