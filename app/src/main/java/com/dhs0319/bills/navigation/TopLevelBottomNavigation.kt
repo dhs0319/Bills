@@ -57,6 +57,11 @@ internal fun TopLevelBottomNavigation(
     ) {
         TopLevelRoute.entries.forEach { tab ->
             val selected = currentTab == tab
+            val tabUnreadBadge = if (tab == TopLevelRoute.MESSAGE) {
+                messageUnreadBadge
+            } else {
+                ImUnreadBadge.None
+            }
             NavigationBarItem(
                 selected = selected,
                 onClick = { onTabChange(tab) },
@@ -64,7 +69,7 @@ internal fun TopLevelBottomNavigation(
                     TopLevelNavigationIcon(
                         tab = tab,
                         selected = selected,
-                        messageUnreadBadge = messageUnreadBadge,
+                        messageUnreadBadge = tabUnreadBadge,
                         contentDescription = null
                     )
                 },

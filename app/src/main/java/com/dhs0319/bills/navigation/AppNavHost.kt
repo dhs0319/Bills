@@ -5,9 +5,13 @@ import android.os.Bundle
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,9 +21,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -30,8 +36,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -51,9 +56,13 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -61,9 +70,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
 import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.os.bundleOf
@@ -574,13 +586,12 @@ private fun MainTabsScaffold(
     } else {
         WindowInsets(0)
     }
-    val useStartAlignedBottomToolbar = configuration.screenWidthDp >= 600
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
     val useBottomMenu by settingsViewModel.useBottomMenu.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
     var topLevelNavSpace by remember(useBottomMenu, isLandscape) { mutableStateOf(0.dp) }
-    val bottomContentPadding by animateDpAsState(
+    val bottomContentPadding = animateDpAsState(
         targetValue = if (!isLandscape && useBottomMenu && !navVisibilityController.hidden) {
             topLevelNavSpace
         } else {
@@ -589,6 +600,15 @@ private fun MainTabsScaffold(
         animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
         label = "bottom menu content padding"
     )
+    // Read the animation in layout, without recomposing the entire tab scaffold each frame.
+    val contentPadding = remember(bottomContentPadding) {
+        object : PaddingValues {
+            override fun calculateLeftPadding(layoutDirection: LayoutDirection) = 0.dp
+            override fun calculateTopPadding() = 0.dp
+            override fun calculateRightPadding(layoutDirection: LayoutDirection) = 0.dp
+            override fun calculateBottomPadding() = bottomContentPadding.value
+        }
+    }
 
     val tabContent: @Composable () -> Unit = {
         TopLevelRoute.entries.forEach { tab ->
@@ -680,8 +700,8 @@ private fun MainTabsScaffold(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = bottomContentPadding)
-                        .consumeWindowInsets(PaddingValues(bottom = bottomContentPadding))
+                        .padding(contentPadding)
+                        .consumeWindowInsets(contentPadding)
                         .clipToBounds()
                 ) {
                     tabContent()
@@ -699,18 +719,11 @@ private fun MainTabsScaffold(
             } else {
                 TopLevelFloatingNavigation(
                     modifier = Modifier
-                        .align(
-                            if (useStartAlignedBottomToolbar) {
-                                Alignment.BottomStart
-                            } else {
-                                Alignment.BottomCenter
-                            }
-                        )
+                        .align(Alignment.BottomCenter)
                         .zIndex(1f),
                     currentTab = currentTab,
                     messageUnreadBadge = messageUnreadBadge,
                     visibilityController = navVisibilityController,
-                    startPadding = if (useStartAlignedBottomToolbar) topLevelNavEdgePadding else 0.dp,
                     onTabChange = selectTab,
                     onNavigateToSearch = onNavigateToSearch,
                     onHeightChanged = { topLevelNavSpace = it }
@@ -769,7 +782,11 @@ private fun TopLevelSideNavigation(
                 TopLevelSideNavigationItem(
                     tab = tab,
                     selected = currentTab == tab,
-                    messageUnreadBadge = messageUnreadBadge,
+                    messageUnreadBadge = if (tab == TopLevelRoute.MESSAGE) {
+                        messageUnreadBadge
+                    } else {
+                        ImUnreadBadge.None
+                    },
                     onClick = { onTabChange(tab) }
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -832,12 +849,14 @@ private fun TopLevelFloatingNavigation(
     currentTab: TopLevelRoute,
     messageUnreadBadge: ImUnreadBadge,
     visibilityController: TopLevelNavVisibilityController,
-    startPadding: Dp,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit,
     onHeightChanged: (Dp) -> Unit = {}
 ) {
-    val toolbarShape = MaterialTheme.shapes.extraLarge
+    val useWideLayout = LocalConfiguration.current.screenWidthDp >= 600
+    val containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    val containerBorder = remember(borderColor) { BorderStroke(1.dp, borderColor) }
     val density = LocalDensity.current
     var hiddenDistancePx by remember { mutableFloatStateOf(0f) }
     val animatedOffsetPx by animateFloatAsState(
@@ -854,45 +873,72 @@ private fun TopLevelFloatingNavigation(
             translationY = animatedOffsetPx
         }
         .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
-        .padding(start = startPadding, bottom = topLevelNavEdgePadding)
-    val tabs: @Composable () -> Unit = {
-        TopLevelRoute.entries.forEach { tab ->
-            TopLevelFloatingNavigationItem(
-                tab = tab,
-                selected = currentTab == tab,
-                messageUnreadBadge = messageUnreadBadge,
-                onClick = { onTabChange(tab) }
-            )
-        }
-    }
-    val searchFab: @Composable () -> Unit = {
-        FloatingActionButton(
-            onClick = onNavigateToSearch,
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
-        ) {
-            Icon(
-                imageVector = MaterialSymbols.OutlinedFilled.Search,
-                contentDescription = "搜索"
-            )
-        }
-    }
+        .padding(bottom = topLevelNavEdgePadding)
 
     Row(
-        modifier = animatedModifier,
+        modifier = if (useWideLayout) {
+            animatedModifier.fillMaxWidth(2f / 3f)
+        } else {
+            animatedModifier.widthIn(max = 312.dp)
+        },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            shape = toolbarShape,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.weight(1f),
+            shape = CircleShape,
+            color = containerColor,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            border = containerBorder,
+            shadowElevation = 3.dp
         ) {
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), content = { tabs() })
+            Row(
+                modifier = Modifier
+                    .selectableGroup()
+                    .padding(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TopLevelRoute.entries.forEach { tab ->
+                    TopLevelFloatingNavigationItem(
+                        tab = tab,
+                        selected = currentTab == tab,
+                        messageUnreadBadge = if (tab == TopLevelRoute.MESSAGE) {
+                            messageUnreadBadge
+                        } else {
+                            ImUnreadBadge.None
+                        },
+                        onClick = { onTabChange(tab) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.width(topLevelNavGap))
-        searchFab()
+        Surface(
+            onClick = onNavigateToSearch,
+            modifier = Modifier.size(68.dp),
+            shape = CircleShape,
+            color = containerColor,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            border = containerBorder,
+            shadowElevation = 3.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.OutlinedFilled.Search,
+                    contentDescription = null
+                )
+                Text(
+                    text = "搜索",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
@@ -901,14 +947,72 @@ private fun TopLevelFloatingNavigationItem(
     tab: TopLevelRoute,
     selected: Boolean,
     messageUnreadBadge: ImUnreadBadge,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val selectedColor = MaterialTheme.colorScheme.primary
+    val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+    // Share one animation between the indicator and foreground, and defer frame reads.
+    val selectionProgress = animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
+        label = "floating nav selection"
+    )
+    Column(
+        modifier = modifier
+            .heightIn(min = 56.dp)
+            .clip(CircleShape)
+            .drawBehind {
+                val progress = selectionProgress.value
+                if (progress > 0f) {
+                    drawRect(selectedColor.copy(alpha = 0.12f * progress))
+                }
+            }
+            .selectable(
+                selected = selected,
+                role = Role.Tab,
+                onClick = onClick
+            )
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        TopLevelFloatingNavigationItemContent(
+            tab = tab,
+            selected = selected,
+            messageUnreadBadge = messageUnreadBadge,
+            selectionProgress = selectionProgress,
+            selectedColor = selectedColor,
+            unselectedColor = unselectedColor
+        )
+    }
+}
+
+@Composable
+private fun TopLevelFloatingNavigationItemContent(
+    tab: TopLevelRoute,
+    selected: Boolean,
+    messageUnreadBadge: ImUnreadBadge,
+    selectionProgress: State<Float>,
+    selectedColor: Color,
+    unselectedColor: Color
+) {
+    // Foreground color changes only recompose the icon and label, not the item layout.
+    val contentColor = lerp(unselectedColor, selectedColor, selectionProgress.value)
     TopLevelNavigationIcon(
         tab = tab,
         selected = selected,
         messageUnreadBadge = messageUnreadBadge,
-        tint = if (selected) null else MaterialTheme.colorScheme.onSurfaceVariant,
-        onClick = onClick
+        contentDescription = null,
+        tint = contentColor
+    )
+    Text(
+        text = tab.label,
+        color = contentColor,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 
