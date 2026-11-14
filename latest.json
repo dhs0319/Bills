@@ -1,10 +1,10 @@
 {
-  "version": "1.1.8",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.8/Bills-1.1.8-arm64-v8a-release.apk",
+  "version": "1.1.9",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.9/Bills-1.1.9-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.8/Bills-1.1.8-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.8/Bills-1.1.8-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.9/Bills-1.1.9-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.9/Bills-1.1.9-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.8",
-  "releaseNotes": "## 更新内容\n\n- 优化我的收藏页面UI\n- 优化稍后再看页面UI\n- 私信页支持表情和图片发送\n- 重构评论弹窗面板减少性能开销"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.9",
+  "releaseNotes": "## 更新内容\n\n- 支持视频字幕\n- 支持消息及动态的角标提示\n- 优化未登录账号时的缺省提示\n- 替换新版Material Symbols图标库"
 }
