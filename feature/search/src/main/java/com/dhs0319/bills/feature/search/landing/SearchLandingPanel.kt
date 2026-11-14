@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
@@ -274,6 +276,15 @@ private fun SearchHotBadge(badge: SearchSuggestionBadge) {
             SearchSuggestionBadge.NEW -> Triple(
                 "新", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer
             )
+            SearchSuggestionBadge.HOT -> {
+                val colors = MaterialTheme.colorScheme
+                val isDark = colors.surface.luminance() < colors.onSurface.luminance()
+                Triple(
+                    "热",
+                    if (isDark) lerp(colors.surfaceContainer, colors.errorContainer, 0.25f) else colors.errorContainer,
+                    if (isDark) lerp(colors.onSurfaceVariant, colors.onErrorContainer, 0.5f) else colors.onErrorContainer
+                )
+            }
             SearchSuggestionBadge.EXCLUSIVE -> Triple(
                 "独家", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer
             )

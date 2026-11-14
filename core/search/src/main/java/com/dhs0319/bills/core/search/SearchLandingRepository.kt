@@ -118,6 +118,7 @@ class SearchLandingRepository @Inject constructor(
         if (item.optBoolean("show_live_icon")) return SearchSuggestionBadge.LIVE
         return when (item.optInt("word_type")) {
             4 -> SearchSuggestionBadge.NEW
+            5 -> SearchSuggestionBadge.HOT
             12 -> SearchSuggestionBadge.EXCLUSIVE
             15 -> SearchSuggestionBadge.PROMOTION
             else -> null

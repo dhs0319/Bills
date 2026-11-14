@@ -22,6 +22,7 @@ enum class SearchOrder {
 
 enum class SearchSuggestionBadge {
     NEW,
+    HOT,
     EXCLUSIVE,
     PROMOTION,
     LIVE
