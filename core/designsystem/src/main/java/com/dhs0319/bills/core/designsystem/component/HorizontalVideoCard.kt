@@ -206,14 +206,18 @@ fun HorizontalVideoCardSkeleton(
             modifier = modifier,
             coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet),
             coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet),
-            contentPadding = 8.dp
+            contentPadding = 8.dp,
+            cardShape = MaterialTheme.shapes.medium,
+            coverShape = MaterialTheme.shapes.small
         )
     } else {
         BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
             VideoListCardSkeleton(
                 coverWidth = horizontalVideoCoverWidth(maxWidth, isTablet),
                 coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet),
-                contentPadding = 8.dp
+                contentPadding = 8.dp,
+                cardShape = MaterialTheme.shapes.medium,
+                coverShape = MaterialTheme.shapes.small
             )
         }
     }

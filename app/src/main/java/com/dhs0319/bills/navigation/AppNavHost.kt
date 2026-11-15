@@ -48,6 +48,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -592,16 +593,20 @@ private fun MainTabsScaffold(
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
     val useBottomMenu by settingsViewModel.useBottomMenu.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
-    var topLevelNavSpace by remember(useBottomMenu, isLandscape) { mutableStateOf(0.dp) }
-    val bottomContentPadding = animateDpAsState(
-        targetValue = if (!isLandscape && useBottomMenu && !navVisibilityController.hidden) {
-            topLevelNavSpace
-        } else {
-            0.dp
-        },
-        animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
-        label = "bottom menu content padding"
-    )
+    // Keep the measured portrait menu height available when returning from landscape.
+    var topLevelNavSpace by remember(useBottomMenu) { mutableStateOf(0.dp) }
+    // A rotation changes the layout immediately; only menu visibility changes should animate.
+    val bottomContentPadding = key(isLandscape) {
+        animateDpAsState(
+            targetValue = if (!isLandscape && useBottomMenu && !navVisibilityController.hidden) {
+                topLevelNavSpace
+            } else {
+                0.dp
+            },
+            animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
+            label = "bottom menu content padding"
+        )
+    }
     // Read the animation in layout, without recomposing the entire tab scaffold each frame.
     val contentPadding = remember(bottomContentPadding) {
         object : PaddingValues {
@@ -661,17 +666,23 @@ private fun MainTabsScaffold(
         }
     }
 
-    if (isLandscape) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .windowInsetsPadding(
-                    navigationBarPadding.only(
-                        WindowInsetsSides.End + WindowInsetsSides.Bottom
-                    )
+    // Keep tab content at the same composition location so rotation preserves its state and effects.
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(
+                navigationBarPadding.only(
+                    WindowInsetsSides.Bottom + if (isLandscape) {
+                        WindowInsetsSides.End
+                    } else {
+                        WindowInsetsSides.Horizontal
+                    }
                 )
-        ) {
+            )
+            .then(if (isLandscape) Modifier else Modifier.nestedScroll(navVisibilityController.connection))
+    ) {
+        if (isLandscape) {
             TopLevelSideNavigation(
                 currentTab = currentTab,
                 messageUnreadBadge = messageUnreadBadge,
@@ -679,25 +690,14 @@ private fun MainTabsScaffold(
                 onTabChange = selectTab,
                 onNavigateToSearch = onNavigateToSearch
             )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                content = { tabContent() }
-            )
         }
-    } else {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .windowInsetsPadding(
-                    navigationBarPadding.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                )
-                .nestedScroll(navVisibilityController.connection)
+                .weight(1f)
+                .fillMaxHeight()
         ) {
             CompositionLocalProvider(
-                LocalTopLevelNavSpace provides if (useBottomMenu) 0.dp else topLevelNavSpace
+                LocalTopLevelNavSpace provides if (!isLandscape && !useBottomMenu) topLevelNavSpace else 0.dp
             ) {
                 Box(
                     modifier = Modifier
@@ -709,27 +709,29 @@ private fun MainTabsScaffold(
                     tabContent()
                 }
             }
-            if (useBottomMenu) {
-                TopLevelBottomNavigation(
-                    modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f),
-                    currentTab = currentTab,
-                    messageUnreadBadge = messageUnreadBadge,
-                    hidden = navVisibilityController.hidden,
-                    onTabChange = selectTab,
-                    onHeightChanged = { topLevelNavSpace = it }
-                )
-            } else {
-                TopLevelFloatingNavigation(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .zIndex(1f),
-                    currentTab = currentTab,
-                    messageUnreadBadge = messageUnreadBadge,
-                    visibilityController = navVisibilityController,
-                    onTabChange = selectTab,
-                    onNavigateToSearch = onNavigateToSearch,
-                    onHeightChanged = { topLevelNavSpace = it }
-                )
+            if (!isLandscape) {
+                if (useBottomMenu) {
+                    TopLevelBottomNavigation(
+                        modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f),
+                        currentTab = currentTab,
+                        messageUnreadBadge = messageUnreadBadge,
+                        hidden = navVisibilityController.hidden,
+                        onTabChange = selectTab,
+                        onHeightChanged = { topLevelNavSpace = it }
+                    )
+                } else {
+                    TopLevelFloatingNavigation(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .zIndex(1f),
+                        currentTab = currentTab,
+                        messageUnreadBadge = messageUnreadBadge,
+                        visibilityController = navVisibilityController,
+                        onTabChange = selectTab,
+                        onNavigateToSearch = onNavigateToSearch,
+                        onHeightChanged = { topLevelNavSpace = it }
+                    )
+                }
             }
         }
     }

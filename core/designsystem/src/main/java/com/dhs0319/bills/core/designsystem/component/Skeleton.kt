@@ -38,59 +38,20 @@ fun SkeletonBlock(
 }
 
 @Composable
-fun VideoGridCardSkeleton(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        SkeletonBlock(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 10f)
-        )
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            SkeletonBlock(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .height(16.dp),
-                shape = MaterialTheme.shapes.extraSmall
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            SkeletonBlock(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .height(14.dp),
-                shape = MaterialTheme.shapes.extraSmall
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkeletonBlock(
-                    modifier = Modifier
-                        .width(60.dp)
-                        .height(12.dp),
-                    shape = MaterialTheme.shapes.extraSmall
-                )
-                SkeletonBlock(
-                    modifier = Modifier
-                        .width(60.dp)
-                        .height(12.dp),
-                    shape = MaterialTheme.shapes.extraSmall
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun VideoListCardSkeleton(
     modifier: Modifier = Modifier,
     coverWidth: Dp? = null,
     coverAspectRatio: Float = 16f / 10f,
-    contentPadding: Dp = 10.dp
+    contentPadding: Dp = 10.dp,
+    cardShape: Shape = MaterialTheme.shapes.large,
+    coverShape: Shape = MaterialTheme.shapes.medium
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .background(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = MaterialTheme.shapes.large
+                shape = cardShape
             )
             .padding(contentPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -99,7 +60,7 @@ fun VideoListCardSkeleton(
             modifier = Modifier
                 .then(if (coverWidth != null) Modifier.width(coverWidth) else Modifier.weight(0.38f))
                 .aspectRatio(coverAspectRatio),
-            shape = MaterialTheme.shapes.medium
+            shape = coverShape
         )
         Column(
             modifier = Modifier.weight(if (coverWidth == null) 0.62f else 1f),
