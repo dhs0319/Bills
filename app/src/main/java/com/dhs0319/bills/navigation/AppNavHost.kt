@@ -7,10 +7,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -745,9 +747,13 @@ private fun TopLevelSideNavigation(
     val startSafeInset = WindowInsets.safeDrawing
         .asPaddingValues()
         .calculateStartPadding(layoutDirection)
+    val menuScrollState = rememberScrollState()
+    val menuCanScroll by remember(menuScrollState) {
+        derivedStateOf { menuScrollState.maxValue > 0 }
+    }
     Surface(
         modifier = Modifier
-            .width(112.dp + startSafeInset)
+            .width(80.dp + startSafeInset)
             .fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface
@@ -760,85 +766,50 @@ private fun TopLevelSideNavigation(
                         WindowInsetsSides.Start + WindowInsetsSides.Top
                     )
                 )
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 6.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             IconButton(onClick = { onTabChange(TopLevelRoute.PROFILE) }) {
                 AvatarImage(
                     url = profileAvatar,
                     contentDescription = TopLevelRoute.PROFILE.label,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(36.dp)
                 )
             }
             IconButton(onClick = onNavigateToSearch) {
                 Icon(
                     imageVector = MaterialSymbols.OutlinedFilled.Search,
                     contentDescription = "搜索",
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
-            TopLevelRoute.entries.forEach { tab ->
-                TopLevelSideNavigationItem(
-                    tab = tab,
-                    selected = currentTab == tab,
-                    messageUnreadBadge = if (tab == TopLevelRoute.MESSAGE) {
-                        messageUnreadBadge
-                    } else {
-                        ImUnreadBadge.None
-                    },
-                    onClick = { onTabChange(tab) }
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(
+                        state = menuScrollState,
+                        overscrollEffect = null,
+                        enabled = menuCanScroll
+                    )
+                    .selectableGroup(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
+            ) {
+                TopLevelRoute.entries.forEach { tab ->
+                    TopLevelNavigationItem(
+                        tab = tab,
+                        selected = currentTab == tab,
+                        messageUnreadBadge = if (tab == TopLevelRoute.MESSAGE) {
+                            messageUnreadBadge
+                        } else {
+                            ImUnreadBadge.None
+                        },
+                        onClick = { onTabChange(tab) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-            Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun TopLevelSideNavigationItem(
-    tab: TopLevelRoute,
-    selected: Boolean,
-    messageUnreadBadge: ImUnreadBadge,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            androidx.compose.ui.graphics.Color.Transparent
-        },
-        contentColor = if (selected) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TopLevelNavigationIcon(
-                tab = tab,
-                selected = selected,
-                messageUnreadBadge = messageUnreadBadge,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = tab.label,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Clip
-            )
         }
     }
 }
