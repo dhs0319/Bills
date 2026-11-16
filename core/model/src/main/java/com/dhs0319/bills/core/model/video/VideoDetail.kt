@@ -60,7 +60,8 @@ data class VideoStaff(
 data class VideoSeason(
     val title: String,
     val subTitle: String?,
-    val sections: List<VideoSeasonSection>
+    val sections: List<VideoSeasonSection>,
+    val id: Long = 0L
 )
 
 @Immutable
@@ -75,7 +76,12 @@ data class VideoSeasonEpisode(
     val cid: Long,
     val title: String,
     val subTitle: String?,
-    val cover: String?
+    val cover: String?,
+    val publishTimeText: String? = null,
+    val durationText: String? = null,
+    val viewText: String? = null,
+    val danmakuText: String? = null,
+    val pubTs: Long? = null
 )
 
 @Immutable

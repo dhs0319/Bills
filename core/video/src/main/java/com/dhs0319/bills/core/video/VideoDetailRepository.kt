@@ -1,5 +1,6 @@
 package com.dhs0319.bills.core.video
 
+import android.util.LruCache
 import com.bapis.bilibili.app.archive.middleware.v1.PlayerArgs
 import com.bapis.bilibili.app.archive.middleware.v1.QnPolicy
 import com.bapis.bilibili.app.viewunite.common.Module
@@ -16,6 +17,7 @@ import com.bapis.bilibili.app.viewunite.v1.ViewReply
 import com.bapis.bilibili.app.viewunite.v1.ViewReq
 import com.bapis.bilibili.pagination.Pagination
 import com.dhs0319.bills.core.common.media.httpsImageUrl
+import com.dhs0319.bills.core.common.BiliConstants
 import com.dhs0319.bills.core.model.PlayBiz
 import com.dhs0319.bills.core.model.ResolvedVideoIds
 import com.dhs0319.bills.core.model.VideoDetail
@@ -35,18 +37,98 @@ import com.dhs0319.bills.core.model.VideoStat
 import com.dhs0319.bills.infra.crypto.BiliSessionId
 import com.dhs0319.bills.infra.crypto.DeviceIdentity
 import com.dhs0319.bills.infra.grpc.BiliGrpcClient
+import com.dhs0319.bills.infra.network.BiliRestClient
 import com.dhs0319.bills.core.model.toUgcTarget
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 @Singleton
 class VideoDetailRepository @Inject constructor(
     private val grpcClient: BiliGrpcClient,
-    private val deviceIdentity: DeviceIdentity
+    private val deviceIdentity: DeviceIdentity,
+    private val restClient: BiliRestClient
 ) {
+    private val seasonPublishTimes = LruCache<Long, Map<Long, Long>>(8)
+    private val webVideoMetadata = LruCache<Long, WebVideoMetadata>(8)
+    private val webVideoMetadataMutex = Mutex()
+
+    // The gRPC season list only includes a shortened date. Load exact timestamps once per season.
+    suspend fun fetchSeasonPublishTimes(aid: Long, seasonId: Long): Map<Long, Long> {
+        if (aid <= 0L || seasonId <= 0L) return emptyMap()
+        seasonPublishTimes.get(seasonId)?.let { return it }
+        return webVideoMetadataMutex.withLock {
+            seasonPublishTimes.get(seasonId)?.let { return@withLock it }
+            val metadata = fetchWebVideoMetadata(aid)
+            if (metadata.seasonId == seasonId) metadata.seasonPublishTimes else emptyMap()
+        }
+    }
+
+    suspend fun fetchPageCovers(aid: Long): Map<Long, String> {
+        if (aid <= 0L) return emptyMap()
+        webVideoMetadata.get(aid)?.let { return it.pageCovers }
+        return webVideoMetadataMutex.withLock { fetchWebVideoMetadata(aid).pageCovers }
+    }
+
+    // Called under the mutex so opening either list can reuse the same batched response.
+    private suspend fun fetchWebVideoMetadata(aid: Long): WebVideoMetadata {
+        webVideoMetadata.get(aid)?.let { return it }
+        val json = restClient.getSigned(
+            url = "${BiliConstants.BASE_URL_API}/x/web-interface/view",
+            params = mapOf("aid" to aid.toString())
+        )
+        val metadata = withContext(Dispatchers.Default) {
+            val data = requireNotNull(json.optJSONObject("data")) { "Missing video detail data" }
+            val season = data.optJSONObject("ugc_season")
+            val seasonId = season?.optLong("id") ?: 0L
+            val sections = season?.optJSONArray("sections")
+            // Different videos in one season share a single timestamp map.
+            val timestamps = seasonPublishTimes.get(seasonId) ?: buildMap<Long, Long> {
+                if (sections != null) {
+                    for (sectionIndex in 0 until sections.length()) {
+                        val episodes = sections.optJSONObject(sectionIndex)?.optJSONArray("episodes") ?: continue
+                        for (episodeIndex in 0 until episodes.length()) {
+                            val episode = episodes.optJSONObject(episodeIndex) ?: continue
+                            val cid = episode.optLong("cid").takeIf { it > 0L } ?: continue
+                            val pubTs = episode.optJSONObject("arc")?.optLong("pubdate")
+                                ?.takeIf { it > 0L }
+                                ?: episode.optLong("pubdate").takeIf { it > 0L }
+                                ?: continue
+                            put(cid, pubTs)
+                        }
+                    }
+                }
+            }
+            val pages = data.optJSONArray("pages")
+            val pageCovers = buildMap<Long, String> {
+                if (pages != null) {
+                    for (pageIndex in 0 until pages.length()) {
+                        val page = pages.optJSONObject(pageIndex) ?: continue
+                        val cid = page.optLong("cid").takeIf { it > 0L } ?: continue
+                        val cover = page.optString("first_frame").takeIf {
+                            it.startsWith("https://") || it.startsWith("http://")
+                        } ?: continue
+                        put(cid, cover.httpsImageUrl())
+                    }
+                }
+            }
+            WebVideoMetadata(
+                seasonId = seasonId,
+                seasonPublishTimes = timestamps,
+                pageCovers = pageCovers
+            )
+        }
+        webVideoMetadata.put(aid, metadata)
+        if (metadata.seasonId > 0L && metadata.seasonPublishTimes.isNotEmpty()) {
+            seasonPublishTimes.put(metadata.seasonId, metadata.seasonPublishTimes)
+        }
+        return metadata
+    }
+
     suspend fun fetchVideoDetail(
         ids: VideoRequestIds,
         src: VideoSrc
@@ -240,7 +322,13 @@ class VideoDetailRepository @Inject constructor(
                     cid = ids.cid,
                     title = epTitle,
                     subTitle = ep.coverRightText.ifBlank { null },
-                    cover = ep.cover.httpsImageUrl().ifBlank { null }
+                    cover = ep.cover.httpsImageUrl().ifBlank { null },
+                    publishTimeText = ep.coverRightText.ifBlank { null },
+                    durationText = ep.duration.takeIf { it > 0L }
+                        ?.let(::formatDur)
+                        ?: ep.page.duration.takeIf { it > 0L }?.let(::formatDur),
+                    viewText = if (ep.hasVt()) ep.vt.text.ifBlank { ep.vt.value.toString() } else null,
+                    danmakuText = if (ep.hasDanmaku()) ep.danmaku.text.ifBlank { ep.danmaku.value.toString() } else null
                 )
             }
             if (eps.isEmpty()) {
@@ -255,7 +343,8 @@ class VideoDetailRepository @Inject constructor(
         return VideoSeason(
             title = title,
             subTitle = season.supernatantTitle.ifBlank { season.unionTitle }.ifBlank { null },
-            sections = sections
+            sections = sections,
+            id = season.id
         )
     }
 
@@ -285,7 +374,16 @@ class VideoDetailRepository @Inject constructor(
                 cid = ep.cid,
                 title = title,
                 subTitle = ep.subtitle.ifBlank { null },
-                cover = ep.cover.httpsImageUrl().ifBlank { null }
+                cover = ep.cover.httpsImageUrl().ifBlank { null },
+                publishTimeText = ep.releaseDate.ifBlank { null },
+                durationText = ep.duration.takeIf { it > 0 }?.let { formatDur(it.toLong() / 1000) },
+                viewText = if (ep.statForUnity.hasVt()) {
+                    ep.statForUnity.vt.text.ifBlank { ep.statForUnity.vt.value.toString() }
+                } else null,
+                danmakuText = if (ep.statForUnity.hasDanmaku()) {
+                    ep.statForUnity.danmaku.text.ifBlank { ep.statForUnity.danmaku.value.toString() }
+                } else null,
+                pubTs = ep.pubTime.takeIf { it > 0L }
             )
         }
         if (eps.isEmpty()) return null
@@ -506,6 +604,12 @@ class VideoDetailRepository @Inject constructor(
             bvid = bvid.takeIf(String::isNotBlank) ?: VideoTargetTool.bvid(shareUrl)
         )
     }
+
+    private data class WebVideoMetadata(
+        val seasonId: Long,
+        val seasonPublishTimes: Map<Long, Long>,
+        val pageCovers: Map<Long, String>
+    )
 
     private data class SupplementIds(
         val ids: List<ResolvedVideoIds> = emptyList(),

@@ -102,6 +102,8 @@ fun VideoScreen(
     val switchEpisode = remember(viewModel) {
         { target: VideoTarget -> viewModel.switchEpisode(target) }
     }
+    val loadSeasonPublishTimes = remember(viewModel) { viewModel::loadSeasonPublishTimes }
+    val loadPageCovers = remember(viewModel) { viewModel::loadPageCovers }
     val downloadClick = remember { { downloadSheetOn = true } }
     val handleBack = {
         if (fullOn) {
@@ -240,6 +242,8 @@ fun VideoScreen(
                         contentHorizontalPad = 0.dp,
                         onOpenVideo = openTarget,
                         onAddToWatchLater = viewModel::addToWatchLater,
+                        loadSeasonPublishTimes = loadSeasonPublishTimes,
+                        loadPageCovers = loadPageCovers,
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
                         onToggleLike = viewModel::toggleLike,
@@ -290,6 +294,8 @@ fun VideoScreen(
                         contentHorizontalPad = 16.dp,
                         onOpenVideo = openTarget,
                         onAddToWatchLater = viewModel::addToWatchLater,
+                        loadSeasonPublishTimes = loadSeasonPublishTimes,
+                        loadPageCovers = loadPageCovers,
                         onOpenSpace = onOpenSpace,
                         onDownloadClick = downloadClick,
                         onToggleLike = viewModel::toggleLike,

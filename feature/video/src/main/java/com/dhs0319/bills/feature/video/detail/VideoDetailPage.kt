@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,7 +41,10 @@ import androidx.compose.foundation.lazy.LazyLayoutScrollScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
@@ -60,7 +63,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -73,18 +75,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Chat_bubble
 import com.composables.icons.materialsymbols.outlined.Chevron_right
 import com.composables.icons.materialsymbols.outlined.Download
+import com.composables.icons.materialsymbols.outlined.Movie
 import com.composables.icons.materialsymbols.outlined.Open_in_new
 import com.composables.icons.materialsymbols.outlined.Play_circle
 import com.composables.icons.materialsymbols.outlined.Star as SymbolOutlinedStar
@@ -147,6 +159,8 @@ internal fun VideoDetailPage(
     contentHorizontalPad: Dp,
     onOpenVideo: (VideoTarget) -> Unit,
     onAddToWatchLater: (Long) -> Unit,
+    loadSeasonPublishTimes: suspend (Long, Long) -> Map<Long, Long>,
+    loadPageCovers: suspend (Long) -> Map<Long, String>,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
@@ -164,7 +178,6 @@ internal fun VideoDetailPage(
     val curCid = ids.cid.takeIf { it > 0L }
     var infoExpanded by rememberSaveable(aidKey) { mutableStateOf(false) }
     var sheet by remember(aidKey) { mutableStateOf<DetailSheet?>(null) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val detailListState = key(aidKey) { rememberLazyListState() }
     val commentListState = key(aidKey) { rememberLazyListState() }
     val commentThreadListState = key(aidKey) { rememberLazyListState() }
@@ -185,16 +198,6 @@ internal fun VideoDetailPage(
     }
     val shareUrl = remember(detail, ids) { detail?.let { buildVideoShareUrl(ids) } }
 
-    fun closeSheet(afterClose: (() -> Unit)? = null) {
-        scope.launch {
-            if (sheetState.isVisible) {
-                sheetState.hide()
-            }
-            sheet = null
-            afterClose?.invoke()
-        }
-    }
-
     val detailTabs = remember { listOf("简介", "评论") }
     val detailTabBadges = remember(detail?.stat?.reply) {
         listOf(
@@ -205,157 +208,175 @@ internal fun VideoDetailPage(
         )
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        PagerSlidingTabRow(
-            tabs = detailTabs,
-            badges = detailTabBadges,
-            pagerState = pagerState,
-            tabTextStyle = MaterialTheme.typography.titleSmall,
-            layout = SlidingTabLayout.Content,
-            onReselect = { page ->
-                val listState = if (page == 0) detailListState else commentListState
-                tabScrollJob?.cancel()
-                tabScrollJob = scope.launch {
-                    if (page == 0) {
-                        listState.animateScrollToItem(0)
-                    } else {
-                        listState.animateContinuouslyToTop()
-                    }
-                }
-            },
+    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+        Column(
             modifier = Modifier
-                .padding(horizontal = contentHorizontalPad)
-        )
-
-        HorizontalPager(
-            state = pagerState,
-            beyondViewportPageCount = 0,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) { page ->
-            when (page) {
-                0 -> DetailPageContent(
-                    modifier = Modifier.fillMaxSize(),
-                    detail = detail,
-                    ids = ids,
-                    detailLoading = detailLoading,
-                    detailError = detailError,
-                    actionState = actionState,
-                    horizontalPad = contentHorizontalPad,
-                    infoListState = detailListState,
-                    infoExpanded = infoExpanded,
-                    onToggleInfo = { infoExpanded = !infoExpanded },
-                    onSeasonClick = { sheet = detail?.season?.let { DetailSheet.Season(it, curCid) } },
-                    onPageClick = {
-                        sheet = detail?.pages
-                            ?.takeIf { it.size > 1 }
-                            ?.let { DetailSheet.Page(it, curCid) }
-                    },
-                    onOpenComments = {
-                        scope.launch {
-                            pagerState.animateScrollToPage(1)
-                        }
-                    },
-                    onOpenVideo = onOpenVideo,
-                    onAddToWatchLater = onAddToWatchLater,
-                    onOpenSpace = onOpenSpace,
-                    onDownloadClick = onDownloadClick,
-                    onToggleLike = onToggleLike,
-                    onToggleDislike = onToggleDislike,
-                    onFollowClick = {
-                        if (!isLoggedIn()) {
-                            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                        } else if (actionState.following) {
-                            unfollowConfirmVisible = true
+                .fillMaxSize()
+                .then(if (sheet != null) Modifier.clearAndSetSemantics {} else Modifier)
+        ) {
+            PagerSlidingTabRow(
+                tabs = detailTabs,
+                badges = detailTabBadges,
+                pagerState = pagerState,
+                tabTextStyle = MaterialTheme.typography.titleSmall,
+                layout = SlidingTabLayout.Content,
+                onReselect = { page ->
+                    val listState = if (page == 0) detailListState else commentListState
+                    tabScrollJob?.cancel()
+                    tabScrollJob = scope.launch {
+                        if (page == 0) {
+                            listState.animateScrollToItem(0)
                         } else {
-                            onToggleFollow()
+                            listState.animateContinuouslyToTop()
                         }
-                    },
-                    isSelf = isSelf,
-                    onOpenCoinPicker = {
-                        if (!isLoggedIn()) {
-                            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                        } else if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
-                            selectedCoinAmount = 1
-                            coinSheetVisible = true
-                        }
-                    },
-                    onOpenFavoritePicker = {
-                        if (
-                            actionState.initialized &&
-                            actionState.aid > 0L &&
-                            !actionState.favoriteLoading &&
-                            !actionState.favoriteSaving
-                        ) {
-                            onLoadFavoriteFolders { folders ->
-                                val selectedIds = folders.filter(VideoFavoriteFolder::selected)
-                                    .mapTo(linkedSetOf(), VideoFavoriteFolder::id)
-                                favoriteFolders = folders
-                                originalFavoriteFolderIds = selectedIds
-                                selectedFavoriteFolderIds = selectedIds
-                                favoriteSheetVisible = true
+                    }
+                },
+                modifier = Modifier
+                    .padding(horizontal = contentHorizontalPad)
+            )
+
+            HorizontalPager(
+                state = pagerState,
+                beyondViewportPageCount = 0,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> DetailPageContent(
+                        modifier = Modifier.fillMaxSize(),
+                        detail = detail,
+                        ids = ids,
+                        detailLoading = detailLoading,
+                        detailError = detailError,
+                        actionState = actionState,
+                        horizontalPad = contentHorizontalPad,
+                        infoListState = detailListState,
+                        infoExpanded = infoExpanded,
+                        onToggleInfo = { infoExpanded = !infoExpanded },
+                        onSeasonClick = { sheet = detail?.season?.let { DetailSheet.Season(it, curCid) } },
+                        onPageClick = {
+                            sheet = detail?.pages
+                                ?.takeIf { it.size > 1 }
+                                ?.let { DetailSheet.Page(it, curCid) }
+                        },
+                        onSwitchPage = onSwitchPage,
+                        onOpenComments = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(1)
+                            }
+                        },
+                        onOpenVideo = onOpenVideo,
+                        onAddToWatchLater = onAddToWatchLater,
+                        onOpenSpace = onOpenSpace,
+                        onDownloadClick = onDownloadClick,
+                        onToggleLike = onToggleLike,
+                        onToggleDislike = onToggleDislike,
+                        onFollowClick = {
+                            if (!isLoggedIn()) {
+                                Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                            } else if (actionState.following) {
+                                unfollowConfirmVisible = true
+                            } else {
+                                onToggleFollow()
+                            }
+                        },
+                        isSelf = isSelf,
+                        onOpenCoinPicker = {
+                            if (!isLoggedIn()) {
+                                Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                            } else if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
+                                selectedCoinAmount = 1
+                                coinSheetVisible = true
+                            }
+                        },
+                        onOpenFavoritePicker = {
+                            if (
+                                actionState.initialized &&
+                                actionState.aid > 0L &&
+                                !actionState.favoriteLoading &&
+                                !actionState.favoriteSaving
+                            ) {
+                                onLoadFavoriteFolders { folders ->
+                                    val selectedIds = folders.filter(VideoFavoriteFolder::selected)
+                                        .mapTo(linkedSetOf(), VideoFavoriteFolder::id)
+                                    favoriteFolders = folders
+                                    originalFavoriteFolderIds = selectedIds
+                                    selectedFavoriteFolderIds = selectedIds
+                                    favoriteSheetVisible = true
+                                }
+                            }
+                        },
+                        onOpenShare = {
+                            if (shareUrl == null) {
+                                Toast.makeText(context, "视频链接无效", Toast.LENGTH_SHORT).show()
+                            } else {
+                                shareSheetVisible = true
                             }
                         }
-                    },
-                    onOpenShare = {
-                        if (shareUrl == null) {
-                            Toast.makeText(context, "视频链接无效", Toast.LENGTH_SHORT).show()
-                        } else {
-                            shareSheetVisible = true
-                        }
-                    }
-                )
-
-                else -> {
-                    CommentPanel(
-                        subject = commentSubject,
-                        isActive = pagerState.currentPage == page,
-                        onOpenSpace = onOpenSpace,
-                        modifier = Modifier.fillMaxSize(),
-                        listState = commentListState,
-                        threadListState = commentThreadListState,
-                        showCommentCount = false,
-                        contentPadding = PaddingValues(
-                            start = contentHorizontalPad,
-                            top = 0.dp,
-                            end = contentHorizontalPad,
-                            bottom = 20.dp
-                        )
                     )
+
+                    else -> {
+                        CommentPanel(
+                            subject = commentSubject,
+                            isActive = pagerState.currentPage == page,
+                            onOpenSpace = onOpenSpace,
+                            modifier = Modifier.fillMaxSize(),
+                            listState = commentListState,
+                            threadListState = commentThreadListState,
+                            showCommentCount = false,
+                            contentPadding = PaddingValues(
+                                start = contentHorizontalPad,
+                                top = 0.dp,
+                                end = contentHorizontalPad,
+                                bottom = 20.dp
+                            )
+                        )
+                    }
                 }
             }
         }
-    }
 
-    sheet?.let { activeSheet ->
-        ModalBottomSheet(
-            onDismissRequest = { closeSheet() },
-            sheetState = sheetState
-        ) {
-            when (activeSheet) {
-                is DetailSheet.Season -> {
-                    SeasonSheetContent(
-                        season = activeSheet.season,
-                        curCid = activeSheet.curCid,
-                        onOpenEpisode = { route ->
-                            closeSheet {
-                                onOpenEpisode(route)
+        sheet?.let { activeSheet ->
+            DetailSelectionPanel(
+                title = when (activeSheet) {
+                    is DetailSheet.Season -> "合集 · ${activeSheet.season.title}"
+                    is DetailSheet.Page -> "分P列表"
+                },
+                onDismiss = { sheet = null },
+                containerColor = MaterialTheme.colorScheme.background
+            ) { close ->
+                when (activeSheet) {
+                    is DetailSheet.Season -> {
+                        SeasonSheetContent(
+                            season = activeSheet.season,
+                            curCid = activeSheet.curCid,
+                            aid = ids.aid,
+                            currentPubTs = detail?.pubTs,
+                            loadPublishTimes = loadSeasonPublishTimes,
+                            onAddToWatchLater = onAddToWatchLater,
+                            onOpenEpisode = { route ->
+                                close {
+                                    onOpenEpisode(route)
+                                }
                             }
-                        }
-                    )
-                }
+                        )
+                    }
 
-                is DetailSheet.Page -> {
-                    PageSheetContent(
-                        pages = activeSheet.pages,
-                        curCid = activeSheet.curCid,
-                        onSwitchPage = { cid ->
-                            closeSheet {
-                                onSwitchPage(cid)
+                    is DetailSheet.Page -> {
+                        PageSheetContent(
+                            pages = activeSheet.pages,
+                            curCid = activeSheet.curCid,
+                            aid = ids.aid,
+                            pubTs = detail?.pubTs,
+                            loadCovers = loadPageCovers,
+                            onSwitchPage = { cid ->
+                                close {
+                                    onSwitchPage(cid)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -459,6 +480,7 @@ private fun DetailPageContent(
     onToggleInfo: () -> Unit,
     onSeasonClick: () -> Unit,
     onPageClick: () -> Unit,
+    onSwitchPage: (Long) -> Unit,
     onOpenComments: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
     onAddToWatchLater: (Long) -> Unit,
@@ -483,40 +505,50 @@ private fun DetailPageContent(
     val infoTopPad = remember(horizontalPad) {
         if (horizontalPad > 0.dp) 16.dp else 0.dp
     }
+    val relateRows = remember(detail?.relates, showTwoColumns) {
+        detail?.relates.orEmpty().chunked(if (showTwoColumns) 2 else 1)
+    }
 
-    LazyColumn(
-        state = infoListState,
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = infoTopPad, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        detailItems(
-            detail = detail,
-            ids = ids,
-            detailLoading = detailLoading,
-            detailError = detailError,
-            actionState = actionState,
-            itemMod = itemMod,
-            relateItemMod = relateItemMod,
-            isTablet = isTablet,
-            showTwoColumns = showTwoColumns,
-            infoExpanded = infoExpanded,
-            onToggleInfo = onToggleInfo,
-            onSeasonClick = onSeasonClick,
-            onPageClick = onPageClick,
-            onOpenVideo = onOpenVideo,
-            onAddToWatchLater = onAddToWatchLater,
-            onOpenSpace = onOpenSpace,
-            onDownloadClick = onDownloadClick,
-            onToggleLike = onToggleLike,
-            onToggleDislike = onToggleDislike,
-            onFollowClick = onFollowClick,
-            isSelf = isSelf,
-            onOpenCoinPicker = onOpenCoinPicker,
-            onOpenFavoritePicker = onOpenFavoritePicker,
-            onOpenShare = onOpenShare,
-            onOpenComments = onOpenComments
-        )
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val columns = if (showTwoColumns) 2 else 1
+        val relateCardWidth = ((maxWidth - 12.dp - 6.dp * (columns - 1)) / columns).coerceAtLeast(0.dp)
+        LazyColumn(
+            state = infoListState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = infoTopPad, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            detailItems(
+                detail = detail,
+                ids = ids,
+                detailLoading = detailLoading,
+                detailError = detailError,
+                actionState = actionState,
+                itemMod = itemMod,
+                relateItemMod = relateItemMod,
+                relateRows = relateRows,
+                relateCardWidth = relateCardWidth,
+                isTablet = isTablet,
+                showTwoColumns = showTwoColumns,
+                infoExpanded = infoExpanded,
+                onToggleInfo = onToggleInfo,
+                onSeasonClick = onSeasonClick,
+                onPageClick = onPageClick,
+                onSwitchPage = onSwitchPage,
+                onOpenVideo = onOpenVideo,
+                onAddToWatchLater = onAddToWatchLater,
+                onOpenSpace = onOpenSpace,
+                onDownloadClick = onDownloadClick,
+                onToggleLike = onToggleLike,
+                onToggleDislike = onToggleDislike,
+                onFollowClick = onFollowClick,
+                isSelf = isSelf,
+                onOpenCoinPicker = onOpenCoinPicker,
+                onOpenFavoritePicker = onOpenFavoritePicker,
+                onOpenShare = onOpenShare,
+                onOpenComments = onOpenComments
+            )
+        }
     }
 }
 
@@ -528,12 +560,15 @@ private fun LazyListScope.detailItems(
     actionState: VideoActionUiState,
     itemMod: Modifier,
     relateItemMod: Modifier,
+    relateRows: List<List<VideoRelate>>,
+    relateCardWidth: Dp,
     isTablet: Boolean,
     showTwoColumns: Boolean,
     infoExpanded: Boolean,
     onToggleInfo: () -> Unit,
     onSeasonClick: () -> Unit,
     onPageClick: () -> Unit,
+    onSwitchPage: (Long) -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
     onAddToWatchLater: (Long) -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
@@ -620,6 +655,7 @@ private fun LazyListScope.detailItems(
                         repeat(2) {
                             HorizontalVideoCardSkeleton(
                                 modifier = Modifier.weight(1f),
+                                cardWidth = relateCardWidth,
                                 isTablet = isTablet
                             )
                         }
@@ -627,6 +663,7 @@ private fun LazyListScope.detailItems(
                 } else {
                     HorizontalVideoCardSkeleton(
                         modifier = relateItemMod,
+                        cardWidth = relateCardWidth,
                         isTablet = isTablet
                     )
                 }
@@ -671,6 +708,23 @@ private fun LazyListScope.detailItems(
                 )
             }
 
+            if (detail.pages.size > 1) {
+                item(
+                    key = "page_entry",
+                    contentType = "page_entry"
+                ) {
+                    key(ids.aid) {
+                        VideoPageSelector(
+                            pages = detail.pages,
+                            curCid = curCid,
+                            onSwitchPage = onSwitchPage,
+                            onShowAll = onPageClick,
+                            modifier = itemMod.padding(bottom = 10.dp)
+                        )
+                    }
+                }
+            }
+
             detail.season?.let { season ->
                 item(
                     key = "season_entry",
@@ -680,27 +734,12 @@ private fun LazyListScope.detailItems(
                         season = season,
                         curCid = curCid,
                         onClick = onSeasonClick,
-                        modifier = itemMod
+                        modifier = itemMod.padding(bottom = 10.dp)
                     )
                 }
             }
 
-            if (detail.pages.size > 1) {
-                item(
-                    key = "page_entry",
-                    contentType = "page_entry"
-                ) {
-                    PageEntryCard(
-                        pages = detail.pages,
-                        curCid = curCid,
-                        onClick = onPageClick,
-                        modifier = itemMod
-                    )
-                }
-            }
-
-            if (detail.relates.isNotEmpty()) {
-                val relateRows = detail.relates.chunked(if (showTwoColumns) 2 else 1)
+            if (relateRows.isNotEmpty()) {
                 items(
                     items = relateRows,
                     key = { row -> row.joinToString("_") { "${it.target.aid}_${it.target.cid}" } },
@@ -715,6 +754,7 @@ private fun LazyListScope.detailItems(
                             row.forEach { relate ->
                                 RelateRow(
                                     relate = relate,
+                                    cardWidth = relateCardWidth,
                                     onOpenVideo = onOpenVideo,
                                     onAddToWatchLater = onAddToWatchLater,
                                     modifier = Modifier.weight(1f)
@@ -727,6 +767,7 @@ private fun LazyListScope.detailItems(
                     } else {
                         RelateRow(
                             relate = row.single(),
+                            cardWidth = relateCardWidth,
                             onOpenVideo = onOpenVideo,
                             onAddToWatchLater = onAddToWatchLater,
                             modifier = relateItemMod
@@ -1839,23 +1880,6 @@ private fun SeasonEntryCard(
 }
 
 @Composable
-private fun PageEntryCard(
-    pages: List<VideoPagePart>,
-    curCid: Long?,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val (title, progressText) = remember(pages, curCid) { pageEntryText(pages, curCid) }
-
-    DetailEntryRow(
-        title = title,
-        progressText = progressText,
-        modifier = modifier,
-        onClick = onClick
-    )
-}
-
-@Composable
 private fun DetailEntryRow(
     title: String,
     progressText: String,
@@ -1909,29 +1933,37 @@ private fun DetailEntryRow(
     }
 }
 
-/** 合集 / 分P 条目前的装饰图标，由几根高低递减的竖条组成。 */
 @Composable
 private fun SeasonSheetContent(
     season: VideoSeason,
     curCid: Long?,
+    aid: Long,
+    currentPubTs: Long?,
+    loadPublishTimes: suspend (Long, Long) -> Map<Long, Long>,
+    onAddToWatchLater: (Long) -> Unit,
     onOpenEpisode: (VideoTarget) -> Unit
 ) {
-    val initIdx = remember(season, curCid) { seasonSheetIndex(season, curCid) }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initIdx)
+    val selectedIndex = remember(season, curCid) { seasonSheetIndex(season, curCid) }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex ?: 0)
+    var publishTimes by remember(aid, season.id) { mutableStateOf(emptyMap<Long, Long>()) }
+    LaunchedEffect(aid, season.id) {
+        if (aid > 0L && season.id > 0L) {
+            publishTimes = loadPublishTimes(aid, season.id)
+        }
+    }
 
-    LazyColumn(
+    DetailSelectionList(
         state = listState,
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+        selectedIndex = selectedIndex
+    ) { cardWidth ->
         item(
             key = "season_title",
             contentType = "title"
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     text = season.title,
                     style = MaterialTheme.typography.titleLarge
@@ -1951,15 +1983,17 @@ private fun SeasonSheetContent(
                 key = "sec_$secIdx",
                 contentType = "section"
             ) {
-                if (secIdx > 0) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                }
-                if (sec.title.isNotBlank()) {
-                    Text(
-                        text = sec.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                Column(Modifier.padding(horizontal = 10.dp)) {
+                    if (secIdx > 0) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                    if (sec.title.isNotBlank()) {
+                        Text(
+                            text = sec.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
             }
 
@@ -1970,7 +2004,10 @@ private fun SeasonSheetContent(
             ) { ep ->
                 SeasonEpisodeRow(
                     ep = ep,
+                    cardWidth = cardWidth,
                     selected = ep.cid == curCid,
+                    pubTs = ep.pubTs ?: publishTimes[ep.cid] ?: currentPubTs.takeIf { ep.cid == curCid },
+                    onAddToWatchLater = onAddToWatchLater,
                     onClick = {
                         if (ep.cid != curCid) {
                             onOpenEpisode(ep.target)
@@ -1986,38 +2023,52 @@ private fun SeasonSheetContent(
 private fun PageSheetContent(
     pages: List<VideoPagePart>,
     curCid: Long?,
+    aid: Long,
+    pubTs: Long?,
+    loadCovers: suspend (Long) -> Map<Long, String>,
     onSwitchPage: (Long) -> Unit
 ) {
-    val pageSheetUi = remember(pages) { buildPageSheetUi(pages) }
-    val initIdx = remember(pages, curCid) { pageSheetIndex(pageSheetUi, curCid) }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initIdx)
+    val selectedIndex = remember(pages, curCid) {
+        pages.indexOfFirst { it.cid == curCid }.takeIf { it >= 0 }?.plus(1)
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex ?: 0)
+    // Parts belong to one video; the API provides its publication time, not a date per part.
+    val publishTimeText = remember(pubTs) { pubTs?.takeIf { it > 0L }?.let(::formatPubTime) }
+    var covers by remember(aid) { mutableStateOf(emptyMap<Long, String>()) }
+    LaunchedEffect(aid) {
+        covers = loadCovers(aid)
+    }
 
-    LazyColumn(
+    DetailSelectionList(
         state = listState,
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+        selectedIndex = selectedIndex
+    ) { cardWidth ->
         item(
             key = "page_title",
             contentType = "title"
         ) {
             Text(
                 text = "分P列表",
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 10.dp)
             )
         }
 
-        items(
-            items = pageSheetUi.items,
-            key = { page -> "page_${page.cid}" },
-            contentType = { "page" }
-        ) { page ->
+        itemsIndexed(
+            items = pages,
+            key = { _, page -> "page_${page.cid}" },
+            contentType = { _, _ -> "page" }
+        ) { index, page ->
+            val title = remember(index, page.part) { buildPageTitle(index, page.part) }
+            val durationText = remember(page.durationSec) {
+                page.durationSec.takeIf { it > 0L }?.let { formatDuration(it * 1000) }
+            }
             PageSheetRow(
-                title = page.title,
-                subTitle = page.subTitle,
+                title = title,
+                durationText = durationText,
+                cardWidth = cardWidth,
+                publishTimeText = publishTimeText,
+                coverUrl = covers[page.cid],
                 selected = page.cid == curCid,
                 onClick = {
                     if (page.cid != curCid) {
@@ -2030,62 +2081,98 @@ private fun PageSheetContent(
 }
 
 @Composable
+private fun SelectionVideoCard(
+    title: String,
+    coverUrl: String?,
+    durationText: String?,
+    cardWidth: Dp,
+    selected: Boolean,
+    onClick: () -> Unit,
+    coverPlaceholder: (@Composable BoxScope.() -> Unit)? = null,
+    metadata: @Composable (Dp) -> Unit
+) {
+    val titleColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    val annotatedTitle = remember(title, titleColor, selected) {
+        buildAnnotatedString {
+            if (selected) {
+                appendInlineContent(SELECTION_PLAYING_TITLE_ICON, "当前播放")
+                append(' ')
+            }
+            withStyle(SpanStyle(color = titleColor)) { append(title) }
+        }
+    }
+    val titleInlineContent = remember(selected, titleColor) {
+        if (selected) {
+            mapOf(
+                SELECTION_PLAYING_TITLE_ICON to InlineTextContent(
+                    Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)
+                ) {
+                    AnimatedLiveBadge(
+                        modifier = Modifier.fillMaxSize(),
+                        tint = titleColor,
+                        contentDescription = null
+                    )
+                }
+            )
+        } else emptyMap()
+    }
+    HorizontalVideoCard(
+        title = annotatedTitle,
+        coverUrl = coverUrl,
+        durationText = durationText,
+        onClick = if (selected) null else onClick,
+        cardWidth = cardWidth,
+        coverSize = DpSize(160.dp, 90.dp),
+        coverPlaceholder = coverPlaceholder,
+        titleInlineContent = titleInlineContent,
+        isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600,
+        metadata = metadata
+    )
+}
+
+@Composable
 private fun SeasonEpisodeRow(
     ep: VideoSeasonEpisode,
+    cardWidth: Dp,
     selected: Boolean,
+    pubTs: Long?,
+    onAddToWatchLater: (Long) -> Unit,
     onClick: () -> Unit
 ) {
-    val rowMod = if (selected) {
-        Modifier.fillMaxWidth()
-    } else {
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+    val publishTimeText = remember(pubTs, ep.publishTimeText) {
+        pubTs?.let(::formatPubTime) ?: ep.publishTimeText?.takeIf(String::isNotBlank)
+    }
+    val viewText = remember(ep.viewText) { ep.viewText?.takeIf(String::isNotBlank)?.let(::compactCount) }
+    val danmakuText = remember(ep.danmakuText) { ep.danmakuText?.takeIf(String::isNotBlank)?.let(::compactCount) }
+    val aid = when (val target = ep.target) {
+        is VideoTarget.Ugc -> target.aid
+        is VideoTarget.Pgc -> target.aid
+        is VideoTarget.Pugv -> target.aid
     }
 
-    Row(
-        modifier = rowMod.padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top
+    SelectionVideoCard(
+        title = ep.title,
+        coverUrl = ep.cover,
+        durationText = ep.durationText,
+        cardWidth = cardWidth,
+        selected = selected,
+        onClick = onClick
     ) {
-        ep.cover?.takeIf(String::isNotBlank)?.let { cover ->
-            BiliAsyncImage(
-                url = cover,
-                contentDescription = ep.title,
-                modifier = Modifier
-                    .width(112.dp)
-                    .aspectRatio(16f / 10f)
-                    .clip(MaterialTheme.shapes.large),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            publishTimeText?.let { publishTime ->
                 Text(
-                    text = ep.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f)
-                )
-                if (selected) {
-                    CurBadge()
-                }
-            }
-            ep.subTitle?.takeIf(String::isNotBlank)?.let {
-                Text(
-                    text = it,
+                    text = publishTime,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+            VideoCardStatistics(
+                viewText = viewText,
+                danmakuText = danmakuText,
+                onAddToWatchLater = if (aid > 0L) ({ onAddToWatchLater(aid) }) else null
+            )
         }
     }
 }
@@ -2093,50 +2180,45 @@ private fun SeasonEpisodeRow(
 @Composable
 private fun PageSheetRow(
     title: String,
-    subTitle: String?,
+    durationText: String?,
+    cardWidth: Dp,
+    publishTimeText: String?,
+    coverUrl: String?,
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val rowMod = if (selected) {
-        Modifier.fillMaxWidth()
-    } else {
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-    }
-
-    Column(
-        modifier = rowMod.padding(vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
+    SelectionVideoCard(
+        title = title,
+        coverUrl = coverUrl,
+        durationText = durationText,
+        cardWidth = cardWidth,
+        selected = selected,
+        onClick = onClick,
+        coverPlaceholder = {
+            Icon(
+                imageVector = MaterialSymbols.Outlined.Movie,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
-            if (selected) {
-                CurBadge()
-            }
         }
-        subTitle?.takeIf(String::isNotBlank)?.let {
+    ) {
+        publishTimeText?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
     }
 }
 
 @Composable
 private fun RelateRow(
     relate: VideoRelate,
+    cardWidth: Dp,
     onOpenVideo: (VideoTarget) -> Unit,
     onAddToWatchLater: (Long) -> Unit,
     modifier: Modifier = Modifier
@@ -2151,108 +2233,113 @@ private fun RelateRow(
         durationText = relate.durationText,
         onClick = { onOpenVideo(relate.target) },
         modifier = modifier,
+        cardWidth = cardWidth,
         isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            if (reason != null || author != null) {
+            if (reason != null && author != null) {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val reasonMaxWidth = maxWidth * if (author != null) 0.4f else 1f
+                    val reasonMaxWidth = maxWidth * 0.4f
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        reason?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier
-                                    .widthIn(max = reasonMaxWidth)
-                                    .background(
-                                        MaterialTheme.colorScheme.secondaryContainer,
-                                        MaterialTheme.shapes.extraSmall
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        author?.let {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (reason == null) {
-                                    UploaderBadge()
-                                }
-                                Text(
-                                    text = it,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+                        RelateReasonBadge(reason, Modifier.widthIn(max = reasonMaxWidth))
+                        RelateAuthor(author, showBadge = false, modifier = Modifier.weight(1f))
                     }
                 }
+            } else if (reason != null) {
+                RelateReasonBadge(reason)
+            } else if (author != null) {
+                RelateAuthor(author, showBadge = true, modifier = Modifier.fillMaxWidth())
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (viewText != null) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Play_circle,
-                        contentDescription = "播放量",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text = viewText,
-                        modifier = Modifier.padding(start = 3.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-                if (danmakuText != null) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Subtitles,
-                        contentDescription = "弹幕数",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(start = 8.dp)
-                            .size(15.dp)
-                    )
-                    Text(
-                        text = danmakuText,
-                        modifier = Modifier.padding(start = 3.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                WatchLaterMoreMenu { onAddToWatchLater(relate.target.aid) }
-            }
+            VideoCardStatistics(
+                viewText = viewText,
+                danmakuText = danmakuText,
+                onAddToWatchLater = { onAddToWatchLater(relate.target.aid) }
+            )
         }
     }
 }
 
 @Composable
-private fun CurBadge() {
-    Surface(
-        color = MaterialTheme.colorScheme.primary,
-        shape = MaterialTheme.shapes.extraSmall
+private fun RelateReasonBadge(reason: String, modifier: Modifier = Modifier) {
+    Text(
+        text = reason,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.extraSmall)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun RelateAuthor(author: String, showBadge: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        if (showBadge) UploaderBadge()
         Text(
-            text = "当前播放",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            text = author,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+private fun VideoCardStatistics(
+    viewText: String?,
+    danmakuText: String?,
+    onAddToWatchLater: (() -> Unit)?
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (viewText != null) {
+            Icon(
+                imageVector = MaterialSymbols.Outlined.Play_circle,
+                contentDescription = "播放量",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = viewText,
+                modifier = Modifier.padding(start = 3.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+        if (danmakuText != null) {
+            Icon(
+                imageVector = MaterialSymbols.Outlined.Subtitles,
+                contentDescription = "弹幕数",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(15.dp)
+            )
+            Text(
+                text = danmakuText,
+                modifier = Modifier.padding(start = 3.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        if (onAddToWatchLater != null) {
+            WatchLaterMoreMenu(onAddToWatchLater)
+        }
     }
 }
 
@@ -2317,29 +2404,24 @@ private fun seasonEntryText(
     season: VideoSeason,
     curCid: Long?
 ): Pair<String, String> {
-    val eps = season.sections.flatMap { it.eps }
-    val curIdx = eps.indexOfFirst { it.cid == curCid }
+    var total = 0
+    var curIdx = -1
+    season.sections.forEach { section ->
+        if (curIdx < 0 && curCid != null) {
+            val index = section.eps.indexOfFirst { it.cid == curCid }
+            if (index >= 0) curIdx = total + index
+        }
+        total += section.eps.size
+    }
     return "合集 · ${season.title}" to if (curIdx >= 0) {
-        "${curIdx + 1}/${eps.size}"
+        "${curIdx + 1}/$total"
     } else {
-        "共 ${eps.size} 个"
+        "共 $total 个"
     }
 }
 
-private fun pageEntryText(
-    pages: List<VideoPagePart>,
-    curCid: Long?
-): Pair<String, String> {
-    val curIdx = pages.indexOfFirst { it.cid == curCid }
-    val curPage = pages.getOrNull(curIdx)
-    val title = curPage?.part?.takeIf(String::isNotBlank)
-        ?.let { "分P · $it" }
-        ?: "分P列表"
-    return title to if (curIdx >= 0) "${curIdx + 1}/${pages.size}" else "共 ${pages.size} 个"
-}
-
-private fun seasonSheetIndex(season: VideoSeason, curCid: Long?): Int {
-    if (curCid == null) return 0
+private fun seasonSheetIndex(season: VideoSeason, curCid: Long?): Int? {
+    if (curCid == null) return null
     var secItemIdx = 1
     season.sections.forEach { sec ->
         val epIdx = sec.eps.indexOfFirst { it.cid == curCid }
@@ -2348,32 +2430,7 @@ private fun seasonSheetIndex(season: VideoSeason, curCid: Long?): Int {
         }
         secItemIdx += 1 + sec.eps.size
     }
-    return 0
-}
-
-private fun pageSheetIndex(
-    pageSheetUi: PageSheetUi,
-    curCid: Long?
-): Int {
-    val pageIdx = curCid?.let { targetCid -> pageSheetUi.indexByCid[targetCid] } ?: -1
-    return if (pageIdx >= 0) pageIdx + 1 else 0
-}
-
-private fun buildPageSheetUi(pages: List<VideoPagePart>): PageSheetUi {
-    val items = ArrayList<PageSheetItem>(pages.size)
-    val indexByCid = HashMap<Long, Int>(pages.size)
-    pages.forEachIndexed { index, page ->
-        items += PageSheetItem(
-            cid = page.cid,
-            title = buildPageTitle(index, page.part),
-            subTitle = page.durationSec.takeIf { it > 0L }?.let { formatDuration(it * 1000) }
-        )
-        indexByCid[page.cid] = index
-    }
-    return PageSheetUi(
-        items = items,
-        indexByCid = indexByCid
-    )
+    return null
 }
 
 private fun buildPageTitle(index: Int, part: String): String {
@@ -2442,6 +2499,7 @@ private suspend fun LazyListState.animateContinuouslyToTop() {
 
 private const val COMMENT_SCROLL_TO_TOP_INSTANT_THRESHOLD_VIEWPORTS = 8f
 private const val DETAIL_RELATE_SKELETON_COUNT = 4
+private const val SELECTION_PLAYING_TITLE_ICON = "selection_playing"
 private sealed interface DetailSheet {
     data class Season(
         val season: VideoSeason,
@@ -2453,16 +2511,3 @@ private sealed interface DetailSheet {
         val curCid: Long?
     ) : DetailSheet
 }
-
-@Immutable
-private data class PageSheetUi(
-    val items: List<PageSheetItem>,
-    val indexByCid: Map<Long, Int>
-)
-
-@Immutable
-private data class PageSheetItem(
-    val cid: Long,
-    val title: String,
-    val subTitle: String?
-)

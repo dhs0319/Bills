@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -46,8 +48,11 @@ fun HorizontalVideoCard(
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
     cardWidth: Dp? = null,
+    coverSize: DpSize? = null,
+    coverPlaceholder: (@Composable BoxScope.() -> Unit)? = null,
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
     coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
+    titleInlineContent: Map<String, InlineTextContent> = emptyMap(),
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
     val annotatedTitle = remember(title) { AnnotatedString(title) }
@@ -59,8 +64,11 @@ fun HorizontalVideoCard(
         modifier = modifier,
         isTablet = isTablet,
         cardWidth = cardWidth,
+        coverSize = coverSize,
+        coverPlaceholder = coverPlaceholder,
         coverOverlay = coverOverlay,
         coverBottomContent = coverBottomContent,
+        titleInlineContent = titleInlineContent,
         metadata = metadata
     )
 }
@@ -75,8 +83,11 @@ fun HorizontalVideoCard(
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
     cardWidth: Dp? = null,
+    coverSize: DpSize? = null,
+    coverPlaceholder: (@Composable BoxScope.() -> Unit)? = null,
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
     coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
+    titleInlineContent: Map<String, InlineTextContent> = emptyMap(),
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
     val cardContent: @Composable () -> Unit = {
@@ -87,8 +98,11 @@ fun HorizontalVideoCard(
                 durationText = durationText,
                 cardWidth = cardWidth,
                 isTablet = isTablet,
+                coverSize = coverSize,
+                coverPlaceholder = coverPlaceholder,
                 coverOverlay = coverOverlay,
                 coverBottomContent = coverBottomContent,
+                titleInlineContent = titleInlineContent,
                 metadata = metadata
             )
         } else {
@@ -99,8 +113,11 @@ fun HorizontalVideoCard(
                     durationText = durationText,
                     cardWidth = maxWidth,
                     isTablet = isTablet,
+                    coverSize = coverSize,
+                    coverPlaceholder = coverPlaceholder,
                     coverOverlay = coverOverlay,
                     coverBottomContent = coverBottomContent,
+                    titleInlineContent = titleInlineContent,
                     metadata = metadata
                 )
             }
@@ -137,14 +154,17 @@ private fun HorizontalVideoCardContent(
     durationText: String?,
     cardWidth: Dp,
     isTablet: Boolean,
+    coverSize: DpSize?,
+    coverPlaceholder: (@Composable BoxScope.() -> Unit)?,
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)?,
     coverBottomContent: (@Composable BoxScope.() -> Unit)?,
+    titleInlineContent: Map<String, InlineTextContent>,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
     val titleStyle = if (isTablet) MaterialTheme.typography.titleSmall
         else MaterialTheme.typography.titleMedium
-    val coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet)
-    val coverHeight = coverWidth / horizontalVideoCoverAspectRatio(isTablet)
+    val coverWidth = coverSize?.width ?: horizontalVideoCoverWidth(cardWidth, isTablet)
+    val coverHeight = coverSize?.height ?: (coverWidth / horizontalVideoCoverAspectRatio(isTablet))
 
     Row(
         modifier = Modifier
@@ -159,7 +179,8 @@ private fun HorizontalVideoCardContent(
             modifier = Modifier
                 .width(coverWidth)
                 .height(coverHeight),
-            shape = MaterialTheme.shapes.small
+            shape = MaterialTheme.shapes.small,
+            placeholderContent = coverPlaceholder
         ) {
             durationText?.takeIf(String::isNotBlank)?.let { duration ->
                 Text(
@@ -185,6 +206,7 @@ private fun HorizontalVideoCardContent(
         ) {
             Text(
                 text = title,
+                inlineContent = titleInlineContent,
                 style = titleStyle,
                 minLines = 2,
                 maxLines = 2,
