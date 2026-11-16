@@ -1,6 +1,10 @@
 package com.dhs0319.bills.core.designsystem.theme
 
 import android.os.Build
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -59,9 +63,10 @@ fun BiliTheme(
 
     CompositionLocalProvider(LocalDensity provides density) {
         ProvideAnimations(config.animationSpeed) {
+            val animatedColorScheme = animateColorScheme(colorScheme)
             ProvidePullRefresh(config.pullRefreshDistanceDp) {
                 MaterialTheme(
-                    colorScheme = colorScheme,
+                    colorScheme = animatedColorScheme,
                     typography = typography,
                     shapes = shapes,
                     content = content
@@ -70,6 +75,74 @@ fun BiliTheme(
         }
     }
 }
+
+@Composable
+private fun animateColorScheme(target: ColorScheme): ColorScheme {
+    val animations = LocalAnimations.current
+    val transition = updateTransition(targetState = target, label = "Theme color scheme")
+
+    return target.copy(
+        primary = transition.animateSchemeColor(animations, "primary") { it.primary },
+        onPrimary = transition.animateSchemeColor(animations, "onPrimary") { it.onPrimary },
+        primaryContainer = transition.animateSchemeColor(animations, "primaryContainer") { it.primaryContainer },
+        onPrimaryContainer = transition.animateSchemeColor(animations, "onPrimaryContainer") { it.onPrimaryContainer },
+        inversePrimary = transition.animateSchemeColor(animations, "inversePrimary") { it.inversePrimary },
+        secondary = transition.animateSchemeColor(animations, "secondary") { it.secondary },
+        onSecondary = transition.animateSchemeColor(animations, "onSecondary") { it.onSecondary },
+        secondaryContainer = transition.animateSchemeColor(animations, "secondaryContainer") { it.secondaryContainer },
+        onSecondaryContainer = transition.animateSchemeColor(animations, "onSecondaryContainer") { it.onSecondaryContainer },
+        tertiary = transition.animateSchemeColor(animations, "tertiary") { it.tertiary },
+        onTertiary = transition.animateSchemeColor(animations, "onTertiary") { it.onTertiary },
+        tertiaryContainer = transition.animateSchemeColor(animations, "tertiaryContainer") { it.tertiaryContainer },
+        onTertiaryContainer = transition.animateSchemeColor(animations, "onTertiaryContainer") { it.onTertiaryContainer },
+        background = transition.animateSchemeColor(animations, "background") { it.background },
+        onBackground = transition.animateSchemeColor(animations, "onBackground") { it.onBackground },
+        surface = transition.animateSchemeColor(animations, "surface") { it.surface },
+        onSurface = transition.animateSchemeColor(animations, "onSurface") { it.onSurface },
+        surfaceVariant = transition.animateSchemeColor(animations, "surfaceVariant") { it.surfaceVariant },
+        onSurfaceVariant = transition.animateSchemeColor(animations, "onSurfaceVariant") { it.onSurfaceVariant },
+        surfaceTint = transition.animateSchemeColor(animations, "surfaceTint") { it.surfaceTint },
+        inverseSurface = transition.animateSchemeColor(animations, "inverseSurface") { it.inverseSurface },
+        inverseOnSurface = transition.animateSchemeColor(animations, "inverseOnSurface") { it.inverseOnSurface },
+        error = transition.animateSchemeColor(animations, "error") { it.error },
+        onError = transition.animateSchemeColor(animations, "onError") { it.onError },
+        errorContainer = transition.animateSchemeColor(animations, "errorContainer") { it.errorContainer },
+        onErrorContainer = transition.animateSchemeColor(animations, "onErrorContainer") { it.onErrorContainer },
+        outline = transition.animateSchemeColor(animations, "outline") { it.outline },
+        outlineVariant = transition.animateSchemeColor(animations, "outlineVariant") { it.outlineVariant },
+        scrim = transition.animateSchemeColor(animations, "scrim") { it.scrim },
+        surfaceBright = transition.animateSchemeColor(animations, "surfaceBright") { it.surfaceBright },
+        surfaceDim = transition.animateSchemeColor(animations, "surfaceDim") { it.surfaceDim },
+        surfaceContainer = transition.animateSchemeColor(animations, "surfaceContainer") { it.surfaceContainer },
+        surfaceContainerHigh = transition.animateSchemeColor(animations, "surfaceContainerHigh") { it.surfaceContainerHigh },
+        surfaceContainerHighest = transition.animateSchemeColor(animations, "surfaceContainerHighest") { it.surfaceContainerHighest },
+        surfaceContainerLow = transition.animateSchemeColor(animations, "surfaceContainerLow") { it.surfaceContainerLow },
+        surfaceContainerLowest = transition.animateSchemeColor(animations, "surfaceContainerLowest") { it.surfaceContainerLowest },
+        primaryFixed = transition.animateSchemeColor(animations, "primaryFixed") { it.primaryFixed },
+        primaryFixedDim = transition.animateSchemeColor(animations, "primaryFixedDim") { it.primaryFixedDim },
+        onPrimaryFixed = transition.animateSchemeColor(animations, "onPrimaryFixed") { it.onPrimaryFixed },
+        onPrimaryFixedVariant = transition.animateSchemeColor(animations, "onPrimaryFixedVariant") { it.onPrimaryFixedVariant },
+        secondaryFixed = transition.animateSchemeColor(animations, "secondaryFixed") { it.secondaryFixed },
+        secondaryFixedDim = transition.animateSchemeColor(animations, "secondaryFixedDim") { it.secondaryFixedDim },
+        onSecondaryFixed = transition.animateSchemeColor(animations, "onSecondaryFixed") { it.onSecondaryFixed },
+        onSecondaryFixedVariant = transition.animateSchemeColor(animations, "onSecondaryFixedVariant") { it.onSecondaryFixedVariant },
+        tertiaryFixed = transition.animateSchemeColor(animations, "tertiaryFixed") { it.tertiaryFixed },
+        tertiaryFixedDim = transition.animateSchemeColor(animations, "tertiaryFixedDim") { it.tertiaryFixedDim },
+        onTertiaryFixed = transition.animateSchemeColor(animations, "onTertiaryFixed") { it.onTertiaryFixed },
+        onTertiaryFixedVariant = transition.animateSchemeColor(animations, "onTertiaryFixedVariant") { it.onTertiaryFixedVariant }
+    )
+}
+
+@Composable
+private fun Transition<ColorScheme>.animateSchemeColor(
+    animations: BiliAnimations,
+    label: String,
+    targetValueByState: (ColorScheme) -> Color
+): Color = animateColor(
+    transitionSpec = { tween(durationMillis = animations.medium, easing = animations.standard) },
+    label = label,
+    targetValueByState = { targetValueByState(it) }
+).value
 
 fun previewThemePrimaryColor(seedColor: Color, isDark: Boolean): Color {
     return createSeedColorScheme(seedColor, isDark).primary

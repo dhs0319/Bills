@@ -12,7 +12,6 @@ import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -74,9 +73,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -103,6 +99,7 @@ import com.composables.icons.materialsymbols.outlinedfilled.Thumb_down as Symbol
 import com.composables.icons.materialsymbols.outlinedfilled.Thumb_up as SymbolOutlinedFilledThumbup
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
+import com.dhs0319.bills.core.designsystem.component.AnimatedLiveBadge
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
@@ -1885,8 +1882,9 @@ private fun DetailEntryRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            CollectionBarsIcon(
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            AnimatedLiveBadge(
+                tint = MaterialTheme.colorScheme.primary,
+                contentDescription = null,
                 modifier = Modifier
                     .padding(start = 12.dp)
                     .size(13.dp)
@@ -1912,27 +1910,6 @@ private fun DetailEntryRow(
 }
 
 /** 合集 / 分P 条目前的装饰图标，由几根高低递减的竖条组成。 */
-@Composable
-private fun CollectionBarsIcon(
-    tint: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        val barFraction = listOf(1f, 0.68f, 0.44f)
-        val gap = size.width * 0.16f
-        val barWidth = (size.width - gap * (barFraction.size - 1)) / barFraction.size
-        barFraction.forEachIndexed { index, fraction ->
-            val barHeight = size.height * fraction
-            drawRoundRect(
-                color = tint,
-                topLeft = Offset(index * (barWidth + gap), size.height - barHeight),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
-            )
-        }
-    }
-}
-
 @Composable
 private fun SeasonSheetContent(
     season: VideoSeason,
@@ -2464,7 +2441,7 @@ private suspend fun LazyListState.animateContinuouslyToTop() {
 }
 
 private const val COMMENT_SCROLL_TO_TOP_INSTANT_THRESHOLD_VIEWPORTS = 8f
-private const val DETAIL_RELATE_SKELETON_COUNT = 2
+private const val DETAIL_RELATE_SKELETON_COUNT = 4
 private sealed interface DetailSheet {
     data class Season(
         val season: VideoSeason,
