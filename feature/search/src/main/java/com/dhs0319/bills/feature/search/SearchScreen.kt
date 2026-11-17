@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +45,7 @@ import com.dhs0319.bills.feature.search.result.SearchAuthorCard
 import com.dhs0319.bills.feature.search.filter.SearchFiltersSheet
 import com.dhs0319.bills.feature.search.landing.SearchLandingPanel
 import com.dhs0319.bills.feature.search.result.SearchCard
+import com.dhs0319.bills.feature.search.suggestion.SearchSuggestionsPanel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +58,7 @@ fun SearchScreen(
     val authors by viewModel.authors.collectAsStateWithLifecycle()
     val videos by viewModel.videos.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
     val hasItems = authors.isNotEmpty() || videos.isNotEmpty()
     val itemCount = authors.size + videos.size
@@ -63,6 +66,8 @@ fun SearchScreen(
     val filters = viewModel.filters.filterNot { it.key == SORT_KEY }
     val hasActiveExtraFilter = filters.any { viewModel.selectedOf(it.key).isNotEmpty() } || viewModel.time.isActive
     val handleBack = {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
         if (!viewModel.consumeBack()) {
             onBack()
         }
@@ -96,9 +101,10 @@ fun SearchScreen(
         topBar = {
             SearchTopBar(
                 text = viewModel.input,
-                placeholder = viewModel.landingState.searchPlaceholder ?: "搜索视频",
+                placeholder = viewModel.defaultWord?.display ?: "搜索视频",
                 autoFocus = viewModel.keyword.isBlank() && viewModel.input.isBlank(),
                 onTextChange = viewModel::updateInput,
+                onInputFocus = viewModel::showInputSuggestions,
                 onBack = handleBack,
                 onSearch = {
                     viewModel.submitSearch()
@@ -115,6 +121,18 @@ fun SearchScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            if (viewModel.suggestions.isVisible) {
+                SearchSuggestionsPanel(
+                    query = viewModel.suggestions.query,
+                    suggestions = viewModel.suggestions.items,
+                    onSearch = { suggestion ->
+                        focusManager.clearFocus(force = true)
+                        keyboard?.hide()
+                        viewModel.submitSearch(suggestion)
+                    }
+                )
+                return@Column
+            }
             sortFilter?.takeIf { it.ops.size > 1 }?.let { filter ->
                 val trailing: (@Composable RowScope.() -> Unit)? =
                     if (filters.isNotEmpty()) {

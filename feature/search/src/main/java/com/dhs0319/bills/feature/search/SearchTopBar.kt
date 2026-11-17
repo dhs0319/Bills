@@ -23,6 +23,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
@@ -41,6 +42,7 @@ internal fun SearchTopBar(
     placeholder: String,
     autoFocus: Boolean,
     onTextChange: (String) -> Unit,
+    onInputFocus: () -> Unit,
     onBack: () -> Unit,
     onSearch: () -> Unit,
     onOpenSpace: (Long) -> Unit
@@ -53,7 +55,7 @@ internal fun SearchTopBar(
     val imeVisible = WindowInsets.isImeVisible
     var imeShown by remember { mutableStateOf(false) }
 
-    LaunchedEffect(autoFocus) {
+    LaunchedEffect(Unit) {
         if (autoFocus) {
             withFrameNanos { }
             focusRequester.requestFocus()
@@ -84,7 +86,8 @@ internal fun SearchTopBar(
                 placeholder = placeholder,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { if (it.isFocused) onInputFocus() },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = true,

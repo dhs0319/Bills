@@ -3,10 +3,12 @@ package com.dhs0319.bills.feature.search
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.model.SearchAuthor
+import com.dhs0319.bills.core.model.SearchDefaultWord
 import com.dhs0319.bills.core.model.SearchFilter
 import com.dhs0319.bills.core.model.SearchOrder
 import com.dhs0319.bills.core.model.SearchReq
@@ -15,7 +17,9 @@ import com.dhs0319.bills.core.model.SearchVideo
 import com.dhs0319.bills.core.search.SearchLandingRepository
 import com.dhs0319.bills.core.search.SearchRepository
 import com.dhs0319.bills.feature.search.landing.SearchLandingUiState
-import com.dhs0319.bills.feature.search.landing.selectSearchPlaceholder
+import com.dhs0319.bills.feature.search.navigation.SEARCH_DEFAULT_SHOW_ARG
+import com.dhs0319.bills.feature.search.navigation.SEARCH_DEFAULT_WORD_ARG
+import com.dhs0319.bills.feature.search.suggestion.SearchSuggestionsState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -29,8 +33,17 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val repo: SearchRepository,
-    private val landingRepo: SearchLandingRepository
+    private val landingRepo: SearchLandingRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    var defaultWord by mutableStateOf(
+        SearchDefaultWord(
+            show = savedStateHandle.get<String>(SEARCH_DEFAULT_SHOW_ARG).orEmpty(),
+            word = savedStateHandle.get<String>(SEARCH_DEFAULT_WORD_ARG).orEmpty()
+        ).takeIf { it.display.isNotBlank() }
+    )
+        private set
 
     var input by mutableStateOf("")
         private set
@@ -56,8 +69,10 @@ class SearchViewModel @Inject constructor(
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    internal val suggestions = SearchSuggestionsState(viewModelScope, repo::suggest)
+
     val canLoadMore: Boolean
-        get() = next.isNotBlank()
+        get() = next.isNotBlank() && !suggestions.isVisible
 
     private val _authors = MutableStateFlow<List<SearchAuthor>>(emptyList())
     val authors = _authors.asStateFlow()
@@ -85,7 +100,20 @@ class SearchViewModel @Inject constructor(
     private var loadMoreJob: Job? = null
 
     init {
+        if (defaultWord == null) loadDefaultWord()
         loadLanding()
+    }
+
+    private fun loadDefaultWord() {
+        viewModelScope.launch {
+            try {
+                defaultWord = repo.defaultWord()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "搜索默认推荐词加载失败" }
+            }
+        }
     }
 
     fun loadLanding(forceRefresh: Boolean = false) {
@@ -101,8 +129,7 @@ class SearchViewModel @Inject constructor(
                 landingState = landingState.copy(
                     trending = data.trending,
                     discovery = data.discovery,
-                    discoveryError = null,
-                    searchPlaceholder = landingState.searchPlaceholder ?: selectSearchPlaceholder(data.discovery)
+                    discoveryError = null
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -125,8 +152,7 @@ class SearchViewModel @Inject constructor(
             try {
                 val discovery = landingRepo.refreshDiscovery()
                 landingState = landingState.copy(
-                    discovery = discovery,
-                    searchPlaceholder = landingState.searchPlaceholder ?: selectSearchPlaceholder(discovery)
+                    discovery = discovery
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -145,15 +171,26 @@ class SearchViewModel @Inject constructor(
 
     fun updateInput(value: String) {
         input = value
+        suggestions.update(value)
+        if (value.isBlank()) clearSearchState()
+    }
+
+    fun showInputSuggestions() {
+        suggestions.update(input)
     }
 
     fun submitSearch(
         value: String = input,
         recordHistory: Boolean = true
     ) {
-        val query = value.trim()
+        val query = value.ifBlank { defaultWord?.keyword.orEmpty() }.trim()
         input = query
-        if (query.isEmpty() || isLoading) return
+        suggestions.clear()
+        if (query.isEmpty()) {
+            clearSearchState()
+            return
+        }
+        if (isLoading && query == keyword) return
         val fresh = query != keyword
         if (fresh) {
             clearSearchState()
@@ -222,6 +259,11 @@ class SearchViewModel @Inject constructor(
     }
 
     fun consumeBack(): Boolean {
+        if (suggestions.isVisible) {
+            suggestions.clear()
+            input = keyword
+            return true
+        }
         val hasState = keyword.isNotBlank() ||
                 _authors.value.isNotEmpty() ||
                 _videos.value.isNotEmpty() ||
@@ -233,6 +275,7 @@ class SearchViewModel @Inject constructor(
                 time.isActive
         if (!hasState) return false
         clearSearchState()
+        input = ""
         return true
     }
 
@@ -285,7 +328,7 @@ class SearchViewModel @Inject constructor(
                 val page = repo.search(request)
                 if (generation != searchGeneration) return@launch
                 keyword = page.keyword
-                input = page.keyword
+                if (!suggestions.isVisible) input = page.keyword
                 next = page.next
                 syncFilters(page.filters)
                 _authors.value = page.authors.filter { authorIds.add(it.mid) }

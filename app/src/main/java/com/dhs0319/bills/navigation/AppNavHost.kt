@@ -102,6 +102,7 @@ import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.ImUnreadBadge
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
+import com.dhs0319.bills.core.model.SearchDefaultWord
 import com.dhs0319.bills.core.model.StreamPlaybackTarget
 import com.dhs0319.bills.core.model.VideoSrc
 import com.dhs0319.bills.core.model.VideoTarget
@@ -322,6 +323,9 @@ fun AppNavHost(
                     themeMode = themeConfig.themeMode,
                     onTabChange = { currentTab = it },
                     onNavigateToSearch = { rootNavController.navigateToSearch() },
+                    onNavigateToSearchWithDefaultWord = { defaultWord ->
+                        rootNavController.navigateToSearch(defaultWord)
+                    },
                     onNavigateToSettings = { rootNavController.navigate(SETTINGS_ROUTE) },
                     onNavigateToAccount = { rootNavController.navigate(ACCOUNT_ROUTE) },
                     onNavigateToLogin = openLogin,
@@ -527,6 +531,7 @@ private fun MainTabsScaffold(
     themeMode: ThemeMode,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToSearchWithDefaultWord: (SearchDefaultWord?) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToAccount: () -> Unit,
     onNavigateToLogin: () -> Unit,
@@ -624,6 +629,7 @@ private fun MainTabsScaffold(
                     when (tab) {
                         TopLevelRoute.HOME -> HomeScreen(
                             onNavigateToSearch = onNavigateToSearch,
+                            onNavigateToSearchWithDefaultWord = onNavigateToSearchWithDefaultWord,
                             onNavigateToProfile = { selectTab(TopLevelRoute.PROFILE) },
                             profileAvatar = userState.user?.avatar,
                             showTopActions = !isLandscape,

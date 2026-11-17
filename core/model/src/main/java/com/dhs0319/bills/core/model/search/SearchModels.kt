@@ -29,6 +29,19 @@ enum class SearchSuggestionBadge {
 }
 
 @Immutable
+data class SearchDefaultWord(
+    val show: String,
+    val word: String,
+    val refreshIntervalMillis: Long = 0L
+) {
+    val display: String
+        get() = show.ifBlank { word }
+
+    val keyword: String
+        get() = word.ifBlank { show }
+}
+
+@Immutable
 data class SearchSuggestion(
     val keyword: String,
     val title: String,
