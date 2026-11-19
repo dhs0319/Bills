@@ -1,5 +1,5 @@
 ## 高质量AI中转站推荐
-[吉吉 API](https://www.jiji.cc/register?aff=N648HZ6QQ5KX) · [LiBwrt API](https://api.zipimg.cn/register?aff=EHA435WA4J6H)
+[吉吉 API](https://aws.jiji.cc/register?aff=N648HZ6QQ5KX) · [LiBwrt API](https://aws.303580.xyz/register?aff=EHA435WA4J6H)
 
 <h2 align="center">Bills</h2>
 
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  一个的第三方哔哩哔哩 Android 客户端。持续施工中...
+  一个简约的第三方哔哩哔哩 Android 客户端。持续施工中...
 </p>
 
 <p align="center">
@@ -102,7 +102,7 @@
 
 ## 说明
 
-Bills基于[bbspace](https://github.com/naaammme/bbspace)项目二次开发，与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
+Bills基于[bbspace](https://github.com/naaammme/bbspace)开发，与哔哩哔哩官方无关。项目主要用于学习、研究和 Android 原生界面实现练习。仓库内涉及的接口信息均来自公开资料整理，仅用于技术交流，不包含破解和付费内容分发。
 
 如果这个项目帮你省下了找实现细节和踩坑的时间，欢迎点个 Star。
 
