@@ -52,7 +52,8 @@ internal fun CommentThreadPane(
     onLoadMore: () -> Unit,
     bottomPadding: Dp,
     modifier: Modifier = Modifier,
-    isDetailMode: Boolean = true
+    isDetailMode: Boolean = true,
+    isActive: Boolean = true
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -69,7 +70,8 @@ internal fun CommentThreadPane(
             onLoadMore = onLoadMore,
             bottomPadding = bottomPadding,
             modifier = Modifier.fillMaxSize(),
-            isDetailMode = isDetailMode
+            isDetailMode = isDetailMode,
+            isActive = isActive
         )
     }
 }
@@ -87,11 +89,13 @@ private fun CommentThreadContent(
     onLoadMore: () -> Unit,
     bottomPadding: Dp,
     modifier: Modifier = Modifier,
-    isDetailMode: Boolean = true
+    isDetailMode: Boolean,
+    isActive: Boolean
 ) {
     val stateHolder by rememberUpdatedState(state)
-    val shouldLoadMore by remember {
+    val shouldLoadMore by remember(isActive, listState) {
         derivedStateOf {
+            if (!isActive) return@derivedStateOf false
             val cur = stateHolder
             val total = listState.layoutInfo.totalItemsCount
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1

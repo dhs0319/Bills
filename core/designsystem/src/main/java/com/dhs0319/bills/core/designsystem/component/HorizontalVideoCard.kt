@@ -53,6 +53,7 @@ fun HorizontalVideoCard(
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
     coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
     titleInlineContent: Map<String, InlineTextContent> = emptyMap(),
+    compact: Boolean = false,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
     val annotatedTitle = remember(title) { AnnotatedString(title) }
@@ -69,6 +70,7 @@ fun HorizontalVideoCard(
         coverOverlay = coverOverlay,
         coverBottomContent = coverBottomContent,
         titleInlineContent = titleInlineContent,
+        compact = compact,
         metadata = metadata
     )
 }
@@ -88,6 +90,7 @@ fun HorizontalVideoCard(
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)? = null,
     coverBottomContent: (@Composable BoxScope.() -> Unit)? = null,
     titleInlineContent: Map<String, InlineTextContent> = emptyMap(),
+    compact: Boolean = false,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
     val cardContent: @Composable () -> Unit = {
@@ -103,6 +106,7 @@ fun HorizontalVideoCard(
                 coverOverlay = coverOverlay,
                 coverBottomContent = coverBottomContent,
                 titleInlineContent = titleInlineContent,
+                compact = compact,
                 metadata = metadata
             )
         } else {
@@ -118,6 +122,7 @@ fun HorizontalVideoCard(
                     coverOverlay = coverOverlay,
                     coverBottomContent = coverBottomContent,
                     titleInlineContent = titleInlineContent,
+                    compact = compact,
                     metadata = metadata
                 )
             }
@@ -159,12 +164,13 @@ private fun HorizontalVideoCardContent(
     coverOverlay: (@Composable BoxScope.(coverWidth: Dp) -> Unit)?,
     coverBottomContent: (@Composable BoxScope.() -> Unit)?,
     titleInlineContent: Map<String, InlineTextContent>,
+    compact: Boolean,
     metadata: @Composable (cardWidth: Dp) -> Unit
 ) {
-    val titleStyle = if (isTablet) MaterialTheme.typography.titleSmall
+    val titleStyle = if (isTablet || compact) MaterialTheme.typography.titleSmall
         else MaterialTheme.typography.titleMedium
-    val coverWidth = coverSize?.width ?: horizontalVideoCoverWidth(cardWidth, isTablet)
-    val coverHeight = coverSize?.height ?: (coverWidth / horizontalVideoCoverAspectRatio(isTablet))
+    val coverWidth = coverSize?.width ?: horizontalVideoCoverWidth(cardWidth, isTablet, compact)
+    val coverHeight = coverSize?.height ?: (coverWidth / horizontalVideoCoverAspectRatio(isTablet && !compact))
 
     Row(
         modifier = Modifier
@@ -221,13 +227,14 @@ private fun HorizontalVideoCardContent(
 fun HorizontalVideoCardSkeleton(
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
-    cardWidth: Dp? = null
+    cardWidth: Dp? = null,
+    compact: Boolean = false
 ) {
     if (cardWidth != null) {
         VideoListCardSkeleton(
             modifier = modifier,
-            coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet),
-            coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet),
+            coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet, compact),
+            coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet && !compact),
             contentPadding = 8.dp,
             cardShape = MaterialTheme.shapes.medium,
             coverShape = MaterialTheme.shapes.small
@@ -235,8 +242,8 @@ fun HorizontalVideoCardSkeleton(
     } else {
         BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
             VideoListCardSkeleton(
-                coverWidth = horizontalVideoCoverWidth(maxWidth, isTablet),
-                coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet),
+                coverWidth = horizontalVideoCoverWidth(maxWidth, isTablet, compact),
+                coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet && !compact),
                 contentPadding = 8.dp,
                 cardShape = MaterialTheme.shapes.medium,
                 coverShape = MaterialTheme.shapes.small
@@ -245,8 +252,13 @@ fun HorizontalVideoCardSkeleton(
     }
 }
 
-private fun horizontalVideoCoverWidth(cardWidth: Dp, isTablet: Boolean): Dp {
-    return (cardWidth - 16.dp) * if (isTablet) 0.49f else 0.43f
+private fun horizontalVideoCoverWidth(cardWidth: Dp, isTablet: Boolean, compact: Boolean): Dp {
+    val available = (cardWidth - 16.dp).coerceAtLeast(0.dp)
+    return when {
+        compact -> (available * 0.4f).coerceAtMost(144.dp)
+        isTablet -> available * 0.49f
+        else -> available * 0.43f
+    }
 }
 
 private fun horizontalVideoCoverAspectRatio(isTablet: Boolean): Float {

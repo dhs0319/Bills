@@ -220,7 +220,7 @@ fun VideoDetailInfoSkeleton(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SkeletonBlock(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
                 shape = CircleShape
             )
             Column(
@@ -252,7 +252,7 @@ fun VideoDetailInfoSkeleton(
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             SkeletonBlock(
                 modifier = Modifier
