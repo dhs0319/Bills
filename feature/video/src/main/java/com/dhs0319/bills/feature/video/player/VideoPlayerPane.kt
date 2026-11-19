@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +46,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
@@ -61,6 +64,7 @@ import androidx.media3.ui.R as Media3UiR
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil3.compose.AsyncImage
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Subtitles
 import com.composables.icons.materialsymbols.outlined.Subtitles_off
@@ -72,7 +76,7 @@ import com.composables.icons.materialsymbols.outlinedfilled.Open_in_full
 import com.composables.icons.materialsymbols.outlinedfilled.Replay
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
-import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
+import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.PlaybackOption
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionBottomSheet
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionSidebar
@@ -80,6 +84,7 @@ import com.dhs0319.bills.core.designsystem.component.shouldShowPlaybackSidebar
 import com.dhs0319.bills.core.designsystem.component.PlayerBottomControls
 import com.dhs0319.bills.core.designsystem.component.PlayerControlTextButton
 import com.dhs0319.bills.core.designsystem.component.formatPlaybackDownloadSpeed
+import com.dhs0319.bills.core.designsystem.component.rememberBiliImageRequest
 import com.dhs0319.bills.core.designsystem.R as DesignSystemR
 import com.dhs0319.bills.infra.player.danmaku.DanmakuLayer
 import com.dhs0319.bills.infra.player.danmaku.DanmakuOverlayState
@@ -89,6 +94,7 @@ import com.dhs0319.bills.core.model.PlaybackState
 import com.dhs0319.bills.core.model.PlayerOverlayPrefs
 import com.dhs0319.bills.core.model.PlayerSettingsState
 import com.dhs0319.bills.core.model.VideoPlaybackState
+import com.dhs0319.bills.feature.video.R
 import com.dhs0319.bills.feature.video.VideoViewModel
 import com.dhs0319.bills.feature.video.formatPlaybackTime
 import com.dhs0319.bills.feature.video.formatSpeed
@@ -226,62 +232,22 @@ internal fun VideoPlayerPane(
                 VideoPlaybackSurface(viewModel, player, state, settingsState, resizeMode)
             }
 
-            if (
-                state.waitingForPlay ||
-                !state.hasRenderedFirstFrame &&
-                !state.detail?.cover.isNullOrBlank() &&
-                (state.isPreparing || state.playbackSource != null)
-            ) {
-                val onPlayVideo: () -> Unit = {
+            VideoCoverOverlay(
+                url = state.detail?.cover,
+                title = state.detail?.title,
+                detailLoading = state.detailLoading,
+                waitingForPlay = state.waitingForPlay,
+                showBeforeFirstFrame = !state.hasRenderedFirstFrame &&
+                    (state.isPreparing || state.playbackSource != null),
+                showBuffering = !state.waitingForPlay && state.playerError.isNullOrBlank() &&
+                    (state.isPreparing || state.playbackState == PlaybackState.Buffering),
+                isFull = isFull,
+                onPlay = {
                     showCtrl = false
                     activeDialog = null
                     showPlaybackSheet = false
                     viewModel.resume()
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                        .then(
-                            if (state.waitingForPlay) {
-                                Modifier.clickable(onClickLabel = "播放视频", onClick = onPlayVideo)
-                            } else {
-                                Modifier
-                            }
-                        )
-                ) {
-                    BiliAsyncImage(
-                        url = state.detail?.cover,
-                        contentDescription = state.detail?.title,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    if (state.waitingForPlay) {
-                        // Keep the original SVG shadows outside a circular button clip.
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 12.dp, bottom = 12.dp)
-                                .size(if (isFull) 80.dp else 64.dp)
-                                .clickable(
-                                    role = Role.Button,
-                                    onClickLabel = "播放视频",
-                                    onClick = onPlayVideo
-                                )
-                        ) {
-                            Image(
-                                painter = painterResource(DesignSystemR.drawable.ic_play_video),
-                                contentDescription = "播放视频",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-                }
-            }
-
-            PlaybackBufferingOverlay(
-                visible = !state.waitingForPlay && state.playerError.isNullOrBlank() &&
-                    (state.isPreparing || state.playbackState == PlaybackState.Buffering),
-                modifier = Modifier.align(Alignment.Center)
             )
 
             if (!state.waitingForPlay && state.hasRenderedFirstFrame && subtitleState.primary != null &&
@@ -585,6 +551,89 @@ internal fun VideoPlayerPane(
                 onDismiss = { showPlaybackSheet = false }
             )
         }
+    }
+}
+
+private enum class CoverLoadState {
+    Pending,
+    Loading,
+    Finished
+}
+
+@Composable
+private fun BoxScope.VideoCoverOverlay(
+    url: String?,
+    title: String?,
+    detailLoading: Boolean,
+    waitingForPlay: Boolean,
+    showBeforeFirstFrame: Boolean,
+    showBuffering: Boolean,
+    isFull: Boolean,
+    onPlay: () -> Unit
+) {
+    val coverUrl = url?.takeIf(String::isNotBlank)
+    val waitingForCoverUrl = coverUrl == null && detailLoading
+    val showCover = waitingForPlay || (showBeforeFirstFrame && (coverUrl != null || waitingForCoverUrl))
+    val coverRequest = rememberBiliImageRequest(
+        url = if (showCover) coverUrl else null,
+        variant = BiliImageVariant.PlayerCover
+    )
+    var coverLoadState by remember(coverRequest?.data) { mutableStateOf(CoverLoadState.Pending) }
+
+    if (showCover) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .then(
+                    if (waitingForPlay) {
+                        Modifier.clickable(onClickLabel = "播放视频", onClick = onPlay)
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
+            if (coverRequest != null) {
+                key(coverRequest.data) {
+                    AsyncImage(
+                        model = coverRequest,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        onLoading = { coverLoadState = CoverLoadState.Loading },
+                        onSuccess = { coverLoadState = CoverLoadState.Finished },
+                        onError = { coverLoadState = CoverLoadState.Finished }
+                    )
+                }
+            }
+            if (waitingForPlay && !waitingForCoverUrl &&
+                (coverRequest == null || coverLoadState == CoverLoadState.Finished)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 12.dp)
+                        .size(if (isFull) 80.dp else 64.dp)
+                        .clickable(role = Role.Button, onClickLabel = "播放视频", onClick = onPlay)
+                ) {
+                    Image(
+                        painter = painterResource(DesignSystemR.drawable.ic_play_video),
+                        contentDescription = "播放视频",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCover && (waitingForCoverUrl || coverLoadState == CoverLoadState.Loading)) {
+        Image(
+            painter = painterResource(R.drawable.video_cover_loading),
+            contentDescription = "正在加载封面",
+            modifier = Modifier.align(Alignment.Center).size(120.dp)
+        )
+    } else if (showBuffering) {
+        PlaybackBufferingOverlay(visible = true, modifier = Modifier.align(Alignment.Center))
     }
 }
 
