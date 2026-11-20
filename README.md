@@ -44,7 +44,7 @@
 
 ## 下载与运行
 
-- 用户安装：前往 [Releases](https://github.com/dhs0319/Bills/releases) 下载最新 APK，64位请下载v8a安装包(v7a适用于老旧设备)
+- 用户安装：前往 [Releases](https://github.com/dhs0319/Bills/releases) 下载最新 APK，优先下载64位的v8a安装包(v7a适用于老旧设备)
 - 系统要求：Android 7.0 及以上
 - 开发环境：JDK 17、Android SDK 36
 

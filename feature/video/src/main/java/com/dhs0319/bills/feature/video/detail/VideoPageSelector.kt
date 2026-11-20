@@ -23,7 +23,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,8 +52,10 @@ internal fun VideoPageSelector(
     val selectedIndex = remember(pages, curCid) { pages.indexOfFirst { it.cid == curCid } }
     val currentPage = pages.getOrNull(selectedIndex)
     val state = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex.coerceAtLeast(0))
-    LaunchedEffect(pages, curCid) {
-        if (selectedIndex >= 0) {
+    val selectedCid = currentPage?.cid
+    var previousSelectedCid by rememberSaveable { mutableStateOf(selectedCid) }
+    LaunchedEffect(selectedCid) {
+        if (selectedCid != null && selectedCid != previousSelectedCid) {
             val layout = state.layoutInfo
             val item = layout.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
             if (item == null || item.offset < layout.viewportStartOffset ||
@@ -58,6 +64,7 @@ internal fun VideoPageSelector(
                 state.scrollToItem(selectedIndex)
             }
         }
+        previousSelectedCid = selectedCid
     }
 
     Column(

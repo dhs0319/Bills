@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -52,6 +53,7 @@ import com.dhs0319.bills.core.model.VideoDownloadKind
 import com.dhs0319.bills.core.model.VideoDownloadOption
 import com.dhs0319.bills.core.model.VideoDownloadOptions
 import com.dhs0319.bills.core.model.VideoDownloadRequest
+import com.dhs0319.bills.feature.video.detail.VideoDetailLayout
 import com.dhs0319.bills.feature.video.detail.VideoDetailPage
 import com.dhs0319.bills.feature.video.player.VideoPlayerPane
 import java.util.Locale
@@ -138,12 +140,15 @@ fun VideoScreen(
         val win = act.window
         val ctrl = remember(win) { WindowInsetsControllerCompat(win, win.decorView) }
         val restoreLightSystemBars by rememberUpdatedState(themeUsesDarkSystemBarIcons)
+        val lightStatusBars = !fullOn && insetPlayer && themeUsesDarkSystemBarIcons
+        val lightNavigationBars = !fullOn && themeUsesDarkSystemBarIcons
 
-        LaunchedEffect(ctrl, fullOn, insetPlayer, themeUsesDarkSystemBarIcons) {
-            ctrl.isAppearanceLightStatusBars =
-                !fullOn && insetPlayer && themeUsesDarkSystemBarIcons
-            ctrl.isAppearanceLightNavigationBars = !fullOn && themeUsesDarkSystemBarIcons
+        LaunchedEffect(ctrl, lightStatusBars, lightNavigationBars) {
+            ctrl.isAppearanceLightStatusBars = lightStatusBars
+            ctrl.isAppearanceLightNavigationBars = lightNavigationBars
+        }
 
+        LaunchedEffect(ctrl, fullOn) {
             if (fullOn) {
                 ctrl.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -162,61 +167,64 @@ fun VideoScreen(
         }
     }
 
-    DisposableEffect(act, fullOn, settingsState.playback.autoRotateFullscreen, isPortraitVideo) {
-        act?.requestedOrientation = if (
-            fullOn &&
-            settingsState.playback.autoRotateFullscreen &&
-            !isPortraitVideo
-        ) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
+    val requestedOrientation = if (fullOn && settingsState.playback.autoRotateFullscreen && !isPortraitVideo) {
+        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+    DisposableEffect(act, requestedOrientation) {
+        act?.requestedOrientation = requestedOrientation
         onDispose { }
     }
 
-    val player: @Composable (Modifier) -> Unit = { modifier ->
-        VideoPlayerPane(
-            modifier = modifier,
-            viewModel = viewModel,
-            state = videoState,
-            settingsState = settingsState,
-            isFull = fullOn,
-            onToggleFull = { isFull = !isFull },
-            onBackClick = handleBack,
-            onGoHome = onGoHome
-        )
-    }
-    if (!hostExpanded || fullOn) {
-        player(Modifier.fillMaxSize())
-    } else {
-        VideoDetailPage(
-            player = player,
-            isLandscape = isLandscape,
-            isExpandedWidth = isExpandedWidth,
-            detail = videoState.detail,
-            ids = videoState.ids,
-            detailLoading = videoState.detailLoading,
-            detailError = videoState.detailError,
-            actionState = actionUiState,
-            commentSubject = viewModel.commentSubject,
-            onOpenVideo = openTarget,
-            onAddToWatchLater = viewModel::addToWatchLater,
-            loadSeasonPublishTimes = loadSeasonPublishTimes,
-            loadPageCovers = loadPageCovers,
-            onOpenSpace = onOpenSpace,
-            onDownloadClick = downloadClick,
-            onToggleLike = viewModel::toggleLike,
-            onToggleDislike = viewModel::toggleDislike,
-            onToggleFollow = viewModel::toggleFollow,
-            isSelf = viewModel::isSelf,
-            isLoggedIn = viewModel::isLoggedIn,
-            onSubmitCoins = viewModel::submitCoins,
-            onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
-            onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
-            onOpenEpisode = switchEpisode,
-            onSwitchPage = switchPage
-        )
+    val detailStateHolder = rememberSaveableStateHolder()
+    VideoDetailLayout(
+        isLandscape = isLandscape,
+        isExpandedWidth = isExpandedWidth,
+        playerOnly = !hostExpanded || fullOn,
+        player = { modifier ->
+            VideoPlayerPane(
+                modifier = modifier,
+                viewModel = viewModel,
+                state = videoState,
+                settingsState = settingsState,
+                isFull = fullOn,
+                onToggleFull = { isFull = !isFull },
+                onBackClick = handleBack,
+                onGoHome = onGoHome
+            )
+        }
+    ) { summaryModifier, tabsModifier ->
+        detailStateHolder.SaveableStateProvider("video_detail") {
+            VideoDetailPage(
+                summaryModifier = summaryModifier,
+                tabsModifier = tabsModifier,
+                isLandscape = isLandscape,
+                isExpandedWidth = isExpandedWidth,
+                detail = videoState.detail,
+                ids = videoState.ids,
+                detailLoading = videoState.detailLoading,
+                detailError = videoState.detailError,
+                actionState = actionUiState,
+                commentSubject = viewModel.commentSubject,
+                onOpenVideo = openTarget,
+                onAddToWatchLater = viewModel::addToWatchLater,
+                loadSeasonPublishTimes = loadSeasonPublishTimes,
+                loadPageCovers = loadPageCovers,
+                onOpenSpace = onOpenSpace,
+                onDownloadClick = downloadClick,
+                onToggleLike = viewModel::toggleLike,
+                onToggleDislike = viewModel::toggleDislike,
+                onToggleFollow = viewModel::toggleFollow,
+                isSelf = viewModel::isSelf,
+                isLoggedIn = viewModel::isLoggedIn,
+                onSubmitCoins = viewModel::submitCoins,
+                onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
+                onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
+                onOpenEpisode = switchEpisode,
+                onSwitchPage = switchPage
+            )
+        }
     }
 
     if (hostExpanded && downloadSheetOn) {

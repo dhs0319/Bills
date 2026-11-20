@@ -145,8 +145,8 @@ internal fun VideoPlayerPane(
     val danmakuOn = settingsState.danmaku.enabled
     val player by viewModel.player.collectAsStateWithLifecycle()
     val subtitleState by viewModel.subtitles.state.collectAsStateWithLifecycle()
-    var activeDialog by remember { mutableStateOf<PlayerDialog?>(null) }
-    var showPlaybackSheet by remember { mutableStateOf(false) }
+    var activeDialog by remember(isFull) { mutableStateOf<PlayerDialog?>(null) }
+    var showPlaybackSheet by remember(isFull) { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
     val replayInteractionSource = remember { MutableInteractionSource() }
     val videoResizeMode = rememberSaveable { mutableStateOf(PlayerVideoResizeMode.Fit) }
@@ -768,6 +768,7 @@ private fun VideoPlayerOverlay(
     val act = LocalActivity.current
 
     LaunchedEffect(
+        isFull,
         showCtrl,
         state.isPlaying,
         dragMs != null,

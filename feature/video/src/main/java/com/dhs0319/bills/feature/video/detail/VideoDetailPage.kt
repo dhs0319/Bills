@@ -67,6 +67,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -153,7 +154,8 @@ import kotlin.math.abs
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun VideoDetailPage(
-    player: @Composable (Modifier) -> Unit,
+    summaryModifier: Modifier,
+    tabsModifier: Modifier,
     isLandscape: Boolean,
     isExpandedWidth: Boolean,
     detail: VideoDetail?,
@@ -181,16 +183,19 @@ internal fun VideoDetailPage(
 ) {
     val aidKey = ids.aid.takeIf { it > 0L }
     val curCid = ids.cid.takeIf { it > 0L }
-    var infoExpanded by rememberSaveable(aidKey) { mutableStateOf(false) }
+    var infoExpanded by key(aidKey) { rememberSaveable { mutableStateOf(false) } }
     var sheet by remember(aidKey) { mutableStateOf<DetailSheet?>(null) }
-    val detailListState = key(aidKey) { rememberLazyListState() }
+    // Only the portrait list has summary and playlist items above the related videos.
+    val portraitDetailListState = key(aidKey) { rememberLazyListState() }
+    val landscapeRelatedListState = key(aidKey) { rememberLazyListState() }
+    val detailListState = if (isLandscape) landscapeRelatedListState else portraitDetailListState
     val commentListState = key(aidKey) { rememberLazyListState() }
     val commentThreadListState = key(aidKey) { rememberLazyListState() }
     val season = remember(detail?.season) {
         detail?.season?.takeIf { it.sections.any { section -> section.eps.isNotEmpty() } }
     }
     val hasPlaylist = season != null || (detail?.pages?.size ?: 0) > 1
-    var wasViewingPlaylist by remember { mutableStateOf(false) }
+    var wasViewingPlaylist by rememberSaveable { mutableStateOf(false) }
     val showPlaylist = isLandscape && (hasPlaylist || (detailLoading && wasViewingPlaylist))
     val detailTabs = remember(isLandscape, showPlaylist) {
         when {
@@ -199,9 +204,14 @@ internal fun VideoDetailPage(
             else -> listOf("简介", "评论")
         }
     }
-    // Keep the playlist open when selecting another video in the same collection.
-    val pagerState = key(isLandscape, if (isLandscape) null else aidKey) {
-        rememberPagerState(pageCount = { detailTabs.size })
+    val pagerState = rememberPagerState(pageCount = { detailTabs.size })
+    var pagerAid by rememberSaveable { mutableLongStateOf(ids.aid) }
+    if (pagerAid != ids.aid) {
+        SideEffect {
+            pagerAid = ids.aid
+            // Keep the playlist open when choosing another video in landscape.
+            if (!isLandscape) pagerState.requestScrollToPage(0)
+        }
     }
     if (!detailLoading) {
         val viewingPlaylist = showPlaylist && pagerState.settledPage == 2
@@ -298,148 +308,144 @@ internal fun VideoDetailPage(
     val onShowPages = {
         sheet = detail?.pages?.takeIf { it.size > 1 }?.let { DetailSheet.Page(it, curCid) }
     }
-    VideoDetailLayout(
-        isLandscape = isLandscape,
-        isExpandedWidth = isExpandedWidth,
-        player = player,
-        summary = summary
-    ) {
-        Box(Modifier.fillMaxSize().clipToBounds()) {
-            Column(
+    if (isLandscape) {
+        summary(summaryModifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp))
+    }
+    Box(tabsModifier.fillMaxSize().clipToBounds()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (sheet != null) Modifier.clearAndSetSemantics {} else Modifier)
+        ) {
+            PagerSlidingTabRow(
+                tabs = detailTabs,
+                badges = detailTabBadges,
+                pagerState = pagerState,
+                tabTextStyle = MaterialTheme.typography.titleSmall,
+                layout = SlidingTabLayout.Content,
+                onReselect = { page ->
+                    if (page == 2) return@PagerSlidingTabRow
+                    tabScrollJob?.cancel()
+                    tabScrollJob = scope.launch {
+                        if (page == 0) {
+                            detailListState.animateScrollToItem(0)
+                        } else {
+                            commentListState.animateContinuouslyToTop()
+                        }
+                    }
+                },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (sheet != null) Modifier.clearAndSetSemantics {} else Modifier)
-            ) {
-                PagerSlidingTabRow(
-                    tabs = detailTabs,
-                    badges = detailTabBadges,
-                    pagerState = pagerState,
-                    tabTextStyle = MaterialTheme.typography.titleSmall,
-                    layout = SlidingTabLayout.Content,
-                    onReselect = { page ->
-                        if (page == 2) return@PagerSlidingTabRow
-                        tabScrollJob?.cancel()
-                        tabScrollJob = scope.launch {
-                            if (page == 0) {
-                                detailListState.animateScrollToItem(0)
-                            } else {
-                                commentListState.animateContinuouslyToTop()
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .padding(horizontal = contentHorizontalPad)
-                )
+                    .padding(horizontal = contentHorizontalPad)
+            )
 
-                HorizontalPager(
-                    state = pagerState,
-                    beyondViewportPageCount = 0,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) { page ->
-                    when (page) {
-                        0 -> RelatedVideoList(
-                            detail = detail,
-                            loading = detailLoading,
-                            error = detailError,
-                            state = detailListState,
-                            horizontalPad = contentHorizontalPad,
-                            cardHorizontalPad = relatedCardHorizontalPad,
-                            isLandscape = isLandscape,
-                            onOpenVideo = onOpenVideo,
-                            onAddToWatchLater = onAddToWatchLater
-                        ) { itemModifier ->
-                            if (!isLandscape) {
-                                item(key = "summary", contentType = "summary") { summary(itemModifier) }
-                                if (detail != null && !detailLoading && detailError.isNullOrBlank()) {
-                                    playlistEntries(
-                                        detail = detail,
-                                        curCid = curCid,
-                                        modifier = itemModifier,
-                                        onSwitchPage = onSwitchPage,
-                                        onShowPages = onShowPages,
-                                        onShowSeason = { sheet = detail.season?.let { DetailSheet.Season(it, curCid) } }
-                                    )
-                                }
-                            }
-                        }
-
-                        1 -> {
-                            CommentPanel(
-                                subject = commentSubject,
-                                isActive = pagerState.currentPage == page,
-                                onOpenSpace = onOpenSpace,
-                                modifier = Modifier.fillMaxSize(),
-                                listState = commentListState,
-                                threadListState = commentThreadListState,
-                                showCommentCount = false,
-                                contentPadding = PaddingValues(
-                                    start = commentHorizontalPad,
-                                    top = 0.dp,
-                                    end = commentHorizontalPad,
-                                    bottom = 20.dp
+            HorizontalPager(
+                state = pagerState,
+                beyondViewportPageCount = 0,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> RelatedVideoList(
+                        detail = detail,
+                        loading = detailLoading,
+                        error = detailError,
+                        state = detailListState,
+                        horizontalPad = contentHorizontalPad,
+                        cardHorizontalPad = relatedCardHorizontalPad,
+                        isLandscape = isLandscape,
+                        onOpenVideo = onOpenVideo,
+                        onAddToWatchLater = onAddToWatchLater
+                    ) { itemModifier ->
+                        if (!isLandscape) {
+                            item(key = "summary", contentType = "summary") { summary(itemModifier) }
+                            if (detail != null && !detailLoading && detailError.isNullOrBlank()) {
+                                playlistEntries(
+                                    detail = detail,
+                                    curCid = curCid,
+                                    modifier = itemModifier,
+                                    onSwitchPage = onSwitchPage,
+                                    onShowPages = onShowPages,
+                                    onShowSeason = { sheet = detail.season?.let { DetailSheet.Season(it, curCid) } }
                                 )
-                            )
+                            }
                         }
+                    }
 
-                        2 -> PlaylistPage(
-                            detail = detail,
-                            season = season,
-                            ids = ids,
-                            loading = detailLoading,
-                            error = detailError,
-                            loadSeasonPublishTimes = loadSeasonPublishTimes,
-                            loadPageCovers = loadPageCovers,
-                            onAddToWatchLater = onAddToWatchLater,
-                            onOpenEpisode = onOpenEpisode,
-                            onSwitchPage = onSwitchPage,
-                            onShowPages = onShowPages
+                    1 -> {
+                        CommentPanel(
+                            subject = commentSubject,
+                            isActive = pagerState.currentPage == page,
+                            onOpenSpace = onOpenSpace,
+                            modifier = Modifier.fillMaxSize(),
+                            listState = commentListState,
+                            threadListState = commentThreadListState,
+                            showCommentCount = false,
+                            contentPadding = PaddingValues(
+                                start = commentHorizontalPad,
+                                top = 0.dp,
+                                end = commentHorizontalPad,
+                                bottom = 20.dp
+                            )
                         )
                     }
+
+                    2 -> PlaylistPage(
+                        detail = detail,
+                        season = season,
+                        ids = ids,
+                        loading = detailLoading,
+                        error = detailError,
+                        loadSeasonPublishTimes = loadSeasonPublishTimes,
+                        loadPageCovers = loadPageCovers,
+                        onAddToWatchLater = onAddToWatchLater,
+                        onOpenEpisode = onOpenEpisode,
+                        onSwitchPage = onSwitchPage,
+                        onShowPages = onShowPages
+                    )
                 }
             }
+        }
 
-            sheet?.let { activeSheet ->
-                DetailSelectionPanel(
-                    title = when (activeSheet) {
-                        is DetailSheet.Season -> "合集 · ${activeSheet.season.title}"
-                        is DetailSheet.Page -> "分P列表"
-                    },
-                    onDismiss = { sheet = null },
-                    containerColor = MaterialTheme.colorScheme.background
-                ) { close ->
-                    when (activeSheet) {
-                        is DetailSheet.Season -> {
-                            SeasonSheetContent(
-                                season = activeSheet.season,
-                                curCid = activeSheet.curCid,
-                                aid = ids.aid,
-                                currentPubTs = detail?.pubTs,
-                                loadPublishTimes = loadSeasonPublishTimes,
-                                onAddToWatchLater = onAddToWatchLater,
-                                onOpenEpisode = { route ->
-                                    close {
-                                        onOpenEpisode(route)
-                                    }
+        sheet?.let { activeSheet ->
+            DetailSelectionPanel(
+                title = when (activeSheet) {
+                    is DetailSheet.Season -> "合集 · ${activeSheet.season.title}"
+                    is DetailSheet.Page -> "分P列表"
+                },
+                onDismiss = { sheet = null },
+                containerColor = MaterialTheme.colorScheme.background
+            ) { close ->
+                when (activeSheet) {
+                    is DetailSheet.Season -> {
+                        SeasonSheetContent(
+                            season = activeSheet.season,
+                            curCid = activeSheet.curCid,
+                            aid = ids.aid,
+                            currentPubTs = detail?.pubTs,
+                            loadPublishTimes = loadSeasonPublishTimes,
+                            onAddToWatchLater = onAddToWatchLater,
+                            onOpenEpisode = { route ->
+                                close {
+                                    onOpenEpisode(route)
                                 }
-                            )
-                        }
+                            }
+                        )
+                    }
 
-                        is DetailSheet.Page -> {
-                            PageSheetContent(
-                                pages = activeSheet.pages,
-                                curCid = activeSheet.curCid,
-                                aid = ids.aid,
-                                pubTs = detail?.pubTs,
-                                loadCovers = loadPageCovers,
-                                onSwitchPage = { cid ->
-                                    close {
-                                        onSwitchPage(cid)
-                                    }
+                    is DetailSheet.Page -> {
+                        PageSheetContent(
+                            pages = activeSheet.pages,
+                            curCid = activeSheet.curCid,
+                            aid = ids.aid,
+                            pubTs = detail?.pubTs,
+                            loadCovers = loadPageCovers,
+                            onSwitchPage = { cid ->
+                                close {
+                                    onSwitchPage(cid)
                                 }
-                            )
-                        }
+                            }
+                        )
                     }
                 }
             }
