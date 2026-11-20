@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +56,7 @@ import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.PagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.SlidingTabLayout
 import com.dhs0319.bills.core.model.LiveRoute
+import com.dhs0319.bills.core.model.SearchDefaultWord
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.listen.ListenItem
@@ -80,6 +82,7 @@ private const val homeScrollToTopInstantThresholdViewports = 8f
 @Composable
 fun HomeScreen(
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToSearchWithDefaultWord: (SearchDefaultWord?) -> Unit = { onNavigateToSearch() },
     onNavigateToProfile: () -> Unit = {},
     profileAvatar: String? = null,
     showTopActions: Boolean = true,
@@ -144,7 +147,8 @@ fun HomeScreen(
             HomeTopBar(
                 scrollBehavior = scrollBehavior,
                 pagerState = pagerState,
-                onNavigateToSearch = onNavigateToSearch,
+                defaultWord = state.searchDefaultWord,
+                onNavigateToSearch = { onNavigateToSearchWithDefaultWord(state.searchDefaultWord) },
                 onNavigateToProfile = onNavigateToProfile,
                 profileAvatar = profileAvatar,
                 showTopActions = showTopActions,
@@ -273,6 +277,7 @@ private suspend fun LazyStaggeredGridState.animateToTop() {
 private fun HomeTopBar(
     scrollBehavior: TopAppBarScrollBehavior,
     pagerState: PagerState,
+    defaultWord: SearchDefaultWord?,
     onNavigateToSearch: () -> Unit,
     onNavigateToProfile: () -> Unit,
     profileAvatar: String?,
@@ -331,9 +336,12 @@ private fun HomeTopBar(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "搜索",
+                            text = defaultWord?.display?.takeIf(String::isNotBlank) ?: "搜索",
+                            modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

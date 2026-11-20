@@ -45,6 +45,9 @@ abstract class SearchHistoryDao {
     @Query("DELETE FROM search_history WHERE keyword = :keyword")
     abstract suspend fun deleteByKeyword(keyword: String)
 
+    @Query("DELETE FROM search_history")
+    abstract suspend fun clear()
+
     @Query(
         """
         SELECT keyword
@@ -53,13 +56,4 @@ abstract class SearchHistoryDao {
         """
     )
     abstract fun observeTopKeywordsByTime(): Flow<List<String>>
-
-    @Query(
-        """
-        SELECT keyword
-        FROM search_history
-        ORDER BY searchCount DESC, updatedAt DESC, keyword ASC
-        """
-    )
-    abstract fun observeTopKeywordsByHot(): Flow<List<String>>
 }

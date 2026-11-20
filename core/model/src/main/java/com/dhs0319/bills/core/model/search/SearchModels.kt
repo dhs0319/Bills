@@ -20,10 +20,40 @@ enum class SearchOrder {
     }
 }
 
-enum class SearchHistoryOrder {
-    TIME,
-    HOT
+enum class SearchSuggestionBadge {
+    NEW,
+    HOT,
+    EXCLUSIVE,
+    PROMOTION,
+    LIVE
 }
+
+@Immutable
+data class SearchDefaultWord(
+    val show: String,
+    val word: String,
+    val refreshIntervalMillis: Long = 0L
+) {
+    val display: String
+        get() = show.ifBlank { word }
+
+    val keyword: String
+        get() = word.ifBlank { show }
+}
+
+@Immutable
+data class SearchSuggestion(
+    val keyword: String,
+    val title: String,
+    val subtitle: String? = null,
+    val badge: SearchSuggestionBadge? = null
+)
+
+@Immutable
+data class SearchLandingData(
+    val trending: List<SearchSuggestion>,
+    val discovery: List<SearchSuggestion>
+)
 
 @Immutable
 data class SearchVideo(

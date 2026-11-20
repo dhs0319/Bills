@@ -27,6 +27,7 @@ import com.dhs0319.bills.feature.video.action.VideoActionController
 import com.dhs0319.bills.feature.video.action.VideoActionSeed
 import com.dhs0319.bills.feature.video.action.VideoActionUiState
 import com.dhs0319.bills.core.video.VideoActionRepository
+import com.dhs0319.bills.core.video.VideoDetailRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -43,6 +44,7 @@ class VideoViewModel @Inject constructor(
     private val playerSettings: AppSettings,
     private val videoActionRepository: VideoActionRepository,
     private val watchLaterRepository: WatchLaterRepository,
+    private val videoDetailRepository: VideoDetailRepository,
     subtitleRepository: VideoSubtitleRepository
 ) : ViewModel() {
 
@@ -166,6 +168,28 @@ class VideoViewModel @Inject constructor(
 
     fun loadFavoriteFolders(onLoaded: (List<com.dhs0319.bills.core.video.VideoFavoriteFolder>) -> Unit) {
         videoActions.loadFavoriteFolders(onLoaded)
+    }
+
+    internal suspend fun loadSeasonPublishTimes(aid: Long, seasonId: Long): Map<Long, Long> {
+        return try {
+            videoDetailRepository.fetchSeasonPublishTimes(aid, seasonId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e("VideoViewModel", e) { "加载合集发布时间失败" }
+            emptyMap()
+        }
+    }
+
+    internal suspend fun loadPageCovers(aid: Long): Map<Long, String> {
+        return try {
+            videoDetailRepository.fetchPageCovers(aid)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e("VideoViewModel", e) { "加载分P封面失败" }
+            emptyMap()
+        }
     }
 
     fun saveFavoriteFolders(

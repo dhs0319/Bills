@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +46,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
@@ -51,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +64,7 @@ import androidx.media3.ui.R as Media3UiR
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil3.compose.AsyncImage
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Subtitles
 import com.composables.icons.materialsymbols.outlined.Subtitles_off
@@ -70,7 +76,7 @@ import com.composables.icons.materialsymbols.outlinedfilled.Open_in_full
 import com.composables.icons.materialsymbols.outlinedfilled.Replay
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.PlaybackBufferingOverlay
-import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
+import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
 import com.dhs0319.bills.core.designsystem.component.PlaybackOption
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionBottomSheet
 import com.dhs0319.bills.core.designsystem.component.PlaybackOptionSidebar
@@ -78,14 +84,17 @@ import com.dhs0319.bills.core.designsystem.component.shouldShowPlaybackSidebar
 import com.dhs0319.bills.core.designsystem.component.PlayerBottomControls
 import com.dhs0319.bills.core.designsystem.component.PlayerControlTextButton
 import com.dhs0319.bills.core.designsystem.component.formatPlaybackDownloadSpeed
+import com.dhs0319.bills.core.designsystem.component.rememberBiliImageRequest
 import com.dhs0319.bills.core.designsystem.R as DesignSystemR
 import com.dhs0319.bills.infra.player.danmaku.DanmakuLayer
 import com.dhs0319.bills.infra.player.danmaku.DanmakuOverlayState
 import com.dhs0319.bills.infra.player.danmaku.rememberDanmakuOverlayState
 import com.dhs0319.bills.infra.player.PlayerViewTargetBinder
 import com.dhs0319.bills.core.model.PlaybackState
+import com.dhs0319.bills.core.model.PlayerOverlayPrefs
 import com.dhs0319.bills.core.model.PlayerSettingsState
 import com.dhs0319.bills.core.model.VideoPlaybackState
+import com.dhs0319.bills.feature.video.R
 import com.dhs0319.bills.feature.video.VideoViewModel
 import com.dhs0319.bills.feature.video.formatPlaybackTime
 import com.dhs0319.bills.feature.video.formatSpeed
@@ -125,23 +134,19 @@ internal val LocalVideoResizeModeState = compositionLocalOf<MutableState<PlayerV
 internal fun VideoPlayerPane(
     modifier: Modifier,
     viewModel: VideoViewModel,
-    videoTitle: String?,
+    state: VideoPlaybackState,
+    settingsState: PlayerSettingsState,
     isFull: Boolean,
     onToggleFull: () -> Unit,
     onBackClick: () -> Unit,
     onGoHome: () -> Unit
 ) {
-    val context = LocalContext.current
     val useSidebar = shouldShowPlaybackSidebar(isFull)
-    val owner = LocalLifecycleOwner.current
-    val timeFmt = remember { android.text.format.DateFormat.getTimeFormat(context) }
-    val state by viewModel.videoState.collectAsStateWithLifecycle()
+    val danmakuOn = settingsState.danmaku.enabled
     val player by viewModel.player.collectAsStateWithLifecycle()
-    val downloadSpeedBytesPerSecond by viewModel.downloadSpeedBytesPerSecond.collectAsStateWithLifecycle()
-    val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val subtitleState by viewModel.subtitles.state.collectAsStateWithLifecycle()
-    var activeDialog by remember { mutableStateOf<PlayerDialog?>(null) }
-    var showPlaybackSheet by remember { mutableStateOf(false) }
+    var activeDialog by remember(isFull) { mutableStateOf<PlayerDialog?>(null) }
+    var showPlaybackSheet by remember(isFull) { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
     val replayInteractionSource = remember { MutableInteractionSource() }
     val videoResizeMode = rememberSaveable { mutableStateOf(PlayerVideoResizeMode.Fit) }
@@ -199,36 +204,6 @@ internal fun VideoPlayerPane(
 
         PlayerDialog.Subtitle, null -> null
     }
-    val topStatus = remember(showCtrl, isFull, downloadSpeedBytesPerSecond, settingsState.overlay) {
-        if (showCtrl && isFull) {
-            readPlayerTopStatus(
-                context = context,
-                timeFmt = timeFmt,
-                downloadSpeedBytesPerSecond = downloadSpeedBytesPerSecond,
-                showTime = settingsState.overlay.showTime,
-                showNetworkSpeed = settingsState.overlay.showNetworkSpeed,
-                showBattery = settingsState.overlay.showBattery
-            )
-        } else {
-            null
-        }
-    }
-    val danmakuOn = settingsState.danmaku.enabled
-    val danmakuOverlayState = if (danmakuOn && !state.waitingForPlay) {
-        rememberDanmakuOverlayState(
-            initialConfig = settingsState.danmaku,
-            initialPositionMs = viewModel.playbackProgress.value.positionMs,
-            initialIsPlaying = state.isPlaying,
-            initialSpeed = state.speed
-        )
-    } else {
-        null
-    }
-    val videoAspect = remember(state.currentStream) {
-        val width = state.currentStream?.width?.takeIf { it > 0 } ?: return@remember null
-        val height = state.currentStream?.height?.takeIf { it > 0 } ?: return@remember null
-        width.toFloat() / height.toFloat()
-    }
     val resizeMode = remember(isFull, videoResizeMode.value) {
         if (!isFull) {
             AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -240,45 +215,11 @@ internal fun VideoPlayerPane(
             }
         }
     }
-    val playerView = remember(context) {
-        PlayerView(context).apply {
-            useController = false
-            setEnableComposeSurfaceSyncWorkaround(true)
-            setKeepContentOnPlayerReset(true)
-        }
-    }
-    var lastWarmAspect by remember(playerView) { mutableStateOf<Float?>(null) }
-
-    LaunchedEffect(state.playWhenReady) {
-        playerView.keepScreenOn = state.playWhenReady
-    }
-
     LaunchedEffect(state.waitingForPlay) {
         if (state.waitingForPlay) {
             showCtrl = false
             activeDialog = null
             showPlaybackSheet = false
-        }
-    }
-
-    DisposableEffect(owner, playerView, player, state.waitingForPlay) {
-        val lifecycle = owner.lifecycle
-        if (!state.waitingForPlay && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            PlayerViewTargetBinder.bind(playerView, player)
-        }
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> if (!state.waitingForPlay) {
-                    PlayerViewTargetBinder.bind(playerView, player)
-                }
-                Lifecycle.Event.ON_STOP -> PlayerViewTargetBinder.unbind(playerView)
-                else -> Unit
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-            PlayerViewTargetBinder.unbind(playerView)
         }
     }
 
@@ -288,89 +229,26 @@ internal fun VideoPlayerPane(
                 .background(Color.Black)
         ) {
             if (!state.waitingForPlay) {
-                AndroidView(
-                    factory = { playerView },
-                    update = { view ->
-                        val content = view.findViewById<AspectRatioFrameLayout>(Media3UiR.id.exo_content_frame)
-                        if (content != null) {
-                            content.resizeMode = resizeMode
-                            if (lastWarmAspect != videoAspect) {
-                                content.setAspectRatio(videoAspect ?: 0f)
-                                lastWarmAspect = videoAspect
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                VideoPlaybackSurface(viewModel, player, state, settingsState, resizeMode)
             }
 
-            if (
-                state.waitingForPlay ||
-                !state.hasRenderedFirstFrame &&
-                !state.detail?.cover.isNullOrBlank() &&
-                (state.isPreparing || state.playbackSource != null)
-            ) {
-                val onPlayVideo: () -> Unit = {
+            VideoCoverOverlay(
+                url = state.detail?.cover,
+                title = state.detail?.title,
+                detailLoading = state.detailLoading,
+                waitingForPlay = state.waitingForPlay,
+                showBeforeFirstFrame = !state.hasRenderedFirstFrame &&
+                    (state.isPreparing || state.playbackSource != null),
+                showBuffering = !state.waitingForPlay && state.playerError.isNullOrBlank() &&
+                    (state.isPreparing || state.playbackState == PlaybackState.Buffering),
+                isFull = isFull,
+                onPlay = {
                     showCtrl = false
                     activeDialog = null
                     showPlaybackSheet = false
                     viewModel.resume()
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                        .then(
-                            if (state.waitingForPlay) {
-                                Modifier.clickable(onClickLabel = "播放视频", onClick = onPlayVideo)
-                            } else {
-                                Modifier
-                            }
-                        )
-                ) {
-                    BiliAsyncImage(
-                        url = state.detail?.cover,
-                        contentDescription = state.detail?.title,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    if (state.waitingForPlay) {
-                        // Keep the original SVG shadows outside a circular button clip.
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 12.dp, bottom = 12.dp)
-                                .size(if (isFull) 80.dp else 64.dp)
-                                .clickable(
-                                    role = Role.Button,
-                                    onClickLabel = "播放视频",
-                                    onClick = onPlayVideo
-                                )
-                        ) {
-                            Image(
-                                painter = painterResource(DesignSystemR.drawable.ic_play_video),
-                                contentDescription = "播放视频",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-                }
-            }
-
-            PlaybackBufferingOverlay(
-                visible = !state.waitingForPlay && state.playerError.isNullOrBlank() &&
-                    (state.isPreparing || state.playbackState == PlaybackState.Buffering),
-                modifier = Modifier.align(Alignment.Center)
             )
-
-            if (danmakuOverlayState != null) {
-                VideoDanmakuLayer(
-                    viewModel = viewModel,
-                    state = state,
-                    settingsState = settingsState,
-                    danmakuOverlayState = danmakuOverlayState,
-                    playerView = playerView
-                )
-            }
 
             if (!state.waitingForPlay && state.hasRenderedFirstFrame && subtitleState.primary != null &&
                 subtitleState.aid == state.ids.aid && subtitleState.cid == state.ids.cid) {
@@ -437,49 +315,7 @@ internal fun VideoPlayerPane(
                         )
                 ) {
                     if (isFull) {
-                        topStatus?.let { status ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 20.dp)
-                                    .padding(start = 32.dp, end = 28.dp)
-                            ) {
-                                status.time?.let { time ->
-                                    Text(
-                                        text = time,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        modifier = Modifier.align(Alignment.Center)
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.align(Alignment.CenterEnd),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    status.downloadSpeedText?.let { speedText ->
-                                        Text(
-                                            text = speedText,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White.copy(alpha = 0.9f)
-                                        )
-                                    }
-                                    status.batteryPercent?.let { batteryPercent ->
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "$batteryPercent%",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color.White.copy(alpha = 0.9f)
-                                            )
-                                            BatteryLevelIcon(batteryPercent = batteryPercent)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        FullscreenStatusBar(settingsState.overlay, viewModel)
                     }
 
                     Row(
@@ -518,7 +354,7 @@ internal fun VideoPlayerPane(
                                     )
                                 }
                             } else {
-                                videoTitle?.takeIf(String::isNotBlank)?.let {
+                                state.detail?.title?.takeIf(String::isNotBlank)?.let {
                                     Text(
                                         text = it,
                                         style = MaterialTheme.typography.titleMedium,
@@ -718,6 +554,166 @@ internal fun VideoPlayerPane(
     }
 }
 
+private enum class CoverLoadState {
+    Pending,
+    Loading,
+    Finished
+}
+
+@Composable
+private fun BoxScope.VideoCoverOverlay(
+    url: String?,
+    title: String?,
+    detailLoading: Boolean,
+    waitingForPlay: Boolean,
+    showBeforeFirstFrame: Boolean,
+    showBuffering: Boolean,
+    isFull: Boolean,
+    onPlay: () -> Unit
+) {
+    val coverUrl = url?.takeIf(String::isNotBlank)
+    val waitingForCoverUrl = coverUrl == null && detailLoading
+    val showCover = waitingForPlay || (showBeforeFirstFrame && (coverUrl != null || waitingForCoverUrl))
+    val coverRequest = rememberBiliImageRequest(
+        url = if (showCover) coverUrl else null,
+        variant = BiliImageVariant.PlayerCover
+    )
+    var coverLoadState by remember(coverRequest?.data) { mutableStateOf(CoverLoadState.Pending) }
+
+    if (showCover) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .then(
+                    if (waitingForPlay) {
+                        Modifier.clickable(onClickLabel = "播放视频", onClick = onPlay)
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
+            if (coverRequest != null) {
+                key(coverRequest.data) {
+                    AsyncImage(
+                        model = coverRequest,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        onLoading = { coverLoadState = CoverLoadState.Loading },
+                        onSuccess = { coverLoadState = CoverLoadState.Finished },
+                        onError = { coverLoadState = CoverLoadState.Finished }
+                    )
+                }
+            }
+            if (waitingForPlay && !waitingForCoverUrl &&
+                (coverRequest == null || coverLoadState == CoverLoadState.Finished)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 12.dp)
+                        .size(if (isFull) 80.dp else 64.dp)
+                        .clickable(role = Role.Button, onClickLabel = "播放视频", onClick = onPlay)
+                ) {
+                    Image(
+                        painter = painterResource(DesignSystemR.drawable.ic_play_video),
+                        contentDescription = "播放视频",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCover && (waitingForCoverUrl || coverLoadState == CoverLoadState.Loading)) {
+        Image(
+            painter = painterResource(R.drawable.video_cover_loading),
+            contentDescription = "正在加载封面",
+            modifier = Modifier.align(Alignment.Center).size(120.dp)
+        )
+    } else if (showBuffering) {
+        PlaybackBufferingOverlay(visible = true, modifier = Modifier.align(Alignment.Center))
+    }
+}
+
+@UnstableApi
+@Composable
+private fun VideoPlaybackSurface(
+    viewModel: VideoViewModel,
+    player: Player?,
+    state: VideoPlaybackState,
+    settingsState: PlayerSettingsState,
+    resizeMode: Int
+) {
+    val context = LocalContext.current
+    val owner = LocalLifecycleOwner.current
+    val playerView = remember(context) {
+        PlayerView(context).apply {
+            useController = false
+            setEnableComposeSurfaceSyncWorkaround(true)
+            setKeepContentOnPlayerReset(true)
+        }
+    }
+    var lastWarmAspect by remember(playerView) { mutableStateOf<Float?>(null) }
+
+    val contentFrame = remember(playerView) {
+        playerView.findViewById<AspectRatioFrameLayout>(Media3UiR.id.exo_content_frame)
+    }
+    val videoAspect = remember(state.currentStream) {
+        val width = state.currentStream?.width?.takeIf { it > 0 } ?: return@remember null
+        val height = state.currentStream?.height?.takeIf { it > 0 } ?: return@remember null
+        width.toFloat() / height.toFloat()
+    }
+
+    DisposableEffect(owner, playerView, player) {
+        val lifecycle = owner.lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> PlayerViewTargetBinder.bind(playerView, player)
+                Lifecycle.Event.ON_STOP -> PlayerViewTargetBinder.unbind(playerView)
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            PlayerViewTargetBinder.unbind(playerView)
+        }
+    }
+
+    AndroidView(
+        factory = { playerView },
+        update = { view ->
+            view.keepScreenOn = state.playWhenReady
+            if (contentFrame != null) {
+                contentFrame.resizeMode = resizeMode
+                if (lastWarmAspect != videoAspect) {
+                    contentFrame.setAspectRatio(videoAspect ?: 0f)
+                    lastWarmAspect = videoAspect
+                }
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+
+    if (settingsState.danmaku.enabled) {
+        val danmakuOverlayState = rememberDanmakuOverlayState(
+            initialConfig = settingsState.danmaku,
+            initialPositionMs = viewModel.playbackProgress.value.positionMs,
+            initialIsPlaying = state.isPlaying,
+            initialSpeed = state.speed
+        )
+        VideoDanmakuLayer(
+            viewModel = viewModel,
+            state = state,
+            settingsState = settingsState,
+            danmakuOverlayState = danmakuOverlayState,
+            playerView = playerView
+        )
+    }
+}
+
 @UnstableApi
 @Composable
 private fun VideoDanmakuLayer(
@@ -763,6 +759,7 @@ private fun VideoPlayerOverlay(
     val gestureState = remember { VideoGestureState() }
     var dragMs by remember { mutableStateOf<Long?>(null) }
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
+    var dragMaxVolume by remember { mutableIntStateOf(0) }
     var dragStartVolumeFrac by remember { mutableFloatStateOf(0f) }
     var speedBeforeGesture by remember { mutableFloatStateOf(1f) }
     var lastGestureBrightness by remember { mutableFloatStateOf(Float.NaN) }
@@ -771,9 +768,10 @@ private fun VideoPlayerOverlay(
     val act = LocalActivity.current
 
     LaunchedEffect(
+        isFull,
         showCtrl,
         state.isPlaying,
-        dragMs,
+        dragMs != null,
         gestureState.dragType,
         gestureState.showSpeedBadge,
         activeDialog,
@@ -819,7 +817,7 @@ private fun VideoPlayerOverlay(
                         next
                     },
                     onVolumeDelta = { deltaFrac ->
-                        val maxVol = audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 0
+                        val maxVol = dragMaxVolume
                         if (maxVol <= 0) {
                             0f
                         } else {
@@ -843,6 +841,7 @@ private fun VideoPlayerOverlay(
                             }
                             DragType.Volume -> {
                                 val maxVol = audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 0
+                                dragMaxVolume = maxVol
                                 val curVol = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
                                 dragStartVolumeFrac = if (maxVol > 0) {
                                     curVol.toFloat() / maxVol.toFloat()
@@ -949,7 +948,7 @@ private fun PlayerCtrlBarHost(
     PlayerBottomControls(
         isPlaying = state.isPlaying,
         playContentDescription = if (state.isPlaying) "暂停" else "播放",
-        timeText = formatPlaybackTime(barMs, durationMs),
+        timeText = remember(barMs / 1000, durationMs / 1000) { formatPlaybackTime(barMs, durationMs) },
         progressValue = sliderVal,
         bufferedProgressValue = bufferedSliderVal,
         progressEnabled = durationMs > 0L,
@@ -995,11 +994,71 @@ private fun PlayerCtrlBarHost(
     )
 }
 
-private data class PlayerTopStatus(
-    val time: String?,
-    val batteryPercent: Int?,
-    val downloadSpeedText: String?
-)
+@Composable
+private fun FullscreenStatusBar(prefs: PlayerOverlayPrefs, viewModel: VideoViewModel) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var time by remember { mutableStateOf<String?>(null) }
+    var battery by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(context, lifecycle, prefs.showTime, prefs.showBattery) {
+        time = null
+        battery = null
+        if (!prefs.showTime && !prefs.showBattery) return@LaunchedEffect
+        val timeFormat = if (prefs.showTime) android.text.format.DateFormat.getTimeFormat(context) else null
+        val batteryManager = if (prefs.showBattery) context.getSystemService(BatteryManager::class.java) else null
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                val now = System.currentTimeMillis()
+                time = timeFormat?.format(now)
+                battery = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.takeIf { it in 0..100 }
+                delay(60_000L - now % 60_000L)
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 20.dp)
+            .padding(start = 32.dp, end = 28.dp)
+    ) {
+        time?.let { time ->
+            Text(
+                text = time,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (prefs.showNetworkSpeed) {
+                val speed by viewModel.downloadSpeedBytesPerSecond.collectAsStateWithLifecycle()
+                Text(
+                    text = formatPlaybackDownloadSpeed(speed),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+            battery?.let { batteryPercent ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "$batteryPercent%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                    BatteryLevelIcon(batteryPercent = batteryPercent)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun BatteryLevelIcon(
@@ -1039,28 +1098,4 @@ private fun BatteryLevelIcon(
             cornerRadius = CornerRadius(terminalWidth / 2f)
         )
     }
-}
-
-private fun readPlayerTopStatus(
-    context: android.content.Context,
-    timeFmt: java.text.DateFormat,
-    downloadSpeedBytesPerSecond: Long,
-    showTime: Boolean,
-    showNetworkSpeed: Boolean,
-    showBattery: Boolean
-): PlayerTopStatus {
-    val time = timeFmt.format(System.currentTimeMillis()).takeIf { showTime }
-    val battery = if (showBattery) {
-        context.getSystemService(BatteryManager::class.java)
-            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-            ?.takeIf { it in 0..100 }
-    } else {
-        null
-    }
-    return PlayerTopStatus(
-        time = time,
-        batteryPercent = battery,
-        downloadSpeedText = formatPlaybackDownloadSpeed(downloadSpeedBytesPerSecond)
-            .takeIf { showNetworkSpeed }
-    )
 }

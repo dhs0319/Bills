@@ -6,6 +6,7 @@ private val thumbReg = Regex(
 )
 
 const val BILI_IMAGE_DEFAULT_Q = 15
+private const val PLAYER_COVER_MAX_WIDTH_PX = 1280
 private const val AVATAR_IMAGE_SUFFIX = "@120w_120h_85q_!widget-layer-avatar.webp"
 private const val COVER_IMAGE_SUFFIX = "@575w_360h_1e_1c_85q.webp"
 
@@ -25,6 +26,19 @@ fun coverThumbnailUrl(src: String?): String? {
     if (src.isNullOrBlank()) return src
     return src.httpsImageUrl().replaceImageBody { body ->
         body.substringBefore('@') + COVER_IMAGE_SUFFIX
+    }
+}
+
+fun playerCoverUrl(src: String?, displayWidthPx: Int = PLAYER_COVER_MAX_WIDTH_PX): String? {
+    if (src.isNullOrBlank()) return src
+    val width = when (displayWidthPx) {
+        in 1..640 -> 640
+        in 641..960 -> 960
+        in 961..1080 -> 1080
+        else -> PLAYER_COVER_MAX_WIDTH_PX
+    }
+    return src.httpsImageUrl().replaceImageBody { body ->
+        "${body.replace(thumbReg, "")}@${width}w_85q.webp"
     }
 }
 

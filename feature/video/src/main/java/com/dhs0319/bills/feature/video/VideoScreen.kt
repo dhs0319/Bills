@@ -1,27 +1,19 @@
 package com.dhs0319.bills.feature.video
 
+import android.content.res.Configuration
 import android.content.pm.ActivityInfo
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
@@ -31,10 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +53,7 @@ import com.dhs0319.bills.core.model.VideoDownloadKind
 import com.dhs0319.bills.core.model.VideoDownloadOption
 import com.dhs0319.bills.core.model.VideoDownloadOptions
 import com.dhs0319.bills.core.model.VideoDownloadRequest
+import com.dhs0319.bills.feature.video.detail.VideoDetailLayout
 import com.dhs0319.bills.feature.video.detail.VideoDetailPage
 import com.dhs0319.bills.feature.video.player.VideoPlayerPane
 import java.util.Locale
@@ -84,7 +76,10 @@ fun VideoScreen(
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val act = LocalActivity.current
     val context = LocalContext.current
-    val isExpandedWidth = LocalConfiguration.current.screenWidthDp >= 840
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isExpandedWidth = configuration.screenWidthDp >= 840
+    val insetPlayer = isLandscape || isExpandedWidth
     val themeUsesDarkSystemBarIcons = MaterialTheme.colorScheme.background.luminance() > 0.5f
     var isFull by rememberSaveable { mutableStateOf(false) }
     var downloadSheetOn by rememberSaveable { mutableStateOf(false) }
@@ -102,6 +97,8 @@ fun VideoScreen(
     val switchEpisode = remember(viewModel) {
         { target: VideoTarget -> viewModel.switchEpisode(target) }
     }
+    val loadSeasonPublishTimes = remember(viewModel) { viewModel::loadSeasonPublishTimes }
+    val loadPageCovers = remember(viewModel) { viewModel::loadPageCovers }
     val downloadClick = remember { { downloadSheetOn = true } }
     val handleBack = {
         if (fullOn) {
@@ -143,12 +140,15 @@ fun VideoScreen(
         val win = act.window
         val ctrl = remember(win) { WindowInsetsControllerCompat(win, win.decorView) }
         val restoreLightSystemBars by rememberUpdatedState(themeUsesDarkSystemBarIcons)
+        val lightStatusBars = !fullOn && insetPlayer && themeUsesDarkSystemBarIcons
+        val lightNavigationBars = !fullOn && themeUsesDarkSystemBarIcons
 
-        LaunchedEffect(ctrl, fullOn, isExpandedWidth, themeUsesDarkSystemBarIcons) {
-            ctrl.isAppearanceLightStatusBars =
-                !fullOn && isExpandedWidth && themeUsesDarkSystemBarIcons
-            ctrl.isAppearanceLightNavigationBars = !fullOn && themeUsesDarkSystemBarIcons
+        LaunchedEffect(ctrl, lightStatusBars, lightNavigationBars) {
+            ctrl.isAppearanceLightStatusBars = lightStatusBars
+            ctrl.isAppearanceLightNavigationBars = lightNavigationBars
+        }
 
+        LaunchedEffect(ctrl, fullOn) {
             if (fullOn) {
                 ctrl.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -167,144 +167,63 @@ fun VideoScreen(
         }
     }
 
-    DisposableEffect(act, fullOn, settingsState.playback.autoRotateFullscreen, isPortraitVideo) {
-        act?.requestedOrientation = if (
-            fullOn &&
-            settingsState.playback.autoRotateFullscreen &&
-            !isPortraitVideo
-        ) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
+    val requestedOrientation = if (fullOn && settingsState.playback.autoRotateFullscreen && !isPortraitVideo) {
+        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+    DisposableEffect(act, requestedOrientation) {
+        act?.requestedOrientation = requestedOrientation
         onDispose { }
     }
 
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val playerTopPad = 16.dp
-        val playerGap = 16.dp
-        val compactVideoH = maxWidth * (9f / 16f)
-        val compactPlayerSpaceH = statusTop + compactVideoH
-        val expandedContentW = (maxWidth - (playerTopPad * 2) - playerGap).coerceAtLeast(0.dp)
-        val expandedPlayerW = expandedContentW * 0.54f
-        val expandedPlayerH = (maxHeight - statusTop - (playerTopPad * 2)).coerceAtLeast(0.dp)
-
-        when {
-            !hostExpanded || fullOn -> {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    VideoPlayerPane(
-                        modifier = Modifier.fillMaxSize(),
-                        viewModel = viewModel,
-                        videoTitle = videoState.detail?.title,
-                        isFull = fullOn,
-                        onToggleFull = { isFull = !isFull },
-                        onBackClick = handleBack,
-                        onGoHome = onGoHome
-                    )
-                }
-            }
-
-            isExpandedWidth -> {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .statusBarsPadding()
-                        .padding(playerTopPad),
-                    horizontalArrangement = Arrangement.spacedBy(playerGap),
-                    verticalAlignment = androidx.compose.ui.Alignment.Top
-                ) {
-                    VideoPlayerPane(
-                        modifier = Modifier
-                            .width(expandedPlayerW)
-                            .height(expandedPlayerH)
-                            .clip(MaterialTheme.shapes.extraLarge),
-                        viewModel = viewModel,
-                        videoTitle = videoState.detail?.title,
-                        isFull = false,
-                        onToggleFull = { isFull = true },
-                        onBackClick = handleBack,
-                        onGoHome = onGoHome
-                    )
-                    VideoDetailPage(
-                        modifier = Modifier.weight(1f),
-                        detail = videoState.detail,
-                        ids = videoState.ids,
-                        detailLoading = videoState.detailLoading,
-                        detailError = videoState.detailError,
-                        actionState = actionUiState,
-                        commentSubject = viewModel.commentSubject,
-                        contentHorizontalPad = 0.dp,
-                        onOpenVideo = openTarget,
-                        onAddToWatchLater = viewModel::addToWatchLater,
-                        onOpenSpace = onOpenSpace,
-                        onDownloadClick = downloadClick,
-                        onToggleLike = viewModel::toggleLike,
-                        onToggleDislike = viewModel::toggleDislike,
-                        onToggleFollow = viewModel::toggleFollow,
-                        isSelf = viewModel::isSelf,
-                        isLoggedIn = viewModel::isLoggedIn,
-                        onSubmitCoins = viewModel::submitCoins,
-                        onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
-                        onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
-                        onOpenEpisode = switchEpisode,
-                        onSwitchPage = switchPage
-                    )
-                }
-            }
-
-            else -> {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(compactPlayerSpaceH)
-                            .background(Color.Black)
-                    ) {
-                        VideoPlayerPane(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .height(compactVideoH),
-                            viewModel = viewModel,
-                            videoTitle = videoState.detail?.title,
-                            isFull = false,
-                            onToggleFull = { isFull = true },
-                            onBackClick = handleBack,
-                            onGoHome = onGoHome
-                        )
-                    }
-                    VideoDetailPage(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(MaterialTheme.colorScheme.background),
-                        detail = videoState.detail,
-                        ids = videoState.ids,
-                        detailLoading = videoState.detailLoading,
-                        detailError = videoState.detailError,
-                        actionState = actionUiState,
-                        commentSubject = viewModel.commentSubject,
-                        contentHorizontalPad = 16.dp,
-                        onOpenVideo = openTarget,
-                        onAddToWatchLater = viewModel::addToWatchLater,
-                        onOpenSpace = onOpenSpace,
-                        onDownloadClick = downloadClick,
-                        onToggleLike = viewModel::toggleLike,
-                        onToggleDislike = viewModel::toggleDislike,
-                        onToggleFollow = viewModel::toggleFollow,
-                        isSelf = viewModel::isSelf,
-                        isLoggedIn = viewModel::isLoggedIn,
-                        onSubmitCoins = viewModel::submitCoins,
-                        onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
-                        onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
-                        onOpenEpisode = switchEpisode,
-                        onSwitchPage = switchPage
-                    )
-                }
-            }
+    val detailStateHolder = rememberSaveableStateHolder()
+    VideoDetailLayout(
+        isLandscape = isLandscape,
+        isExpandedWidth = isExpandedWidth,
+        playerOnly = !hostExpanded || fullOn,
+        player = { modifier ->
+            VideoPlayerPane(
+                modifier = modifier,
+                viewModel = viewModel,
+                state = videoState,
+                settingsState = settingsState,
+                isFull = fullOn,
+                onToggleFull = { isFull = !isFull },
+                onBackClick = handleBack,
+                onGoHome = onGoHome
+            )
+        }
+    ) { summaryModifier, tabsModifier ->
+        detailStateHolder.SaveableStateProvider("video_detail") {
+            VideoDetailPage(
+                summaryModifier = summaryModifier,
+                tabsModifier = tabsModifier,
+                isLandscape = isLandscape,
+                isExpandedWidth = isExpandedWidth,
+                detail = videoState.detail,
+                ids = videoState.ids,
+                detailLoading = videoState.detailLoading,
+                detailError = videoState.detailError,
+                actionState = actionUiState,
+                commentSubject = viewModel.commentSubject,
+                onOpenVideo = openTarget,
+                onAddToWatchLater = viewModel::addToWatchLater,
+                loadSeasonPublishTimes = loadSeasonPublishTimes,
+                loadPageCovers = loadPageCovers,
+                onOpenSpace = onOpenSpace,
+                onDownloadClick = downloadClick,
+                onToggleLike = viewModel::toggleLike,
+                onToggleDislike = viewModel::toggleDislike,
+                onToggleFollow = viewModel::toggleFollow,
+                isSelf = viewModel::isSelf,
+                isLoggedIn = viewModel::isLoggedIn,
+                onSubmitCoins = viewModel::submitCoins,
+                onLoadFavoriteFolders = viewModel::loadFavoriteFolders,
+                onSaveFavoriteFolders = viewModel::saveFavoriteFolders,
+                onOpenEpisode = switchEpisode,
+                onSwitchPage = switchPage
+            )
         }
     }
 

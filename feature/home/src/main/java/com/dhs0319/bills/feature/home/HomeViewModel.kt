@@ -9,7 +9,9 @@ import com.dhs0319.bills.core.feed.FeedRepository
 import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.model.FeedItem
 import com.dhs0319.bills.core.model.ThreePointReason
+import com.dhs0319.bills.core.search.SearchRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -24,7 +26,8 @@ class HomeViewModel @Inject constructor(
     private val feedRepo: FeedRepository,
     private val feedDislikeRepo: FeedDislikeRepository,
     private val appSettings: AppSettings,
-    private val pageActionTracker: PageActionTracker
+    private val pageActionTracker: PageActionTracker,
+    private val searchRepo: SearchRepository
 ) : ViewModel() {
 
     companion object {
@@ -76,6 +79,18 @@ class HomeViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            try {
+                val defaultWord = searchRepo.defaultWord()
+                if (defaultWord != null) {
+                    _uiState.update { it.copy(searchDefaultWord = defaultWord) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "搜索推荐词加载失败" }
+            }
+        }
         viewModelScope.launch {
             feedRepo.toastFlow.collect { toast ->
                 if (toast.hasToast) {

@@ -121,12 +121,12 @@ fun CommentPanel(
     )
 
     var fabVisible by remember { mutableStateOf(true) }
-    val shouldLoadMore by remember {
+    val shouldLoadMore by remember(isActive, listState, isDetailMode) {
         derivedStateOf {
+            if (!isActive || isDetailMode) return@derivedStateOf false
             val total = listState.layoutInfo.totalItemsCount
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            !isDetailMode &&
-                uiState.threadPane == null &&
+            uiState.threadPane == null &&
                 uiState.hasMore &&
                 !uiState.loading &&
                 !uiState.loadingMore &&
@@ -223,6 +223,7 @@ fun CommentPanel(
             if (replyThread != null) {
                 CommentThreadPane(
                     state = replyThread,
+                    isActive = isActive,
                     listState = threadListState,
                     currentMid = uiState.currentMid,
                     busyReplyIds = uiState.busyReplyIds,
@@ -355,6 +356,7 @@ fun CommentPanel(
                 if (threadPane != null) {
                     CommentThreadPane(
                         state = threadPane,
+                        isActive = isActive,
                         listState = threadListState,
                         currentMid = uiState.currentMid,
                         busyReplyIds = uiState.busyReplyIds,

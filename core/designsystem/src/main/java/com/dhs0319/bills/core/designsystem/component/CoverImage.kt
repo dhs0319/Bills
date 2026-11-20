@@ -18,6 +18,7 @@ fun CoverImage(
     modifier: Modifier = Modifier,
     shape: Shape? = MaterialTheme.shapes.medium,
     fallbackContent: (@Composable BoxScope.() -> Unit)? = null,
+    placeholderContent: (@Composable BoxScope.() -> Unit)? = null,
     content: (@Composable BoxScope.() -> Unit)? = null
 ) {
     val bgColor = MaterialTheme.colorScheme.surfaceVariant
@@ -33,6 +34,8 @@ fun CoverImage(
         modifier = coverModifier,
         contentAlignment = Alignment.Center
     ) {
+        // Keep the placeholder behind the image for loading/error states without subcomposition.
+        placeholderContent?.invoke(this)
         if (!url.isNullOrBlank()) {
             BiliAsyncImage(
                 url = url,

@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.CoverImage
+import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeletonStyle
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.article.ArticleRecommendItem
 
@@ -53,7 +54,8 @@ fun HomeArticlePage(
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
         onRetryLoadMore = viewModel::retryLoadMore,
-        key = { _, item -> item.id }
+        key = { _, item -> item.id },
+        skeletonStyle = VideoGridCardSkeletonStyle.ARTICLE
     ) { item ->
         ArticleRecommendCard(
             item = item,

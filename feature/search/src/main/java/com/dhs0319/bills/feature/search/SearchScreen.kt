@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -26,13 +27,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlinedfilled.Menu
-import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.FilledTabRow
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoListCardSkeleton
@@ -42,8 +43,9 @@ import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.feature.search.result.SearchAuthorCard
 import com.dhs0319.bills.feature.search.filter.SearchFiltersSheet
-import com.dhs0319.bills.feature.search.history.SearchHistoryPanel
+import com.dhs0319.bills.feature.search.landing.SearchLandingPanel
 import com.dhs0319.bills.feature.search.result.SearchCard
+import com.dhs0319.bills.feature.search.suggestion.SearchSuggestionsPanel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,9 +57,8 @@ fun SearchScreen(
 ) {
     val authors by viewModel.authors.collectAsStateWithLifecycle()
     val videos by viewModel.videos.collectAsStateWithLifecycle()
-    val histories by viewModel.histories.collectAsStateWithLifecycle()
-    val historyOrder by viewModel.currentHistoryOrder.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
     val hasItems = authors.isNotEmpty() || videos.isNotEmpty()
     val itemCount = authors.size + videos.size
@@ -65,6 +66,8 @@ fun SearchScreen(
     val filters = viewModel.filters.filterNot { it.key == SORT_KEY }
     val hasActiveExtraFilter = filters.any { viewModel.selectedOf(it.key).isNotEmpty() } || viewModel.time.isActive
     val handleBack = {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
         if (!viewModel.consumeBack()) {
             onBack()
         }
@@ -93,13 +96,15 @@ fun SearchScreen(
         }
     }
 
-    CollapsingTopBarScaffold(
+    Scaffold(
         contentWindowInsets = WindowInsets(0),
-        topBar = { scrollBehavior ->
+        topBar = {
             SearchTopBar(
                 text = viewModel.input,
+                placeholder = viewModel.defaultWord?.display ?: "搜索视频",
                 autoFocus = viewModel.keyword.isBlank() && viewModel.input.isBlank(),
                 onTextChange = viewModel::updateInput,
+                onInputFocus = viewModel::showInputSuggestions,
                 onBack = handleBack,
                 onSearch = {
                     viewModel.submitSearch()
@@ -107,8 +112,7 @@ fun SearchScreen(
                 onOpenSpace = { uid ->
                     keyboard?.hide()
                     onOpenSpace(SpaceRoute(mid = uid))
-                },
-                scrollBehavior = scrollBehavior
+                }
             )
         }
     ) { innerPadding ->
@@ -117,6 +121,18 @@ fun SearchScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            if (viewModel.suggestions.isVisible) {
+                SearchSuggestionsPanel(
+                    query = viewModel.suggestions.query,
+                    suggestions = viewModel.suggestions.items,
+                    onSearch = { suggestion ->
+                        focusManager.clearFocus(force = true)
+                        keyboard?.hide()
+                        viewModel.submitSearch(suggestion)
+                    }
+                )
+                return@Column
+            }
             sortFilter?.takeIf { it.ops.size > 1 }?.let { filter ->
                 val trailing: (@Composable RowScope.() -> Unit)? =
                     if (filters.isNotEmpty()) {
@@ -178,18 +194,19 @@ fun SearchScreen(
                 }
 
                 viewModel.keyword.isBlank() -> {
-                    if (histories.isNotEmpty()) {
-                        SearchHistoryPanel(
-                            histories = histories,
-                            order = historyOrder,
-                            onSelectOrder = viewModel::selectHistoryOrder,
-                            onSearch = { keyword ->
-                                keyboard?.hide()
-                                viewModel.submitSearch(keyword)
-                            },
-                            onDelete = viewModel::deleteHistory
-                        )
-                    }
+                    val histories by viewModel.histories.collectAsStateWithLifecycle()
+                    SearchLandingPanel(
+                        state = viewModel.landingState,
+                        histories = histories,
+                        onSearch = { keyword ->
+                            keyboard?.hide()
+                            viewModel.submitSearch(keyword)
+                        },
+                        onDeleteHistory = viewModel::deleteHistory,
+                        onClearHistory = viewModel::clearHistory,
+                        onRetry = { viewModel.loadLanding(forceRefresh = true) },
+                        onRefreshDiscovery = viewModel::refreshDiscovery
+                    )
                 }
 
                 !hasItems -> StateMessageCard(

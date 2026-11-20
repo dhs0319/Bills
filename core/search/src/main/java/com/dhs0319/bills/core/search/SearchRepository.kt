@@ -1,7 +1,12 @@
 package com.dhs0319.bills.core.search
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.room.Room
+import com.bapis.bilibili.app.interfaces.v1.DefaultWordsReply
+import com.bapis.bilibili.app.interfaces.v1.DefaultWordsReq
+import com.bapis.bilibili.app.interfaces.v1.SuggestionResult3Reply
+import com.bapis.bilibili.app.interfaces.v1.SuggestionResult3Req
 import com.bapis.bilibili.pagination.Pagination
 import com.bapis.bilibili.polymer.app.search.v1.FilterEntries
 import com.bapis.bilibili.polymer.app.search.v1.FeedbackItem
@@ -15,7 +20,7 @@ import com.dhs0319.bills.core.common.media.httpsImageUrl
 import com.dhs0319.bills.core.model.SearchFeedbackItem as SearchFdItem
 import com.dhs0319.bills.core.model.SearchFeedbackSec
 import com.dhs0319.bills.core.model.SearchFilter
-import com.dhs0319.bills.core.model.SearchHistoryOrder
+import com.dhs0319.bills.core.model.SearchDefaultWord
 import com.dhs0319.bills.core.model.SearchOp
 import com.dhs0319.bills.core.model.SearchOrder
 import com.dhs0319.bills.core.model.SearchPage
@@ -33,8 +38,10 @@ import dagger.hilt.components.SingletonComponent
 import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 @Singleton
 class SearchRepository @Inject constructor(
@@ -42,7 +49,49 @@ class SearchRepository @Inject constructor(
     private val searchHistoryDao: SearchHistoryDao
 ) {
 
-    suspend fun search(req: SearchReq): SearchPage {
+    private val defaultWordCache = SearchDefaultWordCache(clock = SystemClock::elapsedRealtime)
+    private val suggestionCache = SearchSuggestionCache(clock = SystemClock::elapsedRealtime)
+
+    suspend fun defaultWord(): SearchDefaultWord? = defaultWordCache.load {
+        withContext(Dispatchers.Default) {
+            val request = DefaultWordsReq.newBuilder()
+                .setUserAct(USER_ACT)
+                .build()
+            grpcClient.call(
+                endpoint = DEFAULT_WORD_ENDPOINT,
+                requestBytes = request.toByteArray(),
+                parser = DefaultWordsReply.parser()
+            ).toSearchDefaultWord()
+        }
+    }
+
+    suspend fun suggest(keyword: String): List<String> = withContext(Dispatchers.Default) {
+        val query = keyword.trim()
+        if (query.isEmpty()) {
+            emptyList()
+        } else {
+            suggestionCache.get(query) ?: run {
+                val request = SuggestionResult3Req.newBuilder()
+                    .setKeyword(query)
+                    .setHighlight(0)
+                    .setUserAct(USER_ACT)
+                    .build()
+                val response = grpcClient.call(
+                    endpoint = SUGGEST_ENDPOINT,
+                    requestBytes = request.toByteArray(),
+                    parser = SuggestionResult3Reply.parser()
+                )
+                response.listList
+                    .map { it.keyword.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .take(SUGGEST_LIMIT)
+                    .also { suggestionCache.put(query, it) }
+            }
+        }
+    }
+
+    suspend fun search(req: SearchReq): SearchPage = withContext(Dispatchers.Default) {
         val reqBody = SearchAllRequest.newBuilder()
             .setKeyword(req.keyword)
             .setOrder(req.order.toProto())
@@ -79,7 +128,7 @@ class SearchRepository @Inject constructor(
             mapVideo(item, resp.trackid)?.let(videos::add)
         }
 
-        return SearchPage(
+        SearchPage(
             keyword = resp.keyword.ifBlank { req.keyword },
             authors = authors,
             videos = videos,
@@ -103,14 +152,13 @@ class SearchRepository @Inject constructor(
         searchHistoryDao.deleteByKeyword(query)
     }
 
-    fun observeHistory(
-        order: SearchHistoryOrder
-    ): Flow<List<String>> {
-        val source = when (order) {
-            SearchHistoryOrder.TIME -> searchHistoryDao.observeTopKeywordsByTime()
-            SearchHistoryOrder.HOT -> searchHistoryDao.observeTopKeywordsByHot()
-        }
-        return source.map { list -> list.filter { it.isNotBlank() } }
+    suspend fun clearHistory() {
+        searchHistoryDao.clear()
+    }
+
+    fun observeHistory(): Flow<List<String>> {
+        return searchHistoryDao.observeTopKeywordsByTime()
+            .map { list -> list.filter { it.isNotBlank() } }
     }
 
     private fun mapVideo(
@@ -123,6 +171,7 @@ class SearchRepository @Inject constructor(
         val cid = VideoTargetTool.cid(item.uri)
             ?: av.share.video.cid.takeIf { it > 0L }
             ?: return null
+        val cover = av.cover.httpsImageUrl()
         val target = VideoTarget.Ugc(
             aid = aid,
             cid = cid,
@@ -134,7 +183,7 @@ class SearchRepository @Inject constructor(
                 titleHint = av.title,
                 ownerNameHint = av.author,
                 ownerMidHint = av.mid.takeIf { it > 0L },
-                coverHint = av.cover.httpsImageUrl().takeIf(String::isNotBlank)
+                coverHint = cover.takeIf(String::isNotBlank)
             )
         )
         return SearchVideo(
@@ -142,7 +191,7 @@ class SearchRepository @Inject constructor(
             cid = cid,
             target = target,
             title = av.title,
-            cover = av.cover.httpsImageUrl(),
+            cover = cover,
             author = av.author,
             duration = av.duration,
             viewText = av.viewContent.ifBlank { av.play.toString() },
@@ -232,6 +281,9 @@ class SearchRepository @Inject constructor(
 
     private companion object {
         const val ENDPOINT = "bilibili.polymer.app.search.v1.Search/SearchAll"
+        const val DEFAULT_WORD_ENDPOINT = "bilibili.app.interface.v1.Search/DefaultWords"
+        const val SUGGEST_ENDPOINT = "bilibili.app.interface.v1.Search/Suggest3"
+        const val SUGGEST_LIMIT = 10
         const val FROM_SOURCE = "app_search"
         const val PAGE_SIZE = 20
         const val USER_ACT = "{\"act_seq\":[]}"

@@ -17,7 +17,9 @@ import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeletonStyle
 import com.dhs0319.bills.core.designsystem.component.rememberAdaptiveGridColumnCount
+import com.dhs0319.bills.core.designsystem.component.videoGridCardSkeletonHeight
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
@@ -33,7 +35,8 @@ internal fun <T> HomeMediaGrid(
     contentType: (Int, T) -> Any? = { _, _ -> null },
     columns: Int = rememberAdaptiveGridColumnCount(),
     estimatedRowHeight: Dp? = null,
-    loadingContent: @Composable LazyStaggeredGridItemScope.() -> Unit = { VideoGridCardSkeleton() },
+    skeletonStyle: VideoGridCardSkeletonStyle = VideoGridCardSkeletonStyle.VIDEO,
+    loadingContent: @Composable LazyStaggeredGridItemScope.() -> Unit = { VideoGridCardSkeleton(style = skeletonStyle) },
     headerContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
     separatorIndex: Int? = null,
     separatorContent: (@Composable LazyStaggeredGridItemScope.() -> Unit)? = null,
@@ -46,10 +49,10 @@ internal fun <T> HomeMediaGrid(
         Unit
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Match VideoGridCardSkeleton: 16:10 cover, 72 dp text area and 6 dp gap.
+        // Use the skeleton's own typography and layout metrics, including font/UI scaling.
         // An extra row covers partial rows and differences in real card heights.
         val cardWidth = ((maxWidth.value - 12f - (columns - 1) * 6f) / columns).coerceAtLeast(1f)
-        val rowHeight = estimatedRowHeight?.value ?: (cardWidth * 10f / 16f + 72f + 6f)
+        val rowHeight = estimatedRowHeight?.value ?: (videoGridCardSkeletonHeight(cardWidth.dp, skeletonStyle) + 6.dp).value
         val placeholderCount = (ceil(maxHeight.value / rowHeight).toInt() + 1) * columns
         if (paging.items.isEmpty() && (paging.isInitialLoading || (!paging.hasLoaded && paging.errorMessage == null))) {
             // Skeletons must never participate in the real grid's lane assignment
@@ -62,7 +65,7 @@ internal fun <T> HomeMediaGrid(
                 verticalItemSpacing = 6.dp,
                 contentPadding = PaddingValues(start = 6.dp, end = 6.dp, bottom = 4.dp)
             ) {
-                items(placeholderCount) { loadingContent() }
+                items(placeholderCount, contentType = { "loading" }) { loadingContent() }
             }
         } else {
             AdaptiveMediaGrid(

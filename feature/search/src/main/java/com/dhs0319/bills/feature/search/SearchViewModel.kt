@@ -3,32 +3,47 @@ package com.dhs0319.bills.feature.search
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.common.log.Logger
-import com.dhs0319.bills.core.search.SearchRepository
-import com.dhs0319.bills.core.model.SearchFilter
 import com.dhs0319.bills.core.model.SearchAuthor
-import com.dhs0319.bills.core.model.SearchHistoryOrder
+import com.dhs0319.bills.core.model.SearchDefaultWord
+import com.dhs0319.bills.core.model.SearchFilter
 import com.dhs0319.bills.core.model.SearchOrder
 import com.dhs0319.bills.core.model.SearchReq
 import com.dhs0319.bills.core.model.SearchTime
 import com.dhs0319.bills.core.model.SearchVideo
+import com.dhs0319.bills.core.search.SearchLandingRepository
+import com.dhs0319.bills.core.search.SearchRepository
+import com.dhs0319.bills.feature.search.landing.SearchLandingUiState
+import com.dhs0319.bills.feature.search.navigation.SEARCH_DEFAULT_SHOW_ARG
+import com.dhs0319.bills.feature.search.navigation.SEARCH_DEFAULT_WORD_ARG
+import com.dhs0319.bills.feature.search.suggestion.SearchSuggestionsState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val repo: SearchRepository
+    private val repo: SearchRepository,
+    private val landingRepo: SearchLandingRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    var defaultWord by mutableStateOf(
+        SearchDefaultWord(
+            show = savedStateHandle.get<String>(SEARCH_DEFAULT_SHOW_ARG).orEmpty(),
+            word = savedStateHandle.get<String>(SEARCH_DEFAULT_WORD_ARG).orEmpty()
+        ).takeIf { it.display.isNotBlank() }
+    )
+        private set
 
     var input by mutableStateOf("")
         private set
@@ -54,8 +69,10 @@ class SearchViewModel @Inject constructor(
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    internal val suggestions = SearchSuggestionsState(viewModelScope, repo::suggest)
+
     val canLoadMore: Boolean
-        get() = next.isNotBlank()
+        get() = next.isNotBlank() && !suggestions.isVisible
 
     private val _authors = MutableStateFlow<List<SearchAuthor>>(emptyList())
     val authors = _authors.asStateFlow()
@@ -66,12 +83,10 @@ class SearchViewModel @Inject constructor(
     private val authorIds = hashSetOf<Long>()
     private val videoIds = hashSetOf<Pair<Long, Long>>()
 
-    private val historyOrder = MutableStateFlow(SearchHistoryOrder.TIME)
-    val currentHistoryOrder = historyOrder.asStateFlow()
-    val histories = historyOrder
-        .flatMapLatest { order ->
-            repo.observeHistory(order)
-        }
+    var landingState by mutableStateOf(SearchLandingUiState())
+        private set
+
+    val histories = repo.observeHistory()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -80,6 +95,75 @@ class SearchViewModel @Inject constructor(
 
     private var next = ""
     private var sel by mutableStateOf<Map<String, Set<String>>>(emptyMap())
+    private var searchGeneration = 0L
+    private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+
+    init {
+        if (defaultWord == null) loadDefaultWord()
+        loadLanding()
+    }
+
+    private fun loadDefaultWord() {
+        viewModelScope.launch {
+            try {
+                defaultWord = repo.defaultWord()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "搜索默认推荐词加载失败" }
+            }
+        }
+    }
+
+    fun loadLanding(forceRefresh: Boolean = false) {
+        if (landingState.isLoading || landingState.isRefreshingDiscovery) return
+        landingState = landingState.copy(
+            isLoading = true,
+            trendingError = null,
+            discoveryError = null
+        )
+        viewModelScope.launch {
+            try {
+                val data = landingRepo.load(forceRefresh)
+                landingState = landingState.copy(
+                    trending = data.trending,
+                    discovery = data.discovery,
+                    discoveryError = null
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "搜索首页加载失败" }
+                landingState = landingState.copy(
+                    trendingError = "热搜加载失败，请重试",
+                    discoveryError = "搜索发现加载失败，请重试"
+                )
+            } finally {
+                landingState = landingState.copy(isLoading = false)
+            }
+        }
+    }
+
+    fun refreshDiscovery() {
+        if (landingState.isLoading || landingState.isRefreshingDiscovery) return
+        landingState = landingState.copy(isRefreshingDiscovery = true, discoveryError = null)
+        viewModelScope.launch {
+            try {
+                val discovery = landingRepo.refreshDiscovery()
+                landingState = landingState.copy(
+                    discovery = discovery
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "搜索发现刷新失败" }
+                landingState = landingState.copy(discoveryError = "刷新失败，请重试")
+            } finally {
+                landingState = landingState.copy(isRefreshingDiscovery = false)
+            }
+        }
+    }
 
     fun selectedOf(key: String): Set<String> {
         return sel[key].orEmpty()
@@ -87,34 +171,53 @@ class SearchViewModel @Inject constructor(
 
     fun updateInput(value: String) {
         input = value
+        suggestions.update(value)
+        if (value.isBlank()) clearSearchState()
+    }
+
+    fun showInputSuggestions() {
+        suggestions.update(input)
     }
 
     fun submitSearch(
         value: String = input,
         recordHistory: Boolean = true
     ) {
-        val query = value.trim()
+        val query = value.ifBlank { defaultWord?.keyword.orEmpty() }.trim()
         input = query
-        if (query.isEmpty() || isLoading) return
+        suggestions.clear()
+        if (query.isEmpty()) {
+            clearSearchState()
+            return
+        }
+        if (isLoading && query == keyword) return
         val fresh = query != keyword
         if (fresh) {
             clearSearchState()
         }
-        viewModelScope.launch {
-            if (recordHistory) {
-                repo.recordHistory(query)
+        search(query)
+        if (recordHistory) {
+            viewModelScope.launch {
+                try {
+                    repo.recordHistory(query)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Logger.e(TAG, e) { "搜索历史保存失败" }
+                }
             }
-            search(query)
         }
-    }
-
-    fun selectHistoryOrder(order: SearchHistoryOrder) {
-        historyOrder.value = order
     }
 
     fun deleteHistory(keyword: String) {
         viewModelScope.launch {
             repo.deleteHistory(keyword)
+        }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            repo.clearHistory()
         }
     }
 
@@ -152,12 +255,15 @@ class SearchViewModel @Inject constructor(
         time = timeValue
         order = nextOrder
         if (keyword.isBlank()) return
-        viewModelScope.launch {
-            search(keyword)
-        }
+        search(keyword)
     }
 
     fun consumeBack(): Boolean {
+        if (suggestions.isVisible) {
+            suggestions.clear()
+            input = keyword
+            return true
+        }
         val hasState = keyword.isNotBlank() ||
                 _authors.value.isNotEmpty() ||
                 _videos.value.isNotEmpty() ||
@@ -169,17 +275,21 @@ class SearchViewModel @Inject constructor(
                 time.isActive
         if (!hasState) return false
         clearSearchState()
+        input = ""
         return true
     }
 
     fun loadMore() {
         if (keyword.isBlank() || next.isBlank() || isLoading || isLoadingMore) return
-        viewModelScope.launch {
+        val generation = searchGeneration
+        val request = buildReq(keyword, next)
+        isLoadingMore = true
+        errorMessage = null
+        loadMoreJob = viewModelScope.launch {
             try {
-                isLoadingMore = true
-                errorMessage = null
-                val page = repo.search(buildReq(keyword, next))
-                next = page.next
+                val page = repo.search(request)
+                if (generation != searchGeneration) return@launch
+                next = page.next.takeUnless { it == request.next }.orEmpty()
                 val newAuthors = page.authors.filter { authorIds.add(it.mid) }
                 val newVideos = page.videos.filter { videoIds.add(it.aid to it.cid) }
                 _authors.value += newAuthors
@@ -187,36 +297,51 @@ class SearchViewModel @Inject constructor(
                 if (page.filters.isNotEmpty()) {
                     syncFilters(page.filters)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (generation != searchGeneration) return@launch
                 Logger.e(TAG, e) { "搜索翻页失败" }
                 errorMessage = e.message
             } finally {
-                isLoadingMore = false
+                if (generation == searchGeneration) isLoadingMore = false
             }
         }
     }
 
-    private suspend fun search(query: String) {
-        try {
-            isLoading = true
-            next = ""
-            authorIds.clear()
-            videoIds.clear()
-            _authors.value = emptyList()
-            _videos.value = emptyList()
-            errorMessage = null
-            val page = repo.search(buildReq(query, ""))
-            keyword = page.keyword
-            input = page.keyword
-            next = page.next
-            syncFilters(page.filters)
-            _authors.value = page.authors.filter { authorIds.add(it.mid) }
-            _videos.value = page.videos.filter { videoIds.add(it.aid to it.cid) }
-        } catch (e: Exception) {
-            Logger.e(TAG, e) { "搜索失败" }
-            errorMessage = e.message
-        } finally {
-            isLoading = false
+    private fun search(query: String) {
+        val generation = ++searchGeneration
+        searchJob?.cancel()
+        loadMoreJob?.cancel()
+        isLoading = true
+        isLoadingMore = false
+        keyword = query
+        next = ""
+        authorIds.clear()
+        videoIds.clear()
+        _authors.value = emptyList()
+        _videos.value = emptyList()
+        errorMessage = null
+        val request = buildReq(query, "")
+        searchJob = viewModelScope.launch {
+            try {
+                val page = repo.search(request)
+                if (generation != searchGeneration) return@launch
+                keyword = page.keyword
+                if (!suggestions.isVisible) input = page.keyword
+                next = page.next
+                syncFilters(page.filters)
+                _authors.value = page.authors.filter { authorIds.add(it.mid) }
+                _videos.value = page.videos.filter { videoIds.add(it.aid to it.cid) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (generation != searchGeneration) return@launch
+                Logger.e(TAG, e) { "搜索失败" }
+                errorMessage = e.message
+            } finally {
+                if (generation == searchGeneration) isLoading = false
+            }
         }
     }
 
@@ -275,6 +400,13 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun clearSearchState() {
+        ++searchGeneration
+        searchJob?.cancel()
+        loadMoreJob?.cancel()
+        searchJob = null
+        loadMoreJob = null
+        isLoading = false
+        isLoadingMore = false
         keyword = ""
         next = ""
         order = SearchOrder.DEFAULT

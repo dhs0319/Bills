@@ -34,6 +34,7 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Visibility
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CoverImage
+import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeletonStyle
 import com.dhs0319.bills.core.designsystem.component.UpListRow
 import com.dhs0319.bills.core.model.LiveRecommendItem
 import com.dhs0319.bills.core.model.LiveRoute
@@ -70,6 +71,7 @@ fun HomeLivePage(
         onLoadMore = viewModel::loadMore,
         onRetryLoadMore = viewModel::retryLoadMore,
         key = { _, item -> item.roomId },
+        skeletonStyle = VideoGridCardSkeletonStyle.LIVE,
         headerContent = state.upList?.let { upList ->
             {
                 UpListRow(

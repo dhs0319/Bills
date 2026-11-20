@@ -33,6 +33,7 @@ dependencies {
     implementation(project(":core:listen"))
     implementation(project(":core:live"))
     implementation(project(":core:popular"))
+    implementation(project(":core:search"))
     implementation(project(":core:settings"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))

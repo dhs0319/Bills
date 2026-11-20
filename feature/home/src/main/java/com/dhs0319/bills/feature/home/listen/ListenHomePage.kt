@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CoverImage
+import com.dhs0319.bills.core.designsystem.component.VideoGridCardSkeletonStyle
 import com.dhs0319.bills.core.model.listen.ListenItem
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 
@@ -58,7 +59,8 @@ fun ListenHomePage(
         onRefresh = viewModel::refresh,
         onLoadMore = viewModel::loadMore,
         onRetryLoadMore = viewModel::retryLoadMore,
-        key = { _, item -> item.identityKey }
+        key = { _, item -> item.identityKey },
+        skeletonStyle = VideoGridCardSkeletonStyle.AUDIO
     ) { item ->
         ListenCard(
             item = item,

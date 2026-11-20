@@ -12,7 +12,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +23,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
@@ -39,12 +39,13 @@ import com.dhs0319.bills.core.designsystem.component.SearchCapsuleField
 @Composable
 internal fun SearchTopBar(
     text: String,
+    placeholder: String,
     autoFocus: Boolean,
     onTextChange: (String) -> Unit,
+    onInputFocus: () -> Unit,
     onBack: () -> Unit,
     onSearch: () -> Unit,
-    onOpenSpace: (Long) -> Unit,
-    scrollBehavior: TopAppBarScrollBehavior
+    onOpenSpace: (Long) -> Unit
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -54,7 +55,7 @@ internal fun SearchTopBar(
     val imeVisible = WindowInsets.isImeVisible
     var imeShown by remember { mutableStateOf(false) }
 
-    LaunchedEffect(autoFocus) {
+    LaunchedEffect(Unit) {
         if (autoFocus) {
             withFrameNanos { }
             focusRequester.requestFocus()
@@ -82,10 +83,11 @@ internal fun SearchTopBar(
             SearchCapsuleField(
                 value = text,
                 onValueChange = onTextChange,
-                placeholder = "搜索视频",
+                placeholder = placeholder,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { if (it.isFocused) onInputFocus() },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = true,
@@ -142,7 +144,6 @@ internal fun SearchTopBar(
                     contentDescription = "返回"
                 )
             }
-        },
-        scrollBehavior = scrollBehavior
+        }
     )
 }

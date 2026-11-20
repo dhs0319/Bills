@@ -15,6 +15,7 @@ import coil3.util.DebugLogger
 import okio.Path.Companion.toOkioPath
 import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.common.UserAgentBuilder
+import com.dhs0319.bills.core.designsystem.component.addPlayerCoverMapper
 import com.dhs0319.bills.infra.crypto.DeviceIdentity
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.ConnectionPool
@@ -69,6 +70,7 @@ class BiliApplication : Application(), SingletonImageLoader.Factory {
 
         return ImageLoader.Builder(context)
             .components {
+                addPlayerCoverMapper()
                 if (SDK_INT >= 28) {
                     add(AnimatedImageDecoder.Factory())
                 } else {
