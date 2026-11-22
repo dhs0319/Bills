@@ -62,6 +62,7 @@ fun SearchScreen(
     val listState = rememberLazyListState()
     val hasItems = authors.isNotEmpty() || videos.isNotEmpty()
     val itemCount = authors.size + videos.size
+    val searchError = viewModel.searchError
     val sortFilter = viewModel.filters.firstOrNull { it.key == SORT_KEY }
     val filters = viewModel.filters.filterNot { it.key == SORT_KEY }
     val hasActiveExtraFilter = filters.any { viewModel.selectedOf(it.key).isNotEmpty() } || viewModel.time.isActive
@@ -83,6 +84,7 @@ fun SearchScreen(
             viewModel.canLoadMore &&
                     !viewModel.isLoading &&
                     !viewModel.isLoadingMore &&
+                    viewModel.searchError == null &&
                     itemCount > 0 &&
                     last >= itemCount - 3
         }
@@ -180,17 +182,19 @@ fun SearchScreen(
             when {
                 viewModel.isLoading && !hasItems -> SearchLoadingList()
 
-                viewModel.errorMessage != null && !hasItems -> {
-                    StateMessageCard(
-                        text = viewModel.errorMessage.orEmpty().ifBlank { "搜索失败" },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        isError = true,
-                        actionText = "重试",
-                        onAction = {
-                            keyboard?.hide()
-                            viewModel.submitSearch(recordHistory = false)
-                        }
-                    )
+                searchError != null && !hasItems -> {
+                    searchError.inlineMessage?.let { message ->
+                        StateMessageCard(
+                            text = message,
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            isError = true,
+                            actionText = "重试",
+                            onAction = {
+                                keyboard?.hide()
+                                viewModel.submitSearch(recordHistory = false)
+                            }
+                        )
+                    }
                 }
 
                 viewModel.keyword.isBlank() -> {
@@ -253,10 +257,10 @@ fun SearchScreen(
                             }
                         }
 
-                        if (viewModel.errorMessage != null && itemCount > 0) {
+                        if (searchError != null) {
                             item {
                                 StateMessageCard(
-                                    text = viewModel.errorMessage.orEmpty().ifBlank { "搜索失败" },
+                                    text = searchError.inlineMessage,
                                     isError = true,
                                     actionText = "重试",
                                     onAction = viewModel::loadMore

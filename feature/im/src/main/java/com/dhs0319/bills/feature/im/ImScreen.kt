@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
+import com.dhs0319.bills.core.designsystem.component.LoadFailedState
 import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
@@ -115,6 +116,16 @@ fun ImScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            val loadError = state.errorMessage
+            if (state.sessions.isEmpty() && loadError != null) {
+                LoadFailedState(
+                    onRetry = { vm.refresh() },
+                    description = loadError,
+                    modifier = Modifier.padding(bottom = topLevelNavSpace)
+                )
+                return@BiliPullToRefreshBox
+            }
+
             Column(modifier = Modifier.fillMaxSize()) {
                 LaunchedEffect(
                     state.currentTab,
@@ -152,12 +163,14 @@ fun ImScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        item(key = "im_notification_entries") {
-                            ImNotificationEntries(
-                                onOpenReplyAndMentions = onOpenMsgFeed,
-                                onOpenReceivedLikes = onOpenReceivedLikes,
-                                onOpenNewFollowers = onOpenNewFollowers
-                            )
+                        if (!state.connectionFailed) {
+                            item(key = "im_notification_entries") {
+                                ImNotificationEntries(
+                                    onOpenReplyAndMentions = onOpenMsgFeed,
+                                    onOpenReceivedLikes = onOpenReceivedLikes,
+                                    onOpenNewFollowers = onOpenNewFollowers
+                                )
+                            }
                         }
 
                         if (!state.actionError.isNullOrBlank()) {
@@ -182,14 +195,6 @@ fun ImScreen(
                                         ) {
                                             CircularProgressIndicator()
                                         }
-                                    }
-
-                                    !state.errorMessage.isNullOrBlank() -> {
-                                        StateMessageCard(
-                                            text = state.errorMessage.orEmpty(),
-                                            modifier = Modifier.padding(vertical = 16.dp),
-                                            isError = true
-                                        )
                                     }
 
                                     else -> {
@@ -227,12 +232,14 @@ fun ImScreen(
                             )
                         }
 
-                        if (state.sessions.isNotEmpty() && !state.errorMessage.isNullOrBlank()) {
+                        if (state.sessions.isNotEmpty() && loadError != null) {
                             item(key = "im_error_footer") {
                                 StateMessageCard(
-                                    text = state.errorMessage.orEmpty(),
+                                    text = loadError.takeUnless { state.connectionFailed },
                                     modifier = Modifier.padding(vertical = 8.dp),
-                                    isError = true
+                                    isError = true,
+                                    actionText = "重新加载",
+                                    onAction = { vm.refresh() }
                                 )
                             }
                         }
@@ -244,7 +251,7 @@ fun ImScreen(
                         } else if (!state.loadMoreError.isNullOrBlank()) {
                             item(key = "im_load_more_error") {
                                 StateMessageCard(
-                                    text = state.loadMoreError.orEmpty(),
+                                    text = state.loadMoreError.takeUnless { state.connectionFailed },
                                     modifier = Modifier.padding(vertical = 8.dp),
                                     isError = true,
                                     actionText = "重试",

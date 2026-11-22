@@ -1,6 +1,7 @@
 package com.dhs0319.bills.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,18 +11,28 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun StateMessageCard(
-    text: String,
+    text: String?,
     modifier: Modifier = Modifier,
     title: String? = null,
     isError: Boolean = false,
     actionText: String? = null,
     onAction: (() -> Unit)? = null
 ) {
+    if (text == null) {
+        if (actionText != null && onAction != null) {
+            Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TextButton(onClick = onAction) { Text(actionText) }
+            }
+        }
+        return
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(

@@ -5,6 +5,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import com.dhs0319.bills.core.common.AuthProvider
 import com.dhs0319.bills.core.common.log.Logger
+import com.dhs0319.bills.core.common.network.isNetworkConnectionFailure
 import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.video.VideoDetailRepository
 import com.dhs0319.bills.core.danmaku.VodDanmakuRepository
@@ -424,6 +425,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
             vodSession.value = vodSession.value.copy(
                 detailLoading = false,
                 detailError = t.message ?: "加载视频详情失败",
+                detailConnectionFailed = t.isNetworkConnectionFailure(),
                 detailPlaceholder = null
             )
             refreshVideoState()
@@ -619,6 +621,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
             ),
             detailLoading = false,
             detailError = null,
+            detailConnectionFailed = false,
             detailPlaceholder = null
         )
         vodSession.value.toMediaMetadata()?.let(playerEngine::setMediaMetadata)
@@ -843,6 +846,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
             detail = detail,
             detailLoading = detailLoading,
             detailError = detailError,
+            detailConnectionFailed = detailConnectionFailed,
             isPreparing = isPreparing,
             playbackSource = playbackSource,
             currentStream = currentStream,

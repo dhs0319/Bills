@@ -281,5 +281,6 @@ data class PlayerSessionState(
     val waitingForPlay: Boolean = false,
     val isPreparing: Boolean = false,
     val error: PlaybackError? = null,
-    val detailPlaceholder: VideoDetail? = null
+    val detailPlaceholder: VideoDetail? = null,
+    val detailConnectionFailed: Boolean = false
 )

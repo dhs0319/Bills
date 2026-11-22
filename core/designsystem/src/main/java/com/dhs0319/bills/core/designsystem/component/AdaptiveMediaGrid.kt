@@ -87,6 +87,7 @@ fun <T> AdaptiveMediaGrid(
     loadMoreContent: @Composable LazyStaggeredGridItemScope.() -> Unit = {
         DefaultGridLoadMore()
     },
+    showLoadMoreErrorMessage: Boolean = true,
     itemContent: @Composable LazyStaggeredGridItemScope.(item: T) -> Unit
 ) {
     val gridState = state ?: rememberLazyStaggeredGridState()
@@ -222,7 +223,7 @@ fun <T> AdaptiveMediaGrid(
                     } else if (loadMoreError != null) {
                         item(key = "load_more_error", span = StaggeredGridItemSpan.FullLine) {
                             StateMessageCard(
-                                text = loadMoreError,
+                                text = loadMoreError.takeIf { showLoadMoreErrorMessage },
                                 isError = true,
                                 actionText = "重试",
                                 onAction = onRetryLoadMore

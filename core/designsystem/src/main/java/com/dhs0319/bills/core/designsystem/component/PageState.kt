@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Account_circle
+import com.composables.icons.materialsymbols.outlined.Cloud_off
 
 /** A page-level placeholder. State selection and navigation belong to the caller. */
 @Composable
@@ -97,6 +98,22 @@ fun PageState(
             }
         }
     }
+}
+
+@Composable
+fun LoadFailedState(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    description: String? = null
+) {
+    PageState(
+        icon = MaterialSymbols.Outlined.Cloud_off,
+        title = "加载失败",
+        description = description,
+        actionText = "重新加载",
+        onAction = onRetry,
+        modifier = modifier
+    )
 }
 
 @Composable

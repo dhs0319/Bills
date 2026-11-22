@@ -165,6 +165,7 @@ internal fun VideoDetailPage(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    detailConnectionFailed: Boolean,
     actionState: VideoActionUiState,
     commentSubject: CommentSubject?,
     onOpenVideo: (VideoTarget) -> Unit,
@@ -273,6 +274,7 @@ internal fun VideoDetailPage(
             ids = ids,
             loading = detailLoading,
             error = detailError,
+            connectionFailed = detailConnectionFailed,
             actionState = actionState,
             infoExpanded = infoExpanded,
             onToggleInfo = { infoExpanded = !infoExpanded },
@@ -371,6 +373,7 @@ internal fun VideoDetailPage(
                         detail = detail,
                         loading = detailLoading,
                         error = detailError,
+                        connectionFailed = detailConnectionFailed,
                         state = detailListState,
                         horizontalPad = contentHorizontalPad,
                         cardHorizontalPad = relatedCardHorizontalPad,
@@ -379,7 +382,9 @@ internal fun VideoDetailPage(
                         onAddToWatchLater = onAddToWatchLater
                     ) { itemModifier ->
                         if (!isLandscape) {
-                            item(key = "summary", contentType = "summary") { summary(itemModifier) }
+                            if (!detailConnectionFailed) {
+                                item(key = "summary", contentType = "summary") { summary(itemModifier) }
+                            }
                             if (detail != null && !detailLoading && detailError.isNullOrBlank()) {
                                 playlistEntries(
                                     detail = detail,
@@ -559,6 +564,7 @@ private fun RelatedVideoList(
     detail: VideoDetail?,
     loading: Boolean,
     error: String?,
+    connectionFailed: Boolean,
     state: LazyListState,
     horizontalPad: Dp,
     cardHorizontalPad: Dp,
@@ -649,7 +655,7 @@ private fun RelatedVideoList(
                         RelateRow(relate, relateCardWidth, onOpenVideo, onAddToWatchLater, relateItemMod)
                     }
                 }
-            } else if (isLandscape) {
+            } else if (isLandscape && !connectionFailed) {
                 item { StateMessageCard(text = error ?: "暂无相关视频", isError = !error.isNullOrBlank()) }
             }
         }
@@ -725,6 +731,7 @@ private fun VideoSummarySection(
     detail: VideoDetail?,
     loading: Boolean,
     error: String?,
+    connectionFailed: Boolean,
     isLandscape: Boolean,
     ids: ResolvedVideoIds,
     modifier: Modifier = Modifier,
@@ -756,6 +763,7 @@ private fun VideoSummarySection(
     }
     when {
         loading && detail == null -> VideoDetailInfoSkeleton(modifier = modifier, actionRow = actions)
+        connectionFailed -> Spacer(modifier)
         !loading && !error.isNullOrBlank() -> StateMessageCard(error, modifier = modifier, isError = true)
         detail == null -> StateMessageCard("暂无简介信息", modifier = modifier)
         else -> {

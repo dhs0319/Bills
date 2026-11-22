@@ -119,6 +119,7 @@ private fun LazyListScope.trendingItems(
     onSearch: (String) -> Unit,
     onRetry: () -> Unit
 ) {
+    val error = state.trendingError
     item(key = "trending_header", contentType = "header") {
         SearchSectionHeader(title = "热搜榜")
     }
@@ -133,8 +134,8 @@ private fun LazyListScope.trendingItems(
         }
         else -> item(key = "trending_state", contentType = "state") {
             StateMessageCard(
-                text = state.trendingError ?: "暂无热搜",
-                isError = state.trendingError != null,
+                text = if (error == null) "暂无热搜" else error.inlineMessage,
+                isError = error != null,
                 actionText = "重试",
                 onAction = onRetry,
                 modifier = Modifier.fillMaxWidth()
@@ -150,6 +151,7 @@ private fun LazyListScope.discoveryItems(
     onRefresh: () -> Unit
 ) {
     val isLoading = state.isLoading || state.isRefreshingDiscovery
+    val error = state.discoveryError
     item(key = "discovery_header", contentType = "discovery_header") {
         SearchSectionHeader(title = "搜索发现") {
             IconButton(onClick = onRefresh, enabled = !isLoading) {
@@ -177,20 +179,21 @@ private fun LazyListScope.discoveryItems(
                 modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp)
             ) { SearchDiscoveryChip(it, onSearch) }
         }
-        else -> item(key = "discovery_state", contentType = "state") {
+        error == null || error.inlineMessage != null -> item(key = "discovery_state", contentType = "state") {
             StateMessageCard(
-                text = state.discoveryError ?: "暂无搜索发现",
-                isError = state.discoveryError != null,
+                text = error?.inlineMessage ?: "暂无搜索发现",
+                isError = error != null,
                 actionText = "换一批",
                 onAction = onRefresh,
                 modifier = Modifier.fillMaxWidth()
             )
         }
     }
-    if (rows.isNotEmpty() && state.discoveryError != null) {
+    val inlineMessage = error?.inlineMessage
+    if (rows.isNotEmpty() && inlineMessage != null) {
         item(key = "discovery_error", contentType = "state") {
             StateMessageCard(
-                text = state.discoveryError,
+                text = inlineMessage,
                 isError = true,
                 actionText = "重试",
                 onAction = onRefresh,

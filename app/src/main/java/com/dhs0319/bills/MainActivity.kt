@@ -10,36 +10,50 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.dhs0319.bills.core.settings.AppSettings
 import com.dhs0319.bills.core.settings.update.AppUpdateCheckResult
 import com.dhs0319.bills.core.settings.update.AppUpdateChecker
 import com.dhs0319.bills.core.settings.update.toDialogState
 import com.dhs0319.bills.core.designsystem.component.AppUpdateDialog
 import com.dhs0319.bills.core.designsystem.component.AppUpdateDialogState
+import com.dhs0319.bills.core.designsystem.component.NetworkErrorPopup
 import com.dhs0319.bills.core.designsystem.theme.BiliTheme
 import com.dhs0319.bills.core.designsystem.theme.FrameRateMode
 import com.dhs0319.bills.core.designsystem.theme.ThemeConfig
 import com.dhs0319.bills.core.model.WebLinkParser
 import com.dhs0319.bills.core.model.WebLinkTarget
+import com.dhs0319.bills.infra.network.NetworkFailureEvents
 import com.dhs0319.bills.navigation.AppNavHost
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -53,6 +67,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var updateChecker: AppUpdateChecker
+
+    @Inject
+    lateinit var networkFailureEvents: NetworkFailureEvents
 
     private var updateDialog by mutableStateOf<AppUpdateDialogState?>(null)
 
@@ -84,11 +101,14 @@ class MainActivity : ComponentActivity() {
             }
             BiliTheme(config = themeConfig) {
                 ApplySystemBarAppearance()
-                AppNavHost(
-                    themeConfig = themeConfig,
-                    appLink = pendingAppLink,
-                    onAppLinkConsumed = { pendingAppLink = null }
-                )
+                Box(Modifier.fillMaxSize()) {
+                    AppNavHost(
+                        themeConfig = themeConfig,
+                        appLink = pendingAppLink,
+                        onAppLinkConsumed = { pendingAppLink = null }
+                    )
+                    NetworkFailureOverlay(Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp))
+                }
                 updateDialog?.let { release ->
                     AppUpdateDialog(
                         state = release,
@@ -101,6 +121,27 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    @Composable
+    private fun NetworkFailureOverlay(modifier: Modifier) {
+        val hostState = remember { SnackbarHostState() }
+        LaunchedEffect(hostState) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var popup: Job? = null
+                networkFailureEvents.failures.collect {
+                    if (popup?.isActive != true) {
+                        popup = launch {
+                            hostState.showSnackbar(
+                                message = "网络连接失败，请检查网络设置",
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        NetworkErrorPopup(hostState, modifier)
     }
 
     override fun onNewIntent(intent: Intent) {

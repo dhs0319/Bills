@@ -8,6 +8,7 @@ import com.dhs0319.bills.infra.crypto.HwIdGenerator
 import com.dhs0319.bills.infra.crypto.LegalRegionCache
 import com.dhs0319.bills.infra.crypto.RegionCodeCache
 import com.dhs0319.bills.infra.crypto.TicketGenerator
+import com.dhs0319.bills.infra.network.NetworkFailureEvents
 import com.dhs0319.bills.infra.network.dns.BiliDns
 import dagger.Module
 import dagger.Provides
@@ -55,11 +56,13 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(
         biliDns: BiliDns,
-        connectionPool: ConnectionPool
+        connectionPool: ConnectionPool,
+        networkFailureEvents: NetworkFailureEvents
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .dns(biliDns)
             .connectionPool(connectionPool)
+            .eventListener(networkFailureEvents)
             .addInterceptor(BrotliInterceptor)
             .build()
     }

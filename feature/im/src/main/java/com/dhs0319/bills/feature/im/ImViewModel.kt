@@ -3,6 +3,7 @@ package com.dhs0319.bills.feature.im
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.common.log.Logger
+import com.dhs0319.bills.core.common.network.isNetworkConnectionFailure
 import com.dhs0319.bills.core.auth.AuthRepository
 import com.dhs0319.bills.core.im.ImRepository
 import com.dhs0319.bills.core.model.ImPaginationParams
@@ -63,7 +64,8 @@ class ImViewModel @Inject constructor(
                 isRefreshing = false,
                 isLoadingMore = false,
                 errorMessage = null,
-                loadMoreError = null
+                loadMoreError = null,
+                connectionFailed = false
             )
             return
         }
@@ -250,7 +252,8 @@ class ImViewModel @Inject constructor(
                     isLoadingMore = false,
                     errorMessage = null,
                     loadMoreError = null,
-                    isLoggedIn = true
+                    isLoggedIn = true,
+                    connectionFailed = false
                 )
             }
         } catch (e: Exception) {
@@ -260,23 +263,17 @@ class ImViewModel @Inject constructor(
             )
             Logger.e(TAG, e) { msg }
             if (silent) return
+            val connectionFailed = e.isNetworkConnectionFailure()
             _uiState.update { state ->
                 if (state.currentTab != tab) return@update state
-                if (reset) {
-                    state.copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        isLoadingMore = false,
-                        errorMessage = msg
-                    )
-                } else {
-                    state.copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        isLoadingMore = false,
-                        loadMoreError = msg
-                    )
-                }
+                state.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    isLoadingMore = false,
+                    errorMessage = if (reset) msg else state.errorMessage,
+                    loadMoreError = if (reset) state.loadMoreError else msg,
+                    connectionFailed = connectionFailed
+                )
             }
         }
     }

@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhs0319.bills.core.common.log.Logger
+import com.dhs0319.bills.core.common.network.isNetworkConnectionFailure
 import com.dhs0319.bills.core.model.SearchAuthor
 import com.dhs0319.bills.core.model.SearchDefaultWord
 import com.dhs0319.bills.core.model.SearchFilter
@@ -66,7 +67,7 @@ class SearchViewModel @Inject constructor(
     var isLoadingMore by mutableStateOf(false)
         private set
 
-    var errorMessage by mutableStateOf<String?>(null)
+    internal var searchError by mutableStateOf<SearchLoadError?>(null)
         private set
 
     internal val suggestions = SearchSuggestionsState(viewModelScope, repo::suggest)
@@ -83,7 +84,7 @@ class SearchViewModel @Inject constructor(
     private val authorIds = hashSetOf<Long>()
     private val videoIds = hashSetOf<Pair<Long, Long>>()
 
-    var landingState by mutableStateOf(SearchLandingUiState())
+    internal var landingState by mutableStateOf(SearchLandingUiState())
         private set
 
     val histories = repo.observeHistory()
@@ -136,8 +137,8 @@ class SearchViewModel @Inject constructor(
             } catch (e: Exception) {
                 Logger.e(TAG, e) { "搜索首页加载失败" }
                 landingState = landingState.copy(
-                    trendingError = "热搜加载失败，请重试",
-                    discoveryError = "搜索发现加载失败，请重试"
+                    trendingError = e.toSearchLoadError("热搜加载失败，请重试"),
+                    discoveryError = e.toSearchLoadError("搜索发现加载失败，请重试")
                 )
             } finally {
                 landingState = landingState.copy(isLoading = false)
@@ -158,7 +159,7 @@ class SearchViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Logger.e(TAG, e) { "搜索发现刷新失败" }
-                landingState = landingState.copy(discoveryError = "刷新失败，请重试")
+                landingState = landingState.copy(discoveryError = e.toSearchLoadError("刷新失败，请重试"))
             } finally {
                 landingState = landingState.copy(isRefreshingDiscovery = false)
             }
@@ -269,7 +270,7 @@ class SearchViewModel @Inject constructor(
                 _videos.value.isNotEmpty() ||
                 isLoading ||
                 isLoadingMore ||
-                errorMessage != null ||
+                searchError != null ||
                 filters.isNotEmpty() ||
                 sel.isNotEmpty() ||
                 time.isActive
@@ -284,7 +285,7 @@ class SearchViewModel @Inject constructor(
         val generation = searchGeneration
         val request = buildReq(keyword, next)
         isLoadingMore = true
-        errorMessage = null
+        searchError = null
         loadMoreJob = viewModelScope.launch {
             try {
                 val page = repo.search(request)
@@ -302,7 +303,7 @@ class SearchViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (generation != searchGeneration) return@launch
                 Logger.e(TAG, e) { "搜索翻页失败" }
-                errorMessage = e.message
+                searchError = e.toSearchLoadError(e.message.orEmpty().ifBlank { "搜索失败" })
             } finally {
                 if (generation == searchGeneration) isLoadingMore = false
             }
@@ -321,7 +322,7 @@ class SearchViewModel @Inject constructor(
         videoIds.clear()
         _authors.value = emptyList()
         _videos.value = emptyList()
-        errorMessage = null
+        searchError = null
         val request = buildReq(query, "")
         searchJob = viewModelScope.launch {
             try {
@@ -338,7 +339,7 @@ class SearchViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (generation != searchGeneration) return@launch
                 Logger.e(TAG, e) { "搜索失败" }
-                errorMessage = e.message
+                searchError = e.toSearchLoadError(e.message.orEmpty().ifBlank { "搜索失败" })
             } finally {
                 if (generation == searchGeneration) isLoading = false
             }
@@ -413,7 +414,7 @@ class SearchViewModel @Inject constructor(
         filters = emptyList()
         time = SearchTime()
         sel = emptyMap()
-        errorMessage = null
+        searchError = null
         authorIds.clear()
         videoIds.clear()
         _authors.value = emptyList()
@@ -427,3 +428,8 @@ class SearchViewModel @Inject constructor(
         const val CUSTOM_TIME = "custom"
     }
 }
+
+internal data class SearchLoadError(val inlineMessage: String?)
+
+private fun Exception.toSearchLoadError(message: String): SearchLoadError =
+    SearchLoadError(message.takeUnless { isNetworkConnectionFailure() })

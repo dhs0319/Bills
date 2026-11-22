@@ -206,6 +206,7 @@ fun VideoScreen(
                 ids = videoState.ids,
                 detailLoading = videoState.detailLoading,
                 detailError = videoState.detailError,
+                detailConnectionFailed = videoState.detailConnectionFailed,
                 actionState = actionUiState,
                 commentSubject = viewModel.commentSubject,
                 onOpenVideo = openTarget,

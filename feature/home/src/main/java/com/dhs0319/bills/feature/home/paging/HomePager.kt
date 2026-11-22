@@ -1,5 +1,6 @@
 package com.dhs0319.bills.feature.home.paging
 
+import com.dhs0319.bills.core.common.network.isNetworkConnectionFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -18,7 +19,8 @@ data class HomePagingState<T>(
     val hasLoaded: Boolean = false,
     val hasMore: Boolean = true,
     val errorMessage: String? = null,
-    val loadMoreError: String? = null
+    val loadMoreError: String? = null,
+    val connectionFailed: Boolean = false
 )
 
 internal data class HomePage<T, K>(
@@ -93,7 +95,8 @@ internal class HomePager<T, K : Any>(
             isLoadingMore = !refresh,
             isInitialLoading = refresh && (state.value.isInitialLoading || state.value.items.isEmpty()),
             errorMessage = null,
-            loadMoreError = null
+            loadMoreError = null,
+            connectionFailed = false
         ))
         request = scope.launch {
             var acceptedPage = false
@@ -149,8 +152,9 @@ internal class HomePager<T, K : Any>(
                 if (version != generation) return@launch
                 onError(e)
                 val message = e.message?.takeIf { it.isNotBlank() } ?: "加载失败，请重试"
-                publish(if (refresh && (!acceptedPage || keepOldCursor)) state.value.copy(errorMessage = message)
-                    else state.value.copy(loadMoreError = message))
+                val failed = state.value.copy(connectionFailed = e.isNetworkConnectionFailure())
+                publish(if (refresh && (!acceptedPage || keepOldCursor)) failed.copy(errorMessage = message)
+                    else failed.copy(loadMoreError = message))
             } finally {
                 if (version == generation) {
                     // The visible tail is still the old list, so continue paging from its cursor.

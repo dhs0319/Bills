@@ -17,11 +17,13 @@ data class ImUiState(
     val errorMessage: String? = null,
     val loadMoreError: String? = null,
     val actionError: String? = null,
-    val isLoggedIn: Boolean = true
+    val isLoggedIn: Boolean = true,
+    val connectionFailed: Boolean = false
 ) {
     val canLoadMore: Boolean
         get() = paginationParams?.hasMore == true &&
             sessions.isNotEmpty() &&
+            errorMessage == null &&
             !isLoading &&
             !isRefreshing &&
             !isLoadingMore

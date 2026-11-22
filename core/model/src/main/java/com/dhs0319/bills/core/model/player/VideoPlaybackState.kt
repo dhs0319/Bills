@@ -33,5 +33,6 @@ data class VideoPlaybackState(
     val hasRenderedFirstFrame: Boolean = false,
     val seekEventId: Long = 0L,
     val playerError: String? = null,
-    val detailPlaceholder: VideoDetail? = null
+    val detailPlaceholder: VideoDetail? = null,
+    val detailConnectionFailed: Boolean = false
 )

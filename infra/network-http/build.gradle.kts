@@ -36,4 +36,6 @@ dependencies {
 
     implementation(project(":infra:crypto"))
     implementation(project(":infra:protobuf"))
+
+    testImplementation(libs.junit)
 }

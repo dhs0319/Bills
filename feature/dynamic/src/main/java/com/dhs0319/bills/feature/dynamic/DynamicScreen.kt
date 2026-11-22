@@ -24,9 +24,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.materialsymbols.MaterialSymbols
-import com.composables.icons.materialsymbols.outlined.Cloud_off
 import com.composables.icons.materialsymbols.outlined.Dynamic_feed
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
+import com.dhs0319.bills.core.designsystem.component.LoadFailedState
 import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
 import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
@@ -124,12 +124,9 @@ fun DynamicScreen(
                 }
 
                 state.errorMessage != null && state.items.isEmpty() -> {
-                    PageState(
-                        icon = MaterialSymbols.Outlined.Cloud_off,
-                        title = "加载失败",
+                    LoadFailedState(
                         description = state.errorMessage.orEmpty().ifBlank { "加载动态失败" },
-                        actionText = "重新加载",
-                        onAction = viewModel::refresh,
+                        onRetry = viewModel::refresh,
                         modifier = Modifier.padding(bottom = topLevelNavSpace)
                     )
                 }
