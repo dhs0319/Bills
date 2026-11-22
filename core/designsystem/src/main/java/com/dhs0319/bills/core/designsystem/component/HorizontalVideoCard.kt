@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 
+private val HorizontalVideoCardPadding = 8.dp
+
 @Composable
 fun rememberHorizontalVideoCardColumnCount(): Int {
     val configuration = LocalConfiguration.current
@@ -175,7 +177,7 @@ private fun HorizontalVideoCardContent(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(HorizontalVideoCardPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -223,6 +225,17 @@ private fun HorizontalVideoCardContent(
     }
 }
 
+/** Estimates the card height for loading lists that size their placeholders to the viewport. */
+fun horizontalVideoCardSkeletonHeight(
+    cardWidth: Dp,
+    isTablet: Boolean = false,
+    compact: Boolean = false
+): Dp {
+    val coverHeight = horizontalVideoCoverWidth(cardWidth, isTablet, compact) /
+        horizontalVideoCoverAspectRatio(isTablet && !compact)
+    return videoListCardSkeletonHeight(coverHeight, HorizontalVideoCardPadding)
+}
+
 @Composable
 fun HorizontalVideoCardSkeleton(
     modifier: Modifier = Modifier,
@@ -235,7 +248,7 @@ fun HorizontalVideoCardSkeleton(
             modifier = modifier,
             coverWidth = horizontalVideoCoverWidth(cardWidth, isTablet, compact),
             coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet && !compact),
-            contentPadding = 8.dp,
+            contentPadding = HorizontalVideoCardPadding,
             cardShape = MaterialTheme.shapes.medium,
             coverShape = MaterialTheme.shapes.small
         )
@@ -244,7 +257,7 @@ fun HorizontalVideoCardSkeleton(
             VideoListCardSkeleton(
                 coverWidth = horizontalVideoCoverWidth(maxWidth, isTablet, compact),
                 coverAspectRatio = horizontalVideoCoverAspectRatio(isTablet && !compact),
-                contentPadding = 8.dp,
+                contentPadding = HorizontalVideoCardPadding,
                 cardShape = MaterialTheme.shapes.medium,
                 coverShape = MaterialTheme.shapes.small
             )
@@ -253,7 +266,7 @@ fun HorizontalVideoCardSkeleton(
 }
 
 private fun horizontalVideoCoverWidth(cardWidth: Dp, isTablet: Boolean, compact: Boolean): Dp {
-    val available = (cardWidth - 16.dp).coerceAtLeast(0.dp)
+    val available = (cardWidth - HorizontalVideoCardPadding * 2).coerceAtLeast(0.dp)
     return when {
         compact -> (available * 0.4f).coerceAtMost(144.dp)
         isTablet -> available * 0.49f

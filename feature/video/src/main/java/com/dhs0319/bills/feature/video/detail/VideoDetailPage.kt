@@ -129,6 +129,7 @@ import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
 import com.dhs0319.bills.core.designsystem.component.WatchLaterMoreMenu
 import com.dhs0319.bills.core.designsystem.component.copyTextOnLongPress
+import com.dhs0319.bills.core.designsystem.component.horizontalVideoCardSkeletonHeight
 import com.dhs0319.bills.core.designsystem.icon.AppIcons
 import com.dhs0319.bills.core.model.CommentSubject
 import com.dhs0319.bills.core.model.QualityOption
@@ -151,6 +152,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
+import kotlin.math.ceil
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun VideoDetailPage(
@@ -159,6 +161,7 @@ internal fun VideoDetailPage(
     isLandscape: Boolean,
     isExpandedWidth: Boolean,
     detail: VideoDetail?,
+    detailPlaceholder: VideoDetail?,
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
@@ -195,15 +198,15 @@ internal fun VideoDetailPage(
         detail?.season?.takeIf { it.sections.any { section -> section.eps.isNotEmpty() } }
     }
     val hasPlaylist = season != null || (detail?.pages?.size ?: 0) > 1
-    var wasViewingPlaylist by rememberSaveable { mutableStateOf(false) }
-    val showPlaylist = isLandscape && (hasPlaylist || (detailLoading && wasViewingPlaylist))
+    val showPlaylist = isLandscape && hasPlaylist
     val detailTabs = remember(isLandscape, showPlaylist) {
         when {
-            showPlaylist -> listOf("相关视频", "评论", "播放列表")
+            showPlaylist -> listOf("相关视频", "播放列表", "评论")
             isLandscape -> listOf("相关视频", "评论")
             else -> listOf("简介", "评论")
         }
     }
+    val commentsPage = detailTabs.lastIndex
     val pagerState = rememberPagerState(pageCount = { detailTabs.size })
     var pagerAid by rememberSaveable { mutableLongStateOf(ids.aid) }
     if (pagerAid != ids.aid) {
@@ -212,10 +215,6 @@ internal fun VideoDetailPage(
             // Keep the playlist open when choosing another video in landscape.
             if (!isLandscape) pagerState.requestScrollToPage(0)
         }
-    }
-    if (!detailLoading) {
-        val viewingPlaylist = showPlaylist && pagerState.settledPage == 2
-        SideEffect { wasViewingPlaylist = viewingPlaylist }
     }
     val contentHorizontalPad = if (isLandscape || isExpandedWidth) 0.dp else 16.dp
     val relatedCardHorizontalPad = contentHorizontalPad.coerceAtLeast(6.dp)
@@ -236,27 +235,48 @@ internal fun VideoDetailPage(
     }
     val shareUrl = remember(detail, ids) { detail?.let { buildVideoShareUrl(ids) } }
 
-    val detailTabBadges = remember(detail?.stat?.reply) {
-        listOf(
-            null,
-            detail?.stat?.reply
-                ?.takeIf(String::isNotBlank)
-                ?.let { compactCount(it) }
+    val displayedDetail = remember(detail, detailPlaceholder) {
+        if (detail == null || detailPlaceholder == null) return@remember detail
+
+        val owner = detail.owner
+        val previousOwner = detailPlaceholder.owner
+        val displayedOwner = if (
+            owner != null && previousOwner != null && owner.mid > 0L && owner.mid == previousOwner.mid
+        ) {
+            owner.copy(
+                fansText = owner.fansText ?: previousOwner.fansText,
+                arcCountText = owner.arcCountText ?: previousOwner.arcCountText,
+                face = owner.face ?: previousOwner.face
+            )
+        } else {
+            owner
+        }
+        detail.copy(
+            owner = displayedOwner,
+            stat = detail.stat ?: detailPlaceholder.stat,
+            pubTs = detail.pubTs ?: detailPlaceholder.pubTs,
+            desc = detail.desc.ifBlank { detailPlaceholder.desc },
+            tags = detail.tags.ifEmpty { detailPlaceholder.tags }
         )
+    }
+    val replyCount = displayedDetail?.stat?.reply
+    val detailTabBadges = remember(detailTabs, replyCount) {
+        val badge = replyCount?.takeIf(String::isNotBlank)?.let { compactCount(it) }
+        List(detailTabs.size) { page -> if (page == commentsPage) badge else null }
     }
 
     val summary: @Composable (Modifier) -> Unit = { modifier ->
         VideoSummarySection(
             modifier = modifier,
             isLandscape = isLandscape,
-            detail = detail,
+            detail = displayedDetail,
             ids = ids,
             loading = detailLoading,
             error = detailError,
             actionState = actionState,
             infoExpanded = infoExpanded,
             onToggleInfo = { infoExpanded = !infoExpanded },
-            onOpenComments = { scope.launch { pagerState.animateScrollToPage(1) } },
+            onOpenComments = { scope.launch { pagerState.animateScrollToPage(commentsPage) } },
             onOpenSpace = onOpenSpace,
             onDownloadClick = onDownloadClick,
             onToggleLike = onToggleLike,
@@ -324,7 +344,7 @@ internal fun VideoDetailPage(
                 tabTextStyle = MaterialTheme.typography.titleSmall,
                 layout = SlidingTabLayout.Content,
                 onReselect = { page ->
-                    if (page == 2) return@PagerSlidingTabRow
+                    if (page != 0 && page != commentsPage) return@PagerSlidingTabRow
                     tabScrollJob?.cancel()
                     tabScrollJob = scope.launch {
                         if (page == 0) {
@@ -341,6 +361,7 @@ internal fun VideoDetailPage(
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 0,
+                key = { detailTabs[it] },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -366,13 +387,13 @@ internal fun VideoDetailPage(
                                     modifier = itemModifier,
                                     onSwitchPage = onSwitchPage,
                                     onShowPages = onShowPages,
-                                    onShowSeason = { sheet = detail.season?.let { DetailSheet.Season(it, curCid) } }
+                                    onShowSeason = { sheet = detail.season?.let { DetailSheet.Season(it, ids) } }
                                 )
                             }
                         }
                     }
 
-                    1 -> {
+                    commentsPage -> {
                         CommentPanel(
                             subject = commentSubject,
                             isActive = pagerState.currentPage == page,
@@ -390,12 +411,10 @@ internal fun VideoDetailPage(
                         )
                     }
 
-                    2 -> PlaylistPage(
+                    else -> PlaylistPage(
                         detail = detail,
                         season = season,
                         ids = ids,
-                        loading = detailLoading,
-                        error = detailError,
                         loadSeasonPublishTimes = loadSeasonPublishTimes,
                         loadPageCovers = loadPageCovers,
                         onAddToWatchLater = onAddToWatchLater,
@@ -420,8 +439,7 @@ internal fun VideoDetailPage(
                     is DetailSheet.Season -> {
                         SeasonSheetContent(
                             season = activeSheet.season,
-                            curCid = activeSheet.curCid,
-                            aid = ids.aid,
+                            ids = activeSheet.ids,
                             currentPubTs = detail?.pubTs,
                             loadPublishTimes = loadSeasonPublishTimes,
                             onAddToWatchLater = onAddToWatchLater,
@@ -553,24 +571,28 @@ private fun RelatedVideoList(
     val showTwoColumns = isTablet && !isLandscape
     val relates = detail?.relates.orEmpty()
     val relateItemMod = Modifier.padding(horizontal = cardHorizontalPad)
+    val rowSpacing = 6.dp
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val columns = if (showTwoColumns) 2 else 1
         val relateCardWidth = ((maxWidth - cardHorizontalPad * 2 - 6.dp * (columns - 1)) / columns)
             .coerceAtLeast(0.dp)
+        val skeletonRowCount = if (loading && isTablet) {
+            val rowHeight = horizontalVideoCardSkeletonHeight(relateCardWidth, isTablet = true) + rowSpacing
+            // An extra row covers list padding and pixel rounding.
+            (ceil(maxHeight / rowHeight).toInt() + 1).coerceAtLeast(DETAIL_RELATE_SKELETON_ROWS)
+        } else {
+            DETAIL_RELATE_SKELETON_ROWS
+        }
         LazyColumn(
             state = state,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = horizontalPad, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
             header(Modifier.padding(horizontal = horizontalPad))
             if (loading) {
                 items(
-                    count = if (showTwoColumns) {
-                        (DETAIL_RELATE_SKELETON_COUNT + 1) / 2
-                    } else {
-                        DETAIL_RELATE_SKELETON_COUNT
-                    },
+                    count = skeletonRowCount,
                     key = { index -> "detail_loading_relate_$index" },
                     contentType = { "skeleton" }
                 ) {
@@ -665,8 +687,6 @@ private fun PlaylistPage(
     detail: VideoDetail?,
     season: VideoSeason?,
     ids: ResolvedVideoIds,
-    loading: Boolean,
-    error: String?,
     loadSeasonPublishTimes: suspend (Long, Long) -> Map<Long, Long>,
     loadPageCovers: suspend (Long) -> Map<Long, String>,
     onAddToWatchLater: (Long) -> Unit,
@@ -676,16 +696,13 @@ private fun PlaylistPage(
 ) {
     val pages = detail?.pages.orEmpty()
     when {
-        loading -> StateMessageCard(text = "正在加载播放列表")
-        !error.isNullOrBlank() -> StateMessageCard(text = error, isError = true)
         season != null -> Column(Modifier.fillMaxSize()) {
             if (pages.size > 1) {
                 VideoPageSelector(pages, ids.cid, onSwitchPage, onShowPages, Modifier.padding(horizontal = 6.dp))
             }
             SeasonSheetContent(
                 season = season,
-                curCid = ids.cid,
-                aid = ids.aid,
+                ids = ids,
                 currentPubTs = detail?.pubTs,
                 loadPublishTimes = loadSeasonPublishTimes,
                 onAddToWatchLater = onAddToWatchLater,
@@ -762,7 +779,7 @@ private fun VideoSummarySection(
                             },
                             following = actionState.following,
                             followBusy = actionState.followBusy,
-                            onFollowClick = if (isSelf(owner.mid)) null else onFollowClick
+                            onFollowClick = if (loading || isSelf(owner.mid)) null else onFollowClick
                         )
                     }
                     VideoInfoBlock(
@@ -1827,19 +1844,18 @@ private fun DetailEntryRow(
 @Composable
 private fun SeasonSheetContent(
     season: VideoSeason,
-    curCid: Long?,
-    aid: Long,
+    ids: ResolvedVideoIds,
     currentPubTs: Long?,
     loadPublishTimes: suspend (Long, Long) -> Map<Long, Long>,
     onAddToWatchLater: (Long) -> Unit,
     onOpenEpisode: (VideoTarget) -> Unit
 ) {
-    val selectedIndex = remember(season, curCid) { seasonSheetIndex(season, curCid) }
+    val selectedIndex = season.sheetItemIndex(ids)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex ?: 0)
-    var publishTimes by remember(aid, season.id) { mutableStateOf(emptyMap<Long, Long>()) }
-    LaunchedEffect(aid, season.id) {
-        if (aid > 0L && season.id > 0L) {
-            publishTimes = loadPublishTimes(aid, season.id)
+    var publishTimes by remember(season.id) { mutableStateOf(emptyMap<Long, Long>()) }
+    LaunchedEffect(ids.aid, season.id) {
+        if (ids.aid > 0L && season.id > 0L && publishTimes.isEmpty()) {
+            publishTimes = loadPublishTimes(ids.aid, season.id)
         }
     }
 
@@ -1896,14 +1912,15 @@ private fun SeasonSheetContent(
                 key = { "ep_${it.cid}_${it.title}" },
                 contentType = { "episode" }
             ) { ep ->
+                val selected = ep.isCurrent(ids)
                 SeasonEpisodeRow(
                     ep = ep,
                     cardWidth = cardWidth,
-                    selected = ep.cid == curCid,
-                    pubTs = ep.pubTs ?: publishTimes[ep.cid] ?: currentPubTs.takeIf { ep.cid == curCid },
+                    selected = selected,
+                    pubTs = ep.pubTs ?: publishTimes[ep.cid] ?: currentPubTs.takeIf { selected },
                     onAddToWatchLater = onAddToWatchLater,
                     onClick = {
-                        if (ep.cid != curCid) {
+                        if (!selected) {
                             onOpenEpisode(ep.target)
                         }
                     }
@@ -2320,19 +2337,6 @@ private fun seasonEntryText(
     }
 }
 
-private fun seasonSheetIndex(season: VideoSeason, curCid: Long?): Int? {
-    if (curCid == null) return null
-    var secItemIdx = 1
-    season.sections.forEach { sec ->
-        val epIdx = sec.eps.indexOfFirst { it.cid == curCid }
-        if (epIdx >= 0) {
-            return secItemIdx + 1 + epIdx
-        }
-        secItemIdx += 1 + sec.eps.size
-    }
-    return null
-}
-
 private fun buildPageTitle(index: Int, part: String): String {
     return "P${index + 1} $part"
 }
@@ -2398,12 +2402,12 @@ private suspend fun LazyListState.animateContinuouslyToTop() {
 }
 
 private const val COMMENT_SCROLL_TO_TOP_INSTANT_THRESHOLD_VIEWPORTS = 8f
-private const val DETAIL_RELATE_SKELETON_COUNT = 4
+private const val DETAIL_RELATE_SKELETON_ROWS = 4
 private const val SELECTION_PLAYING_TITLE_ICON = "selection_playing"
 private sealed interface DetailSheet {
     data class Season(
         val season: VideoSeason,
-        val curCid: Long?
+        val ids: ResolvedVideoIds
     ) : DetailSheet
 
     data class Page(

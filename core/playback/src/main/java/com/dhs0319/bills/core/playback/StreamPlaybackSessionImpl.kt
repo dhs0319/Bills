@@ -52,8 +52,10 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -97,6 +99,7 @@ class StreamPlaybackSessionImpl @Inject constructor(
     override val downloadSpeedBytesPerSecond: StateFlow<Long> = playerEngine.downloadSpeedBytesPerSecond
     private val prepMu = Mutex()
     private val openId = AtomicLong(0L)
+    private var videoLoadScope: CoroutineScope? = null
     private var lastDiscontinuitySeq = 0L
     private var nextPlayWhenReady = true
     private var currentVideoCdnMode = VideoCdnMode.Backup2
@@ -269,10 +272,11 @@ class StreamPlaybackSessionImpl @Inject constructor(
             val state = vodSession.value
             if (state.waitingForPlay) {
                 val request = state.request ?: return
+                val loadScope = videoLoadScope ?: return
                 val token = openId.get()
                 vodSession.value = state.copy(waitingForPlay = false, isPreparing = true, error = null)
                 refreshVideoState()
-                runtimeScope.launch { loadVideoPlayback(request, token) }
+                loadScope.launch { loadVideoPlayback(request, token) }
                 return
             }
             if (state.playbackSource == null) return
@@ -350,12 +354,20 @@ class StreamPlaybackSessionImpl @Inject constructor(
         }
         val reuseDetail = currentState.takeIf {
             request.ids.aid > 0L && request.ids.cid > 0L &&
-                !it.detailLoading && it.detail != null &&
+                !it.detailLoading && it.detailError == null && it.detail != null &&
                 (currentVideoTarget == target ||
                     currentVideoTarget is VideoTarget.Ugc &&
                     target is VideoTarget.Ugc &&
-                    currentVideoTarget.aid > 0L &&
-                    currentVideoTarget.aid == target.aid)
+                    it.ids.aid == request.ids.aid)
+        }
+        val season = currentState.detail?.season?.takeIf { season ->
+            reuseDetail == null && season.containsEntry(target)
+        }
+        val detail = reuseDetail?.detail ?: target.previewDetail(season)
+        val detailPlaceholder = when {
+            season == null || currentState.detailError != null -> null
+            currentState.detailLoading -> currentState.detailPlaceholder
+            else -> currentState.detail
         }
 
         val token = openId.incrementAndGet()
@@ -372,10 +384,11 @@ class StreamPlaybackSessionImpl @Inject constructor(
                 seasonId = request.ids.seasonId,
                 bvid = request.ids.bvid
             ),
-            detail = reuseDetail?.detail ?: target.previewDetail(),
+            detail = detail,
             detailLoading = reuseDetail == null,
             waitingForPlay = !shouldAutoPlay,
-            isPreparing = shouldAutoPlay
+            isPreparing = shouldAutoPlay,
+            detailPlaceholder = detailPlaceholder
         )
         finishVideoPlayback(
             invalidateOpen = false,
@@ -387,19 +400,22 @@ class StreamPlaybackSessionImpl @Inject constructor(
         if (openId.get() != token) return
         nextPlayWhenReady = shouldAutoPlay
 
+        val loadScope = videoLoadScope ?: return
         if (reuseDetail == null) {
-            runtimeScope.launch { loadVideoDetail(request, token) }
+            loadScope.launch { loadVideoDetail(request, token) }
         }
         if (shouldAutoPlay) {
-            loadVideoPlayback(request, token)
+            loadScope.launch { loadVideoPlayback(request, token) }.join()
         }
     }
 
     private suspend fun loadVideoDetail(request: PlaybackRequest, token: Long) {
         try {
-            val detailResult = withContext(Dispatchers.IO) {
-                detailRepository.fetchVideoDetail(ids = request.ids, src = request.playable.src)
-            }
+            val detailResult = detailRepository.fetchVideoDetail(
+                ids = request.ids,
+                src = request.playable.src,
+                cancelWithCaller = true
+            )
             if (openId.get() != token) return
             applyDetailResult(detailResult)
         } catch (t: Throwable) {
@@ -407,7 +423,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
             if (openId.get() != token) return
             vodSession.value = vodSession.value.copy(
                 detailLoading = false,
-                detailError = t.message ?: "加载视频详情失败"
+                detailError = t.message ?: "加载视频详情失败",
+                detailPlaceholder = null
             )
             refreshVideoState()
         }
@@ -476,6 +493,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
             if (t is CancellationException) {
                 if (openId.get() == token && vodSession.value.playbackSource == null) {
                     openId.incrementAndGet()
+                    videoLoadScope?.cancel()
+                    videoLoadScope = null
                     nextPlayWhenReady = true
                     _currentTarget.value = null
                     vodSession.value = PlayerSessionState(biz = PlayBiz.UGC)
@@ -524,6 +543,10 @@ class StreamPlaybackSessionImpl @Inject constructor(
         val hasEngineMedia = playerEngine.currentSource.value != null ||
             player.value?.currentMediaItem != null
         if (invalidateOpen) openId.incrementAndGet()
+        videoLoadScope?.cancel()
+        videoLoadScope = nextState?.let {
+            CoroutineScope(runtimeScope.coroutineContext + SupervisorJob(runtimeScope.coroutineContext[Job]))
+        }
         _currentTarget.value = nextTarget?.let { StreamPlaybackTarget.Video(it) }
         nextPlayWhenReady = true
         vodSession.value = nextState ?: PlayerSessionState(biz = PlayBiz.UGC)
@@ -581,17 +604,22 @@ class StreamPlaybackSessionImpl @Inject constructor(
         return currentPlaybackProgress().positionMs
     }
 
-    private fun applyDetailResult(detailResult: com.dhs0319.bills.core.model.VideoDetailResult) {
-        vodSession.value = vodSession.value.copy(
+    private fun applyDetailResult(detailResult: VideoDetailResult) {
+        val state = vodSession.value
+        val detail = detailResult.detail
+        val season = detail.season?.takeIf { season -> season.sections.any { it.eps.isNotEmpty() } }
+        vodSession.value = state.copy(
             biz = detailResult.biz,
             ids = detailResult.ids,
-            detail = detailResult.detail.copy(
-                cover = vodSession.value.request?.playable?.src?.coverHint?.takeIf(String::isNotBlank)
-                    ?: detailResult.detail.cover?.takeIf(String::isNotBlank)
-                    ?: vodSession.value.detail?.cover
+            detail = detail.copy(
+                cover = state.request?.playable?.src?.coverHint?.takeIf(String::isNotBlank)
+                    ?: detail.cover?.takeIf(String::isNotBlank)
+                    ?: state.detail?.cover,
+                season = season ?: state.detail?.season
             ),
             detailLoading = false,
-            detailError = null
+            detailError = null,
+            detailPlaceholder = null
         )
         vodSession.value.toMediaMetadata()?.let(playerEngine::setMediaMetadata)
         refreshVideoState()
@@ -831,7 +859,8 @@ class StreamPlaybackSessionImpl @Inject constructor(
             audioDecoderName = state.audioDecoderName,
             hasRenderedFirstFrame = state.firstFrameSeq > 0L,
             seekEventId = if (isNewSeekEvent) prev.seekEventId + 1L else prev.seekEventId,
-            playerError = state.errorMessage
+            playerError = state.errorMessage,
+            detailPlaceholder = detailPlaceholder
         )
     }
 

@@ -37,6 +37,17 @@ fun SkeletonBlock(
     Box(modifier = modifier.background(color = blockColor, shape = shape))
 }
 
+private val VideoListSkeletonTitleHeight = 18.dp
+private val VideoListSkeletonMetadataHeight = 12.dp
+private val VideoListSkeletonTitleBottomSpacer = 2.dp
+private val VideoListSkeletonTextSpacing = 8.dp
+
+internal fun videoListCardSkeletonHeight(coverHeight: Dp, contentPadding: Dp): Dp {
+    val textHeight = VideoListSkeletonTitleHeight * 2 + VideoListSkeletonMetadataHeight +
+        VideoListSkeletonTitleBottomSpacer + VideoListSkeletonTextSpacing * 3
+    return maxOf(coverHeight, textHeight) + contentPadding * 2
+}
+
 @Composable
 fun VideoListCardSkeleton(
     modifier: Modifier = Modifier,
@@ -64,32 +75,32 @@ fun VideoListCardSkeleton(
         )
         Column(
             modifier = Modifier.weight(if (coverWidth == null) 0.62f else 1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(VideoListSkeletonTextSpacing)
         ) {
             SkeletonBlock(
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
-                    .height(18.dp),
+                    .height(VideoListSkeletonTitleHeight),
                 shape = MaterialTheme.shapes.extraSmall
             )
             SkeletonBlock(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
-                    .height(18.dp),
+                    .height(VideoListSkeletonTitleHeight),
                 shape = MaterialTheme.shapes.extraSmall
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(VideoListSkeletonTitleBottomSpacer))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SkeletonBlock(
                     modifier = Modifier
                         .width(72.dp)
-                        .height(12.dp),
+                        .height(VideoListSkeletonMetadataHeight),
                     shape = MaterialTheme.shapes.extraSmall
                 )
                 SkeletonBlock(
                     modifier = Modifier
                         .width(58.dp)
-                        .height(12.dp),
+                        .height(VideoListSkeletonMetadataHeight),
                     shape = MaterialTheme.shapes.extraSmall
                 )
             }
