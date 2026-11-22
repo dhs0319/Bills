@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -761,7 +762,8 @@ private fun TopLevelSideNavigation(
     }
     Surface(
         modifier = Modifier
-            .width(80.dp + startSafeInset)
+            .widthIn(min = 100.dp + startSafeInset)
+            .width(IntrinsicSize.Max)
             .fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface
@@ -774,7 +776,7 @@ private fun TopLevelSideNavigation(
                         WindowInsetsSides.Start + WindowInsetsSides.Top
                     )
                 )
-                .padding(horizontal = 6.dp, vertical = 8.dp),
+                .padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             IconButton(onClick = { onTabChange(TopLevelRoute.PROFILE) }) {
@@ -788,7 +790,8 @@ private fun TopLevelSideNavigation(
                 Icon(
                     imageVector = MaterialSymbols.OutlinedFilled.Search,
                     contentDescription = "搜索",
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Column(
@@ -801,24 +804,64 @@ private fun TopLevelSideNavigation(
                         enabled = menuCanScroll
                     )
                     .selectableGroup(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
+                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
             ) {
                 TopLevelRoute.entries.forEach { tab ->
-                    TopLevelNavigationItem(
+                    TopLevelSideNavigationItem(
                         tab = tab,
                         selected = currentTab == tab,
-                        messageUnreadBadge = if (tab == TopLevelRoute.MESSAGE) {
-                            messageUnreadBadge
-                        } else {
-                            ImUnreadBadge.None
-                        },
-                        onClick = { onTabChange(tab) },
-                        modifier = Modifier.fillMaxWidth()
+                        messageUnreadBadge = messageUnreadBadge,
+                        onClick = { onTabChange(tab) }
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TopLevelSideNavigationItem(
+    tab: TopLevelRoute,
+    selected: Boolean,
+    messageUnreadBadge: ImUnreadBadge,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val contentColor = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant
+    val indicatorAlpha = animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(durationMillis = topLevelNavAnimationDurationMillis),
+        label = "side menu selection"
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(MaterialTheme.shapes.large)
+            .drawBehind {
+                drawRect(color = colors.secondaryContainer, alpha = indicatorAlpha.value)
+            }
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TopLevelNavigationIcon(
+            tab = tab,
+            selected = selected,
+            messageUnreadBadge = messageUnreadBadge,
+            modifier = Modifier.size(24.dp),
+            contentDescription = null,
+            tint = contentColor
+        )
+        Text(
+            text = tab.label,
+            color = contentColor,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
