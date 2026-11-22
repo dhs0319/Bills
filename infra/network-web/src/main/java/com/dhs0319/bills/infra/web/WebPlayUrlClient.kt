@@ -3,6 +3,7 @@ package com.dhs0319.bills.infra.web
 import com.dhs0319.bills.core.common.BiliConstants
 import com.dhs0319.bills.core.common.UserAgentBuilder
 import com.dhs0319.bills.infra.crypto.WbiSigner
+import com.dhs0319.bills.infra.network.executeCancellable
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +77,7 @@ class WebPlayUrlClient @Inject constructor(
         }
     }
 
-    private fun getBuvid3(): String {
+    private suspend fun getBuvid3(): String {
         buvid3.takeIf(String::isNotBlank)?.let { return it }
         val request = Request.Builder()
             .url("${BiliConstants.BASE_URL_API}$GET_BUVID_ENDPOINT")
@@ -95,7 +96,7 @@ class WebPlayUrlClient @Inject constructor(
         return value
     }
 
-    private fun getWbiKeys(): WbiKeys {
+    private suspend fun getWbiKeys(): WbiKeys {
         wbiKeys?.let { return it }
         val request = Request.Builder()
             .url("${BiliConstants.BASE_URL_API}$NAV_ENDPOINT")
@@ -115,11 +116,11 @@ class WebPlayUrlClient @Inject constructor(
         return keys
     }
 
-    private fun executeJson(request: Request): JSONObject {
-        return okHttpClient.newCall(request).execute().use { response ->
-            val body = response.body?.string() ?: error("empty response")
-            JSONObject(body)
+    private suspend fun executeJson(request: Request): JSONObject {
+        val body = okHttpClient.newCall(request).executeCancellable { response ->
+            response.body?.string() ?: error("empty response")
         }
+        return JSONObject(body)
     }
 
     private fun ensureSuccess(json: JSONObject, api: String) {

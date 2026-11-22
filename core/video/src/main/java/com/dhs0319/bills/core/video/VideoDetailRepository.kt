@@ -42,9 +42,13 @@ import com.dhs0319.bills.core.model.toUgcTarget
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 @Singleton
@@ -55,28 +59,77 @@ class VideoDetailRepository @Inject constructor(
 ) {
     private val seasonPublishTimes = LruCache<Long, Map<Long, Long>>(8)
     private val webVideoMetadata = LruCache<Long, WebVideoMetadata>(8)
-    private val webVideoMetadataMutex = Mutex()
+    private val webMetadataScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val webMetadataLock = Any()
+    private val pendingWebMetadata = mutableMapOf<Long, Deferred<WebVideoMetadata>>()
+    private val pendingSeasonAids = mutableMapOf<Long, Long>()
+    @Volatile
+    private var cachedUgcSeason: CachedUgcSeason? = null
 
     // The gRPC season list only includes a shortened date. Load exact timestamps once per season.
     suspend fun fetchSeasonPublishTimes(aid: Long, seasonId: Long): Map<Long, Long> {
         if (aid <= 0L || seasonId <= 0L) return emptyMap()
         seasonPublishTimes.get(seasonId)?.let { return it }
-        return webVideoMetadataMutex.withLock {
-            seasonPublishTimes.get(seasonId)?.let { return@withLock it }
-            val metadata = fetchWebVideoMetadata(aid)
-            if (metadata.seasonId == seasonId) metadata.seasonPublishTimes else emptyMap()
+        val (requestAid, request) = synchronized(webMetadataLock) {
+            seasonPublishTimes.get(seasonId)?.let { return it }
+            val sharedAid = pendingSeasonAids[seasonId] ?: aid
+            if (sharedAid == aid) {
+                webVideoMetadata.get(aid)?.let { return it.publishTimesFor(seasonId) }
+            }
+            pendingSeasonAids[seasonId] = sharedAid
+            sharedAid to startWebMetadataRequest(sharedAid)
+        }
+        if (requestAid == aid) return request.await().publishTimesFor(seasonId)
+
+        val timestamps = try {
+            request.await().publishTimesFor(seasonId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            emptyMap()
+        }
+        return timestamps.ifEmpty {
+            loadWebVideoMetadata(aid, seasonId).publishTimesFor(seasonId)
         }
     }
 
     suspend fun fetchPageCovers(aid: Long): Map<Long, String> {
         if (aid <= 0L) return emptyMap()
-        webVideoMetadata.get(aid)?.let { return it.pageCovers }
-        return webVideoMetadataMutex.withLock { fetchWebVideoMetadata(aid).pageCovers }
+        return loadWebVideoMetadata(aid).pageCovers
     }
 
-    // Called under the mutex so opening either list can reuse the same batched response.
-    private suspend fun fetchWebVideoMetadata(aid: Long): WebVideoMetadata {
+    private suspend fun loadWebVideoMetadata(aid: Long, seasonId: Long? = null): WebVideoMetadata {
         webVideoMetadata.get(aid)?.let { return it }
+        val request = synchronized(webMetadataLock) {
+            webVideoMetadata.get(aid)?.let { return it }
+            if (seasonId != null && seasonId !in pendingSeasonAids) {
+                pendingSeasonAids[seasonId] = aid
+            }
+            startWebMetadataRequest(aid)
+        }
+        return request.await()
+    }
+
+    // The caller holds webMetadataLock. The repository owns the request so callers can change
+    // episodes without interrupting a load shared with the next episode.
+    private fun startWebMetadataRequest(aid: Long): Deferred<WebVideoMetadata> {
+        val request = pendingWebMetadata.getOrPut(aid) {
+            webMetadataScope.async(start = CoroutineStart.LAZY) {
+                try {
+                    fetchWebVideoMetadata(aid)
+                } finally {
+                    synchronized(webMetadataLock) {
+                        pendingWebMetadata.remove(aid)
+                        pendingSeasonAids.values.removeAll { it == aid }
+                    }
+                }
+            }
+        }
+        request.start()
+        return request
+    }
+
+    private suspend fun fetchWebVideoMetadata(aid: Long): WebVideoMetadata {
         val json = restClient.getSigned(
             url = "${BiliConstants.BASE_URL_API}/x/web-interface/view",
             params = mapOf("aid" to aid.toString())
@@ -122,22 +175,32 @@ class VideoDetailRepository @Inject constructor(
                 pageCovers = pageCovers
             )
         }
-        webVideoMetadata.put(aid, metadata)
-        if (metadata.seasonId > 0L && metadata.seasonPublishTimes.isNotEmpty()) {
-            seasonPublishTimes.put(metadata.seasonId, metadata.seasonPublishTimes)
+        return synchronized(webMetadataLock) {
+            val existingTimes = seasonPublishTimes.get(metadata.seasonId)
+            val result = if (existingTimes != null) {
+                metadata.copy(seasonPublishTimes = existingTimes)
+            } else {
+                if (metadata.seasonId > 0L && metadata.seasonPublishTimes.isNotEmpty()) {
+                    seasonPublishTimes.put(metadata.seasonId, metadata.seasonPublishTimes)
+                }
+                metadata
+            }
+            webVideoMetadata.put(aid, result)
+            result
         }
-        return metadata
     }
 
     suspend fun fetchVideoDetail(
         ids: VideoRequestIds,
-        src: VideoSrc
+        src: VideoSrc,
+        cancelWithCaller: Boolean = false
     ): VideoDetailResult {
         val reply = withContext(Dispatchers.IO) {
             grpcClient.call(
                 endpoint = ENDPOINT,
                 requestBytes = buildRequest(ids, src).toByteArray(),
-                parser = ViewReply.parser()
+                parser = ViewReply.parser(),
+                cancelWithCaller = cancelWithCaller
             )
         }
         return withContext(Dispatchers.Default) {
@@ -191,6 +254,7 @@ class VideoDetailRepository @Inject constructor(
     ): VideoDetailResult {
         val ids = resolveIds(requestIds, reply)
         val biz = resolveBiz(requestIds, reply)
+        val owner = mapOwner(reply)
         var title = reply.arc.title
         var pubTs: Long? = null
         var desc = ""
@@ -229,7 +293,7 @@ class VideoDetailRepository @Inject constructor(
                     }
 
                     Module.DataCase.UGC_SEASON -> {
-                        season = mapSeason(mod.ugcSeason)
+                        season = mapSeason(mod.ugcSeason, owner)
                     }
 
                     Module.DataCase.SECTION_DATA -> {
@@ -249,7 +313,7 @@ class VideoDetailRepository @Inject constructor(
             detail = VideoDetail(
                 title = title.ifBlank { "视频详情" },
                 cover = reply.arc.cover.httpsImageUrl().ifBlank { null },
-                owner = mapOwner(reply),
+                owner = owner,
                 stat = mapStat(reply.arc.stat),
                 pubTs = pubTs,
                 tags = tags.distinct(),
@@ -303,26 +367,49 @@ class VideoDetailRepository @Inject constructor(
         )
     }
 
-    private fun mapSeason(season: UgcSeasons): VideoSeason? {
+    private fun mapSeason(season: UgcSeasons, owner: VideoOwner?): VideoSeason? {
         val title = season.title.ifBlank { season.seasonTitle }.ifBlank { return null }
+        val subTitle = season.supernatantTitle.ifBlank { season.unionTitle }.ifBlank { null }
+        val cached = cachedUgcSeason?.takeIf {
+            it.detail.id == season.id && it.detail.title == title && it.detail.subTitle == subTitle
+        }
+        if (cached != null &&
+            cached.owner?.mid == owner?.mid &&
+            cached.owner?.name == owner?.name &&
+            cached.owner?.face == owner?.face &&
+            cached.source.sectionList == season.sectionList
+        ) {
+            return cached.detail
+        }
+
+        val src = VideoTargetTool.relate()
         val sections = season.sectionList.mapNotNull { sec ->
             val eps = sec.episodesList.mapNotNull { ep ->
                 val epTitle = ep.title.ifBlank { return@mapNotNull null }
+                val cover = ep.cover.httpsImageUrl().ifBlank { null }
+                val authorMid = ep.author.mid.takeIf { it > 0L }
+                val authorName = ep.author.name.takeIf(String::isNotBlank)
+                val sharedOwner = owner?.takeIf {
+                    if (authorMid != null) it.mid == authorMid else authorName == null || it.name == authorName
+                }
                 val ids = ResolvedVideoIds(
                     aid = ep.aid,
                     cid = ep.cid
                 )
                 VideoSeasonEpisode(
                     target = ids.toUgcTarget(
-                        VideoTargetTool.relate().copy(
+                        src.copy(
                             titleHint = epTitle,
-                            coverHint = ep.cover.httpsImageUrl().ifBlank { null }
+                            ownerNameHint = sharedOwner?.name ?: authorName,
+                            ownerMidHint = authorMid ?: sharedOwner?.mid?.takeIf { it > 0L },
+                            coverHint = cover,
+                            ownerFaceHint = sharedOwner?.face
                         )
                     ),
                     cid = ids.cid,
                     title = epTitle,
                     subTitle = ep.coverRightText.ifBlank { null },
-                    cover = ep.cover.httpsImageUrl().ifBlank { null },
+                    cover = cover,
                     publishTimeText = ep.coverRightText.ifBlank { null },
                     durationText = ep.duration.takeIf { it > 0L }
                         ?.let(::formatDur)
@@ -340,12 +427,14 @@ class VideoDetailRepository @Inject constructor(
                 )
             }
         }
-        return VideoSeason(
+        val detail = cached?.detail?.takeIf { it.sections == sections } ?: VideoSeason(
             title = title,
-            subTitle = season.supernatantTitle.ifBlank { season.unionTitle }.ifBlank { null },
+            subTitle = subTitle,
             sections = sections,
             id = season.id
         )
+        cachedUgcSeason = CachedUgcSeason(season, owner, detail)
+        return detail
     }
 
     private fun mapSectionDataSeason(section: com.bapis.bilibili.app.viewunite.common.SectionData): VideoSeason? {
@@ -609,6 +698,15 @@ class VideoDetailRepository @Inject constructor(
         val seasonId: Long,
         val seasonPublishTimes: Map<Long, Long>,
         val pageCovers: Map<Long, String>
+    ) {
+        fun publishTimesFor(seasonId: Long): Map<Long, Long> =
+            if (this.seasonId == seasonId) seasonPublishTimes else emptyMap()
+    }
+
+    private data class CachedUgcSeason(
+        val source: UgcSeasons,
+        val owner: VideoOwner?,
+        val detail: VideoSeason
     )
 
     private data class SupplementIds(

@@ -42,6 +42,7 @@ private const val VIDEO_TITLE_HINT_ARG = "titleHint"
 private const val VIDEO_OWNER_NAME_HINT_ARG = "ownerNameHint"
 private const val VIDEO_OWNER_MID_HINT_ARG = "ownerMidHint"
 private const val VIDEO_COVER_HINT_ARG = "coverHint"
+private const val VIDEO_OWNER_FACE_HINT_ARG = "ownerFaceHint"
 private const val VIDEO_RESUME_POSITION_ARG = "resumePositionMs"
 private const val VIDEO_RESUME_UPDATED_AT_ARG = "resumeUpdatedAtSec"
 
@@ -61,6 +62,7 @@ private const val VIDEO_ROUTE_PATTERN =
         "&$VIDEO_OWNER_NAME_HINT_ARG={$VIDEO_OWNER_NAME_HINT_ARG}" +
         "&$VIDEO_OWNER_MID_HINT_ARG={$VIDEO_OWNER_MID_HINT_ARG}" +
         "&$VIDEO_COVER_HINT_ARG={$VIDEO_COVER_HINT_ARG}" +
+        "&$VIDEO_OWNER_FACE_HINT_ARG={$VIDEO_OWNER_FACE_HINT_ARG}" +
         "&$VIDEO_RESUME_POSITION_ARG={$VIDEO_RESUME_POSITION_ARG}" +
         "&$VIDEO_RESUME_UPDATED_AT_ARG={$VIDEO_RESUME_UPDATED_AT_ARG}"
 
@@ -154,6 +156,7 @@ private val videoNavArguments = listOf(
     navArgument(VIDEO_OWNER_NAME_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
     navArgument(VIDEO_OWNER_MID_HINT_ARG) { type = NavType.LongType; defaultValue = -1L },
     navArgument(VIDEO_COVER_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
+    navArgument(VIDEO_OWNER_FACE_HINT_ARG) { type = NavType.StringType; defaultValue = "" },
     navArgument(VIDEO_RESUME_POSITION_ARG) { type = NavType.LongType; defaultValue = -1L },
     navArgument(VIDEO_RESUME_UPDATED_AT_ARG) { type = NavType.LongType; defaultValue = 0L },
 )
@@ -179,6 +182,7 @@ private fun VideoTarget.toRoute(): String {
         "&$VIDEO_OWNER_NAME_HINT_ARG=${src.ownerNameHint.orEmpty().encode()}" +
         "&$VIDEO_OWNER_MID_HINT_ARG=${src.ownerMidHint ?: -1L}" +
         "&$VIDEO_COVER_HINT_ARG=${src.coverHint.orEmpty().encode()}" +
+        "&$VIDEO_OWNER_FACE_HINT_ARG=${src.ownerFaceHint.orEmpty().encode()}" +
         "&$VIDEO_RESUME_POSITION_ARG=${resumePosition?.positionMs ?: -1L}" +
         "&$VIDEO_RESUME_UPDATED_AT_ARG=${resumePosition?.updatedAtSec ?: 0L}"
 }
@@ -204,6 +208,7 @@ private fun NavBackStackEntry.toVideoTarget(): VideoTarget {
         ownerNameHint = args.getString(VIDEO_OWNER_NAME_HINT_ARG).orEmpty().ifBlank { null },
         ownerMidHint = args.getLong(VIDEO_OWNER_MID_HINT_ARG).takeIf { it > 0L },
         coverHint = args.getString(VIDEO_COVER_HINT_ARG).orEmpty().ifBlank { null },
+        ownerFaceHint = args.getString(VIDEO_OWNER_FACE_HINT_ARG).orEmpty().ifBlank { null },
     )
     val aid = args.getLong(VIDEO_AID_ARG)
     val cid = args.getLong(VIDEO_CID_ARG)

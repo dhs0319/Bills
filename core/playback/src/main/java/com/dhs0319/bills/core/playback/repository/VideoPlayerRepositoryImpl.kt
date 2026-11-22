@@ -48,7 +48,8 @@ class VideoPlayerRepositoryImpl @Inject constructor(
             grpcClient.call(
                 endpoint = ENDPOINT,
                 requestBytes = req.toByteArray(),
-                parser = PlayViewUniteReply.parser()
+                parser = PlayViewUniteReply.parser(),
+                cancelWithCaller = true
             )
         }
         return withContext(Dispatchers.Default) { mapReply(request, reply) }

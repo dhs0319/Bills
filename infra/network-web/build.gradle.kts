@@ -23,6 +23,7 @@ android {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":infra:crypto"))
+    implementation(project(":infra:network-http"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

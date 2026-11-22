@@ -44,11 +44,11 @@ data class VideoResumePosition(
     val updatedAtSec: Long
 )
 
-fun VideoTarget.previewDetail(): VideoDetail? {
+fun VideoTarget.previewDetail(season: VideoSeason? = null): VideoDetail? {
     val title = src.titleHint?.takeIf(String::isNotBlank)
     val ownerName = src.ownerNameHint?.takeIf(String::isNotBlank)
     val cover = src.coverHint?.takeIf(String::isNotBlank)
-    if (title == null && ownerName == null && cover == null) return null
+    if (title == null && ownerName == null && cover == null && season == null) return null
     return VideoDetail(
         title = title ?: "视频详情",
         cover = cover,
@@ -58,9 +58,10 @@ fun VideoTarget.previewDetail(): VideoDetail? {
                 name = name,
                 fansText = null,
                 arcCountText = null,
-                face = null
+                face = src.ownerFaceHint?.takeIf(String::isNotBlank)
             )
-        }
+        },
+        season = season
     )
 }
 
@@ -144,7 +145,8 @@ data class VideoSrc(
     val titleHint: String? = null,
     val ownerNameHint: String? = null,
     val ownerMidHint: Long? = null,
-    val coverHint: String? = null
+    val coverHint: String? = null,
+    val ownerFaceHint: String? = null
 )
 
 object VideoTargetTool {

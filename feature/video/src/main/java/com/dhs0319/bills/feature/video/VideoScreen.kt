@@ -202,6 +202,7 @@ fun VideoScreen(
                 isLandscape = isLandscape,
                 isExpandedWidth = isExpandedWidth,
                 detail = videoState.detail,
+                detailPlaceholder = videoState.detailPlaceholder,
                 ids = videoState.ids,
                 detailLoading = videoState.detailLoading,
                 detailError = videoState.detailError,
