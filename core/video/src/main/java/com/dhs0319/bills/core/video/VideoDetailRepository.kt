@@ -287,7 +287,10 @@ class VideoDetailRepository @Inject constructor(
                             val name = staff.name.ifBlank { return@mapNotNull null }
                             VideoStaff(
                                 role = staff.title.ifBlank { "成员" },
-                                name = name
+                                name = name,
+                                mid = staff.mid,
+                                face = staff.face.httpsImageUrl().ifBlank { null },
+                                isFollowing = staff.attention > 0
                             )
                         }
                     }
@@ -318,7 +321,7 @@ class VideoDetailRepository @Inject constructor(
                 pubTs = pubTs,
                 tags = tags.distinct(),
                 desc = desc,
-                staffs = staffs,
+                staffs = mapTeam(staffs, owner),
                 season = season,
                 pages = parsePages(reply),
                 relates = relates,
@@ -330,6 +333,27 @@ class VideoDetailRepository @Inject constructor(
             ids = ids,
             biz = biz
         )
+    }
+
+    private fun mapTeam(staffs: List<VideoStaff>, owner: VideoOwner?): List<VideoStaff> {
+        if (staffs.isEmpty()) return emptyList()
+        val members = staffs.distinctBy { if (it.mid > 0L) it.mid else it.name to it.role }
+        if (owner == null) return members
+        val (ownerEntries, collaborators) = members.partition {
+            if (it.mid > 0L && owner.mid > 0L) it.mid == owner.mid else it.name == owner.name
+        }
+        if (collaborators.isEmpty()) return emptyList()
+
+        val ownerEntry = ownerEntries.firstOrNull()
+        val uploader = VideoStaff(
+            role = "UP主",
+            name = owner.name,
+            mid = owner.mid.takeIf { it > 0L } ?: ownerEntry?.mid ?: 0L,
+            face = owner.face ?: ownerEntry?.face,
+            isFollowing = owner.isFollowing,
+            isFollowedBy = owner.isFollowedBy
+        )
+        return listOf(uploader) + collaborators
     }
 
     private fun mapOwner(reply: ViewReply): VideoOwner? {

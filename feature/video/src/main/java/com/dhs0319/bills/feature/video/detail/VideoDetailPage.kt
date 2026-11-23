@@ -71,6 +71,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -98,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Add
 import com.composables.icons.materialsymbols.outlined.Chat_bubble
 import com.composables.icons.materialsymbols.outlined.Chevron_right
 import com.composables.icons.materialsymbols.outlined.Download
@@ -143,6 +145,7 @@ import com.dhs0319.bills.core.model.VideoRelate
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.VideoSeason
 import com.dhs0319.bills.core.model.VideoSeasonEpisode
+import com.dhs0319.bills.core.model.VideoStaff
 import com.dhs0319.bills.core.model.VideoStat
 import com.dhs0319.bills.feature.comment.CommentPanel
 import com.dhs0319.bills.feature.video.formatDuration
@@ -176,7 +179,7 @@ internal fun VideoDetailPage(
     onDownloadClick: () -> Unit,
     onToggleLike: () -> Unit,
     onToggleDislike: () -> Unit,
-    onToggleFollow: () -> Unit,
+    onToggleFollow: (Long) -> Unit,
     isSelf: (Long) -> Boolean,
     isLoggedIn: () -> Boolean,
     onSubmitCoins: (Int, () -> Unit) -> Unit,
@@ -185,7 +188,8 @@ internal fun VideoDetailPage(
     onOpenEpisode: (VideoTarget) -> Unit,
     onSwitchPage: (Long) -> Unit
 ) {
-    val aidKey = ids.aid.takeIf { it > 0L }
+    val aid = ids.aid
+    val aidKey = aid.takeIf { it > 0L }
     val curCid = ids.cid.takeIf { it > 0L }
     var infoExpanded by key(aidKey) { rememberSaveable { mutableStateOf(false) } }
     var sheet by remember(aidKey) { mutableStateOf<DetailSheet?>(null) }
@@ -229,7 +233,8 @@ internal fun VideoDetailPage(
     var originalFavoriteFolderIds by remember(aidKey) { mutableStateOf(emptySet<Long>()) }
     var selectedFavoriteFolderIds by remember(aidKey) { mutableStateOf(emptySet<Long>()) }
     var shareSheetVisible by remember(aidKey) { mutableStateOf(false) }
-    var unfollowConfirmVisible by remember(aidKey) { mutableStateOf(false) }
+    var teamSheetVisible by remember(aidKey) { mutableStateOf(false) }
+    var unfollowMid by remember(aidKey) { mutableStateOf<Long?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = remember(context) {
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -265,6 +270,23 @@ internal fun VideoDetailPage(
         val badge = replyCount?.takeIf(String::isNotBlank)?.let { compactCount(it) }
         List(detailTabs.size) { page -> if (page == commentsPage) badge else null }
     }
+    val latestActionState by rememberUpdatedState(actionState)
+    val onFollowClick: (Long) -> Unit = { mid ->
+        val actions = latestActionState
+        if (!isLoggedIn()) {
+            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+        } else if (actions.aid == aid) {
+            if (actions.followingByMid[mid] == true) {
+                unfollowMid = mid
+            } else {
+                onToggleFollow(mid)
+            }
+        }
+    }
+    val onOpenTeamMember: (VideoStaff) -> Unit = { member ->
+        teamSheetVisible = false
+        onOpenSpace(SpaceRoute(mid = member.mid, name = member.name, fromViewAid = aidKey))
+    }
 
     val summary: @Composable (Modifier) -> Unit = { modifier ->
         VideoSummarySection(
@@ -280,18 +302,12 @@ internal fun VideoDetailPage(
             onToggleInfo = { infoExpanded = !infoExpanded },
             onOpenComments = { scope.launch { pagerState.animateScrollToPage(commentsPage) } },
             onOpenSpace = onOpenSpace,
+            onOpenTeam = { teamSheetVisible = true },
+            onOpenTeamMember = onOpenTeamMember,
             onDownloadClick = onDownloadClick,
             onToggleLike = onToggleLike,
             onToggleDislike = onToggleDislike,
-            onFollowClick = {
-                if (!isLoggedIn()) {
-                    Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                } else if (actionState.following) {
-                    unfollowConfirmVisible = true
-                } else {
-                    onToggleFollow()
-                }
-            },
+            onFollowClick = onFollowClick,
             isSelf = isSelf,
             onOpenCoinPicker = {
                 if (!isLoggedIn()) {
@@ -535,21 +551,34 @@ internal fun VideoDetailPage(
         )
     }
 
-    if (unfollowConfirmVisible) {
+    val team = displayedDetail?.staffs.orEmpty()
+    if (teamSheetVisible && team.isNotEmpty()) {
+        VideoTeamSheet(
+            members = team,
+            followingByMid = actionState.followingByMid,
+            followBusyMids = actionState.followBusyMids,
+            isSelf = isSelf,
+            onOpenMember = onOpenTeamMember,
+            onFollowClick = onFollowClick,
+            onDismiss = { teamSheetVisible = false }
+        )
+    }
+
+    unfollowMid?.let { mid ->
         AlertDialog(
-            onDismissRequest = { unfollowConfirmVisible = false },
+            onDismissRequest = { unfollowMid = null },
             title = { Text("取消关注") },
             text = { Text("确定要取消关注TA吗？") },
             dismissButton = {
-                TextButton(onClick = { unfollowConfirmVisible = false }) {
+                TextButton(onClick = { unfollowMid = null }) {
                     Text("取消")
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        unfollowConfirmVisible = false
-                        onToggleFollow()
+                        unfollowMid = null
+                        onToggleFollow(mid)
                     }
                 ) {
                     Text("取消关注")
@@ -576,6 +605,7 @@ private fun RelatedVideoList(
     val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
     val showTwoColumns = isTablet && !isLandscape
     val relates = detail?.relates.orEmpty()
+    val topPadding = if (detail?.staffs.isNullOrEmpty()) horizontalPad else 0.dp
     val relateItemMod = Modifier.padding(horizontal = cardHorizontalPad)
     val rowSpacing = 6.dp
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -592,7 +622,7 @@ private fun RelatedVideoList(
         LazyColumn(
             state = state,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = horizontalPad, bottom = 20.dp),
+            contentPadding = PaddingValues(top = topPadding, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
             header(Modifier.padding(horizontal = horizontalPad))
@@ -738,7 +768,9 @@ private fun VideoSummarySection(
     infoExpanded: Boolean,
     onToggleInfo: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
-    onFollowClick: () -> Unit,
+    onOpenTeam: () -> Unit,
+    onOpenTeamMember: (VideoStaff) -> Unit,
+    onFollowClick: (Long) -> Unit,
     isSelf: (Long) -> Boolean,
     onDownloadClick: () -> Unit,
     actionState: VideoActionUiState,
@@ -767,7 +799,6 @@ private fun VideoSummarySection(
         !loading && !error.isNullOrBlank() -> StateMessageCard(error, modifier = modifier, isError = true)
         detail == null -> StateMessageCard("暂无简介信息", modifier = modifier)
         else -> {
-            val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
             val summaryModifier = if (isLandscape) {
                 modifier.verticalScroll(key(ids.aid) { rememberScrollState() })
             } else {
@@ -778,17 +809,34 @@ private fun VideoSummarySection(
                 verticalArrangement = if (isLandscape) Arrangement.SpaceBetween else Arrangement.spacedBy(12.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    detail.owner?.let { owner ->
-                        OwnerRow(
-                            owner = owner,
-                            showStatsSkeleton = loading,
-                            onClick = spaceRoute?.let { route ->
-                                { onOpenSpace(route) }
-                            },
-                            following = actionState.following,
-                            followBusy = actionState.followBusy,
-                            onFollowClick = if (loading || isSelf(owner.mid)) null else onFollowClick
-                        )
+                    if (detail.staffs.isNotEmpty()) {
+                        key(ids.aid) {
+                            VideoTeamPreview(
+                                members = detail.staffs,
+                                followingByMid = actionState.followingByMid,
+                                followBusyMids = actionState.followBusyMids,
+                                isSelf = isSelf,
+                                onOpenTeam = onOpenTeam,
+                                onOpenMember = onOpenTeamMember,
+                                onFollowClick = onFollowClick
+                            )
+                        }
+                    } else {
+                        detail.owner?.let { owner ->
+                            val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
+                            OwnerRow(
+                                owner = owner,
+                                showStatsSkeleton = loading,
+                                onClick = spaceRoute?.let { route ->
+                                    { onOpenSpace(route) }
+                                },
+                                following = actionState.followingByMid[owner.mid] ?: owner.isFollowing,
+                                followBusy = owner.mid in actionState.followBusyMids,
+                                onFollowClick = if (loading || isSelf(owner.mid)) null else {
+                                    { onFollowClick(owner.mid) }
+                                }
+                            )
+                        }
                     }
                     VideoInfoBlock(
                         detail = detail,
@@ -872,11 +920,12 @@ private fun OwnerRow(
 }
 
 @Composable
-private fun FollowButton(
+internal fun FollowButton(
     following: Boolean,
     followedBy: Boolean,
     busy: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    compactName: String? = null
 ) {
     val text = when {
         following && followedBy -> "互相关注"
@@ -895,11 +944,24 @@ private fun FollowButton(
     Button(
         onClick = onClick,
         enabled = !busy,
+        shape = if (compactName == null) ButtonDefaults.shape else CircleShape,
         colors = colors,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-        modifier = Modifier.height(32.dp)
+        contentPadding = if (compactName == null) {
+            PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+        } else {
+            PaddingValues(0.dp)
+        },
+        modifier = if (compactName == null) Modifier.height(32.dp) else Modifier.size(32.dp)
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelMedium)
+        if (compactName == null) {
+            Text(text = text, style = MaterialTheme.typography.labelMedium)
+        } else {
+            Icon(
+                imageVector = if (following) MaterialSymbols.OutlinedFilled.Check else MaterialSymbols.Outlined.Add,
+                contentDescription = "$text $compactName",
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 

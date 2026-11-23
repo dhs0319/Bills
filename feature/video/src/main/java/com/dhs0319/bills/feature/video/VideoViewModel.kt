@@ -24,7 +24,6 @@ import com.dhs0319.bills.core.model.VideoPlaybackState
 import com.dhs0319.bills.core.model.VideoTarget
 import com.dhs0319.bills.core.model.isSameEntry
 import com.dhs0319.bills.feature.video.action.VideoActionController
-import com.dhs0319.bills.feature.video.action.VideoActionSeed
 import com.dhs0319.bills.feature.video.action.VideoActionUiState
 import com.dhs0319.bills.core.video.VideoActionRepository
 import com.dhs0319.bills.core.video.VideoDetailRepository
@@ -78,23 +77,9 @@ class VideoViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            videoState
-                .map { state ->
-                    VideoActionSeed(
-                        aid = state.ids.aid,
-                        detailLoaded = state.detail != null && !state.detailLoading,
-                        liked = state.detail?.isLiked == true,
-                        disliked = state.detail?.isDisliked == true,
-                        favorited = state.detail?.isFavorited == true,
-                        userCoinCount = state.detail?.userCoinCount ?: 0,
-                        ownerMid = state.detail?.owner?.mid ?: 0L,
-                        following = state.detail?.owner?.isFollowing == true
-                    )
-                }
-                .distinctUntilChanged()
-                .collect { seed ->
-                    videoActions.sync(seed)
-                }
+            videoState.collect { state ->
+                videoActions.sync(state.ids.aid, state.detail, state.detailLoading)
+            }
         }
     }
 
@@ -154,8 +139,8 @@ class VideoViewModel @Inject constructor(
         videoActions.toggleDislike()
     }
 
-    fun toggleFollow() {
-        videoActions.toggleFollow()
+    fun toggleFollow(mid: Long) {
+        videoActions.toggleFollow(mid)
     }
 
     fun isLoggedIn(): Boolean = videoActionRepository.isLoggedIn()

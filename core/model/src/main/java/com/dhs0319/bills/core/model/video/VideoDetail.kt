@@ -53,7 +53,11 @@ data class VideoStat(
 @Immutable
 data class VideoStaff(
     val role: String,
-    val name: String
+    val name: String,
+    val mid: Long,
+    val face: String?,
+    val isFollowing: Boolean,
+    val isFollowedBy: Boolean = false
 )
 
 @Immutable

@@ -1,6 +1,7 @@
 package com.dhs0319.bills.feature.video.action
 
 import androidx.compose.runtime.Immutable
+import com.dhs0319.bills.core.model.VideoDetail
 import com.dhs0319.bills.core.video.VideoActionRepository
 import com.dhs0319.bills.core.video.VideoFavoriteFolder
 import kotlinx.coroutines.CoroutineScope
@@ -18,8 +19,7 @@ internal data class VideoActionUiState(
     val disliked: Boolean = false,
     val favorited: Boolean = false,
     val userCoinCount: Int = 0,
-    val ownerMid: Long = 0L,
-    val following: Boolean = false,
+    val followingByMid: Map<Long, Boolean> = emptyMap(),
     val likeCountDelta: Int = 0,
     val coinCountDelta: Int = 0,
     val favoriteCountDelta: Int = 0,
@@ -28,20 +28,9 @@ internal data class VideoActionUiState(
     val coinBusy: Boolean = false,
     val favoriteLoading: Boolean = false,
     val favoriteSaving: Boolean = false,
-    val followBusy: Boolean = false,
+    val followBusyMids: Set<Long> = emptySet(),
     val dislikeThanksVisible: Boolean = false,
     val message: String? = null
-)
-
-internal data class VideoActionSeed(
-    val aid: Long,
-    val detailLoaded: Boolean,
-    val liked: Boolean,
-    val disliked: Boolean,
-    val favorited: Boolean,
-    val userCoinCount: Int,
-    val ownerMid: Long,
-    val following: Boolean
 )
 
 /**
@@ -55,31 +44,31 @@ internal class VideoActionController(
     private val mutableState = MutableStateFlow(VideoActionUiState())
     val state: StateFlow<VideoActionUiState> = mutableState
 
-    fun sync(seed: VideoActionSeed) {
+    fun sync(aid: Long, detail: VideoDetail?, detailLoading: Boolean) {
+        val detailLoaded = detail != null && !detailLoading
         val current = mutableState.value
-        if (current.aid != seed.aid) {
-            mutableState.value = VideoActionUiState(
-                aid = seed.aid,
-                initialized = seed.detailLoaded,
-                liked = seed.liked,
-                disliked = seed.disliked,
-                favorited = seed.favorited,
-                userCoinCount = seed.userCoinCount,
-                ownerMid = seed.ownerMid,
-                following = seed.following
-            )
-        } else if (!current.initialized && seed.detailLoaded) {
-            mutableState.update {
-                it.copy(
-                    initialized = true,
-                    liked = seed.liked,
-                    disliked = seed.disliked,
-                    favorited = seed.favorited,
-                    userCoinCount = seed.userCoinCount,
-                    ownerMid = seed.ownerMid,
-                    following = seed.following
-                )
+        if (current.aid == aid && (current.initialized || !detailLoaded)) return
+
+        val followingByMid = buildMap {
+            detail?.staffs?.forEach { member ->
+                if (member.mid > 0L) put(member.mid, member.isFollowing)
             }
+            detail?.owner?.let { owner ->
+                if (owner.mid > 0L) put(owner.mid, owner.isFollowing)
+            }
+        }
+        mutableState.update { state ->
+            val base = if (state.aid == aid) state else {
+                VideoActionUiState(aid = aid, followBusyMids = state.followBusyMids)
+            }
+            base.copy(
+                initialized = detailLoaded,
+                liked = detail?.isLiked == true,
+                disliked = detail?.isDisliked == true,
+                favorited = detail?.isFavorited == true,
+                userCoinCount = detail?.userCoinCount ?: 0,
+                followingByMid = followingByMid
+            )
         }
     }
 
@@ -149,31 +138,30 @@ internal class VideoActionController(
         }
     }
 
-    fun toggleFollow() {
+    fun toggleFollow(mid: Long) {
         val current = mutableState.value
-        val ownerMid = current.ownerMid
-        if (ownerMid <= 0L || !current.initialized || current.followBusy) return
-        val nextFollowing = !current.following
-        mutableState.update { it.copy(followBusy = true, message = null) }
+        val following = current.followingByMid[mid] ?: return
+        if (!current.initialized || mid in current.followBusyMids) return
+        val nextFollowing = !following
+        mutableState.update { it.copy(followBusyMids = it.followBusyMids + mid, message = null) }
         scope.launch {
-            runCatching { repository.setFollowing(ownerMid, nextFollowing) }
-                .onSuccess {
-                    updateForAid(current.aid) {
-                        it.copy(
-                            following = nextFollowing,
-                            followBusy = false,
-                            message = if (nextFollowing) "关注成功" else "已取消关注"
-                        )
-                    }
+            val result = runCatching { repository.setFollowing(mid, nextFollowing) }
+            val message = result.fold(
+                onSuccess = { if (nextFollowing) "关注成功" else "已取消关注" },
+                onFailure = { it.actionMessage("操作失败") }
+            )
+            mutableState.update { state ->
+                val followingByMid = if (result.isSuccess && mid in state.followingByMid) {
+                    state.followingByMid + (mid to nextFollowing)
+                } else {
+                    state.followingByMid
                 }
-                .onFailure { error ->
-                    updateForAid(current.aid) {
-                        it.copy(
-                            followBusy = false,
-                            message = error.actionMessage("操作失败")
-                        )
-                    }
-                }
+                state.copy(
+                    followingByMid = followingByMid,
+                    followBusyMids = state.followBusyMids - mid,
+                    message = if (state.aid == current.aid) message else state.message
+                )
+            }
         }
     }
 
