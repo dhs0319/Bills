@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
 import com.dhs0319.bills.core.common.media.ImageSaver
 import com.dhs0319.bills.core.common.log.Logger
@@ -207,10 +206,10 @@ fun PreviewImageDialog(
                                         runCatching { ImageSaver.saveUrl(context, currentImage.url) }
                                     }
                                     result.onSuccess {
-                                        Toast.makeText(context, "已保存到相册", Toast.LENGTH_SHORT).show()
+                                        context.showAppToast("已保存到相册")
                                     }.onFailure { err ->
                                         Logger.e("PreviewImageDialog", err as? Exception) { "save image failed url=${currentImage.url}" }
-                                        Toast.makeText(context, err.message ?: "保存图片失败", Toast.LENGTH_SHORT).show()
+                                        context.showAppToast(err.message ?: "保存图片失败")
                                     }
                                 }
                             }

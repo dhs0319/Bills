@@ -1,7 +1,6 @@
 package com.dhs0319.bills.core.designsystem.component
 
 import android.content.ClipData
-import android.widget.Toast
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.LocalTextStyle
@@ -164,7 +163,7 @@ fun SelectableText(
                                         ClipData.newPlainText(null, selectedText).toClipEntry()
                                     )
                                 }
-                                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                                context.showAppToast("已复制")
                             }
                         }) {
                             Text("复制")

@@ -1,6 +1,5 @@
 package com.dhs0319.bills.core.designsystem.component
 
-import android.widget.Toast
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,7 +27,7 @@ fun Modifier.copyTextOnLongPress(
             onTap = { currentOnTap?.invoke() },
             onLongPress = {
                 clipboard.setText(AnnotatedString(text))
-                Toast.makeText(context, "已复制$label", Toast.LENGTH_SHORT).show()
+                context.showAppToast("已复制$label")
             }
         )
     }

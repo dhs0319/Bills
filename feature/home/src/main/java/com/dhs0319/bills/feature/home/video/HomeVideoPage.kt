@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.home.video
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +47,7 @@ import com.composables.icons.materialsymbols.outlined.Play_circle
 import com.composables.icons.materialsymbols.outlined.Subtitles
 import com.composables.icons.materialsymbols.outlined.Visibility
 import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.feature.home.paging.HomePagingState
 import com.dhs0319.bills.core.designsystem.component.CoverImage
@@ -91,7 +91,7 @@ fun HomeVideoPage(
     val scope = rememberCoroutineScope()
     LaunchedEffect(toastMessage, context) {
         if (toastMessage.isNotEmpty()) {
-            Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+            context.showAppToast(toastMessage)
             onToastShown()
         }
     }

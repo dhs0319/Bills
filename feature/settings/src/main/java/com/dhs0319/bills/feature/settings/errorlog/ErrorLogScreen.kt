@@ -3,7 +3,6 @@ package com.dhs0319.bills.feature.settings.errorlog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.feature.settings.errorlog.ErrorLogViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.materialsymbols.MaterialSymbols
@@ -154,7 +154,7 @@ private fun ErrorLogItem(log: ErrorLog, fmt: SimpleDateFormat) {
                                 }
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("error_log", text))
-                                Toast.makeText(context, "日志已复制", Toast.LENGTH_SHORT).show()
+                                context.showAppToast("日志已复制")
                             }
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     )

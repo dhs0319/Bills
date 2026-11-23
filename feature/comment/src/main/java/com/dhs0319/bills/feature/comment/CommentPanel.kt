@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.comment
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -55,6 +54,7 @@ import com.dhs0319.bills.core.common.log.Logger
 import com.dhs0319.bills.core.designsystem.component.CommentCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.PreviewImage
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.model.PublishedRecord
 import com.dhs0319.bills.core.model.CommentSubjectTool
 import com.dhs0319.bills.core.model.CommentSort
@@ -164,7 +164,7 @@ fun CommentPanel(
 
     LaunchedEffect(viewModel, context) {
         viewModel.msg.collectLatest { text ->
-            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+            context.showAppToast(text)
         }
     }
 

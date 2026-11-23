@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.history.watchlater
 
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +62,7 @@ import com.composables.icons.materialsymbols.outlined.Subtitles
 import com.composables.icons.materialsymbols.outlinedfilled.Arrow_drop_down
 import com.composables.icons.materialsymbols.outlinedfilled.Check
 import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.common.compactCount
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
@@ -95,7 +95,7 @@ fun WatchLaterScreen(
     val context = LocalContext.current
     LaunchedEffect(actionMessage) {
         actionMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            context.showAppToast(message)
             viewModel.consumeActionMessage()
         }
     }

@@ -2,7 +2,6 @@ package com.dhs0319.bills.feature.video
 
 import android.content.res.Configuration
 import android.content.pm.ActivityInfo
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.media3.common.util.UnstableApi
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.model.PlaybackSource
 import com.dhs0319.bills.core.model.PlaybackStream
 import com.dhs0319.bills.core.model.PlayerSettingsState
@@ -112,14 +112,14 @@ fun VideoScreen(
 
     LaunchedEffect(actionUiState.message, context) {
         actionUiState.message?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            context.showAppToast(message)
             viewModel.consumeActionMessage()
         }
     }
 
     LaunchedEffect(watchLaterMessage, context) {
         watchLaterMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            context.showAppToast(message)
             viewModel.consumeWatchLaterMessage()
         }
     }

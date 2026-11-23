@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.dynamic
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +28,7 @@ import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.LoadFailedState
 import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
 import com.dhs0319.bills.core.designsystem.component.PageState
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.designsystem.theme.LocalTopLevelNavSpace
 import com.dhs0319.bills.core.model.LiveRoute
 import com.dhs0319.bills.core.model.SpaceRoute
@@ -85,7 +85,7 @@ fun DynamicScreen(
 
     LaunchedEffect(actionMessage) {
         actionMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            context.showAppToast(message)
             viewModel.consumeActionMessage()
         }
     }

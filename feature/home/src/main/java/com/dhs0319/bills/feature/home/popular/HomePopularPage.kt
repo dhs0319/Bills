@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.home.popular
 
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +30,7 @@ import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.WatchLaterMoreMenu
 import com.dhs0319.bills.core.designsystem.component.rememberHorizontalVideoCardColumnCount
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.model.PopularVideoItem
 import com.dhs0319.bills.core.model.SpaceRoute
 import com.dhs0319.bills.core.model.VideoTarget
@@ -54,7 +54,7 @@ fun HomePopularPage(
 
     LaunchedEffect(actionMessage) {
         actionMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            context.showAppToast(message)
             viewModel.consumeActionMessage()
         }
     }

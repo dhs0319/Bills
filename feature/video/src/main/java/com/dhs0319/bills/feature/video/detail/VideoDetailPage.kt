@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ActivityNotFoundException
 import android.text.format.DateFormat
-import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -132,6 +131,7 @@ import com.dhs0319.bills.core.designsystem.component.VideoDetailInfoSkeleton
 import com.dhs0319.bills.core.designsystem.component.WatchLaterMoreMenu
 import com.dhs0319.bills.core.designsystem.component.copyTextOnLongPress
 import com.dhs0319.bills.core.designsystem.component.horizontalVideoCardSkeletonHeight
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.designsystem.icon.AppIcons
 import com.dhs0319.bills.core.model.CommentSubject
 import com.dhs0319.bills.core.model.QualityOption
@@ -274,7 +274,7 @@ internal fun VideoDetailPage(
     val onFollowClick: (Long) -> Unit = { mid ->
         val actions = latestActionState
         if (!isLoggedIn()) {
-            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+            context.showAppToast("请先登录")
         } else if (actions.aid == aid) {
             if (actions.followingByMid[mid] == true) {
                 unfollowMid = mid
@@ -311,7 +311,7 @@ internal fun VideoDetailPage(
             isSelf = isSelf,
             onOpenCoinPicker = {
                 if (!isLoggedIn()) {
-                    Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                    context.showAppToast("请先登录")
                 } else if (actionState.initialized && actionState.aid > 0L && !actionState.coinBusy) {
                     selectedCoinAmount = 1
                     coinSheetVisible = true
@@ -336,7 +336,7 @@ internal fun VideoDetailPage(
             },
             onOpenShare = {
                 if (shareUrl == null) {
-                    Toast.makeText(context, "视频链接无效", Toast.LENGTH_SHORT).show()
+                    context.showAppToast("视频链接无效")
                 } else {
                     shareSheetVisible = true
                 }
@@ -537,12 +537,12 @@ internal fun VideoDetailPage(
             onShare = { channel ->
                 if (channel == ShareChannel.COPY_LINK) {
                     clipboardManager.setPrimaryClip(ClipData.newPlainText("video_link", shareUrl))
-                    Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                    context.showAppToast("链接已复制")
                     shareSheetVisible = false
                 } else {
                     val launched = launchShareTarget(context, channel, formatShareTitle(detail.title), shareUrl)
                     if (!launched) {
-                        Toast.makeText(context, "未安装对应应用", Toast.LENGTH_SHORT).show()
+                        context.showAppToast("未安装对应应用")
                     } else {
                         shareSheetVisible = false
                     }

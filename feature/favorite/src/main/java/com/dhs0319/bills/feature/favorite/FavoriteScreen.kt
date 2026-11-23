@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.favorite
 
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +29,7 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Bookmarks
 import com.composables.icons.materialsymbols.outlined.Cloud_off
 import com.composables.icons.materialsymbols.outlined.Folder_open
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.AdaptivePagerSlidingTabRow
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
@@ -67,7 +67,7 @@ fun FavoriteScreen(
     val context = LocalContext.current
     LaunchedEffect(actionMessage) {
         actionMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            context.showAppToast(message)
             viewModel.consumeActionMessage()
         }
     }

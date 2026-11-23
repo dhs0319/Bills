@@ -3,7 +3,6 @@ package com.dhs0319.bills.feature.settings.privacy
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import java.time.Instant
@@ -57,7 +57,7 @@ fun PrivacySettingsScreen(
 
     LaunchedEffect(state.importResult) {
         state.importResult?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            context.showAppToast(it)
             viewModel.clearImportResult()
         }
     }
@@ -174,7 +174,7 @@ fun PrivacySettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 viewModel.clearImageCache()
-                                Toast.makeText(context, "已清除图片缓存", Toast.LENGTH_SHORT).show()
+                                context.showAppToast("已清除图片缓存")
                             },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -183,7 +183,7 @@ fun PrivacySettingsScreen(
                         Button(
                             onClick = {
                                 viewModel.clearAllCache()
-                                Toast.makeText(context, "已清除所有缓存", Toast.LENGTH_SHORT).show()
+                                context.showAppToast("已清除所有缓存")
                             },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -238,7 +238,7 @@ fun PrivacySettingsScreen(
                             val json = viewModel.exportAllAccounts()
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("accounts", json))
-                            Toast.makeText(context, "已复制到剪切板", Toast.LENGTH_SHORT).show()
+                            context.showAppToast("已复制到剪切板")
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -250,7 +250,7 @@ fun PrivacySettingsScreen(
                             val clip = clipboard.primaryClip
                             val text = clip?.getItemAt(0)?.text?.toString()
                             if (text.isNullOrBlank()) {
-                                Toast.makeText(context, "剪切板为空", Toast.LENGTH_SHORT).show()
+                                context.showAppToast("剪切板为空")
                             } else {
                                 viewModel.importAccounts(text)
                             }

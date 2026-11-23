@@ -1,6 +1,5 @@
 package com.dhs0319.bills.feature.comment.component
 
-import android.widget.Toast
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.InlineTextContent
@@ -30,6 +29,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import com.dhs0319.bills.core.designsystem.component.BiliAsyncImage
 import com.dhs0319.bills.core.designsystem.component.BiliImageVariant
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.CommentUser
 
@@ -88,7 +88,7 @@ fun CommentRichText(
             },
             onLongPress = {
                 clipboard.setText(AnnotatedString(text))
-                Toast.makeText(context, "已复制$copyLabel", Toast.LENGTH_SHORT).show()
+                context.showAppToast("已复制$copyLabel")
             }
         )
     }

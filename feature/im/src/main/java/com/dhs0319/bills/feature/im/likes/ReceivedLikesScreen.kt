@@ -1,7 +1,6 @@
 package com.dhs0319.bills.feature.im.likes
 
 import android.text.format.DateFormat
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
@@ -51,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlinedfilled.Person
+import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
@@ -98,7 +98,7 @@ fun ReceivedLikesScreen(
                         is WebLinkTarget.ToLive -> onOpenLiveDetail(LiveRoute(roomId = target.roomId))
                         WebLinkTarget.External, WebLinkTarget.Stay -> Unit
                     }
-                    null -> Toast.makeText(context, "暂时无法打开该消息对应的内容", Toast.LENGTH_SHORT).show()
+                    null -> context.showAppToast("暂时无法打开该消息对应的内容")
                 }
             }
         )
