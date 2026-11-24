@@ -1,10 +1,10 @@
 {
-  "version": "1.1.9",
-  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.1.9/Bills-1.1.9-arm64-v8a-release.apk",
+  "version": "1.2.0",
+  "downloadUrl": "https://github.com/dhs0319/Bills/releases/download/v1.2.0/Bills-1.2.0-arm64-v8a-release.apk",
   "downloadUrls": {
-    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.1.9/Bills-1.1.9-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.1.9/Bills-1.1.9-armeabi-v7a-release.apk"
+    "arm64-v8a": "https://github.com/dhs0319/Bills/releases/download/v1.2.0/Bills-1.2.0-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/dhs0319/Bills/releases/download/v1.2.0/Bills-1.2.0-armeabi-v7a-release.apk"
   },
-  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.1.9",
-  "releaseNotes": "## 更新内容\n\n- 支持视频字幕\n- 支持消息及动态的角标提示\n- 优化未登录账号时的缺省提示\n- 替换新版Material Symbols图标库"
+  "releaseUrl": "https://github.com/dhs0319/Bills/releases/tag/v1.2.0",
+  "releaseNotes": "## 更新内容\n\n- 搜索页支持提示词、热搜和发现\n- APP图标支持莫奈取色(需系统桌面支持)\n- 优化首页菜单的UI和性能\n- 优化视频详情页在横屏时的布局\n- 优化合集与分P列表UI\n- 优化视频封面的清晰度及加载速度\n- 优化切换全屏及退出时的流畅度\n- 修复部分已知问题"
 }
