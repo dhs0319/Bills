@@ -6,6 +6,8 @@ import com.bapis.bilibili.app.im.v1.CustomerId
 import com.bapis.bilibili.app.im.v1.DeleteSessionReply
 import com.bapis.bilibili.app.im.v1.DeleteSessionReq
 import com.bapis.bilibili.app.im.v1.FoldId
+import com.bapis.bilibili.app.im.v1.GetQuickLinkUnreadReply
+import com.bapis.bilibili.app.im.v1.GetQuickLinkUnreadReq
 import com.bapis.bilibili.app.im.v1.GetTotalUnreadReply
 import com.bapis.bilibili.app.im.v1.GetTotalUnreadReq
 import com.bapis.bilibili.app.im.v1.GroupId
@@ -57,6 +59,7 @@ import com.dhs0319.bills.core.common.media.httpsImageUrlOrNull
 import com.dhs0319.bills.core.model.CommentEmote
 import com.dhs0319.bills.core.model.ImConversationPage
 import com.dhs0319.bills.core.model.ImMessage
+import com.dhs0319.bills.core.model.ImNotificationBadges
 import com.dhs0319.bills.core.model.ImUploadedImage
 import com.dhs0319.bills.core.model.ImPage
 import com.dhs0319.bills.core.model.ImPaginationOffset
@@ -133,6 +136,17 @@ class ImRepository @Inject constructor(
             parser = GetTotalUnreadReply.parser()
         )
         return reply.total.toImUnreadBadge()
+    }
+
+    suspend fun fetchNotificationBadges(): ImNotificationBadges {
+        require(authProvider.mid > 0L) { "请先登录" }
+        val reply = grpcClient.call(
+            endpoint = QUICK_LINK_UNREAD_ENDPOINT,
+            requestBytes = GetQuickLinkUnreadReq.getDefaultInstance().toByteArray(),
+            parser = GetQuickLinkUnreadReply.parser(),
+            cancelWithCaller = true
+        )
+        return reply.toImNotificationBadges()
     }
 
     suspend fun fetchSessions(
@@ -876,6 +890,7 @@ class ImRepository @Inject constructor(
 
     private companion object {
         const val TOTAL_UNREAD_ENDPOINT = "bilibili.app.im.v1.im/GetTotalUnread"
+        const val QUICK_LINK_UNREAD_ENDPOINT = "bilibili.app.im.v1.im/GetQuickLinkUnread"
         const val MAIN_ENDPOINT = "bilibili.app.im.v1.im/SessionMain"
         const val SECONDARY_ENDPOINT = "bilibili.app.im.v1.im/SessionSecondary"
         const val PIN_SESSION_ENDPOINT = "bilibili.app.im.v1.im/PinSession"

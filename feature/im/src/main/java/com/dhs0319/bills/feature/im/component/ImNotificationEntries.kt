@@ -25,10 +25,14 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlinedfilled.Person_add
 import com.composables.icons.materialsymbols.outlinedfilled.Thumb_up
+import com.dhs0319.bills.core.designsystem.component.ImUnreadBadgedBox
 import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
+import com.dhs0319.bills.core.model.ImNotificationBadges
+import com.dhs0319.bills.core.model.ImUnreadBadge
 
 @Composable
 internal fun ImNotificationEntries(
+    badges: ImNotificationBadges,
     onOpenReplyAndMentions: () -> Unit,
     onOpenReceivedLikes: () -> Unit,
     onOpenNewFollowers: () -> Unit,
@@ -42,18 +46,21 @@ internal fun ImNotificationEntries(
         ImNotificationEntry(
             label = "回复与@",
             icon = MirroredSymbols.Chat,
+            unread = badges.repliesAndMentions,
             onClick = onOpenReplyAndMentions,
             modifier = Modifier.weight(1f)
         )
         ImNotificationEntry(
             label = "收到喜欢",
             icon = MaterialSymbols.OutlinedFilled.Thumb_up,
+            unread = badges.likes,
             onClick = onOpenReceivedLikes,
             modifier = Modifier.weight(1f)
         )
         ImNotificationEntry(
             label = "新增粉丝",
             icon = MaterialSymbols.OutlinedFilled.Person_add,
+            unread = badges.followers,
             onClick = onOpenNewFollowers,
             modifier = Modifier.weight(1f)
         )
@@ -64,6 +71,7 @@ internal fun ImNotificationEntries(
 private fun ImNotificationEntry(
     label: String,
     icon: ImageVector,
+    unread: ImUnreadBadge,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -82,18 +90,20 @@ private fun ImNotificationEntry(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
+            ImUnreadBadgedBox(unread = unread) { iconModifier ->
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = iconModifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
             Text(

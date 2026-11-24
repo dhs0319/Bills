@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ private val ACTION_BUTTON_WIDTH = 84.dp
 @Composable
 internal fun ImSessionSwipeItem(
     item: ImSessionItem,
+    nowMillis: State<Long>,
     isOpen: Boolean,
     onSwipeStateChange: (Boolean) -> Unit,
     onTogglePin: () -> Unit,
@@ -47,7 +49,7 @@ internal fun ImSessionSwipeItem(
 ) {
     val showPin = if (item.isPinned) item.canUnpin else item.canPin
     if (item.sessionId == null || (!showPin && !item.canDelete)) {
-        ImSessionCard(item = item, onClick = onClick, modifier = modifier)
+        ImSessionCard(item = item, nowMillis = nowMillis, onClick = onClick, modifier = modifier)
         return
     }
 
@@ -127,6 +129,7 @@ internal fun ImSessionSwipeItem(
         ) {
             ImSessionCard(
                 item = item,
+                nowMillis = nowMillis,
                 onClick = if (isOpen) {
                     { onSwipeStateChange(false) }
                 } else {

@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -32,7 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.dhs0319.bills.core.designsystem.component.BiliPullToRefreshBox
 import com.dhs0319.bills.core.designsystem.component.LoadFailedState
 import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
@@ -43,7 +48,9 @@ import com.dhs0319.bills.core.model.ImSessionTab
 import com.dhs0319.bills.feature.im.component.ImNotificationEntries
 import com.dhs0319.bills.feature.im.component.ImSessionDropdown
 import com.dhs0319.bills.feature.im.component.ImSessionSwipeItem
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +71,11 @@ fun ImScreen(
     val listState = listStates.getValue(state.currentTab)
     var openedSessionKey by remember { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<ImSessionItem?>(null) }
+
+    LifecycleResumeEffect(vm) {
+        vm.setScreenVisible(true)
+        onPauseOrDispose { vm.setScreenVisible(false) }
+    }
 
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
@@ -108,6 +120,15 @@ fun ImScreen(
                 modifier = Modifier.padding(padding).padding(bottom = topLevelNavSpace)
             )
             return@Scaffold
+        }
+        val lifecycle = LocalLifecycleOwner.current.lifecycle
+        val nowMillis = produceState(System.currentTimeMillis(), lifecycle) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    value = System.currentTimeMillis()
+                    delay(1.minutes)
+                }
+            }
         }
         BiliPullToRefreshBox(
             isRefreshing = state.isRefreshing,
@@ -166,6 +187,7 @@ fun ImScreen(
                         if (!state.connectionFailed) {
                             item(key = "im_notification_entries") {
                                 ImNotificationEntries(
+                                    badges = state.notificationBadges,
                                     onOpenReplyAndMentions = onOpenMsgFeed,
                                     onOpenReceivedLikes = onOpenReceivedLikes,
                                     onOpenNewFollowers = onOpenNewFollowers
@@ -213,6 +235,7 @@ fun ImScreen(
                         ) { item ->
                             ImSessionSwipeItem(
                                 item = item,
+                                nowMillis = nowMillis,
                                 modifier = Modifier.animateItem(placementSpec = null),
                                 isOpen = openedSessionKey == item.key,
                                 onSwipeStateChange = { open ->

@@ -12,9 +12,15 @@ import com.dhs0319.bills.core.model.ImSessionTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -32,10 +38,12 @@ class ImViewModel @Inject constructor(
     private var reqId = 0L
     private var authVersion = 0L
     private var handledSessionListVersion = 0L
+    private val isScreenVisible = MutableStateFlow(false)
+    private val notificationRefreshVersion = MutableStateFlow(0L)
 
     init {
         viewModelScope.launch {
-            authRepo.currentMidFlow.collect { mid ->
+            authRepo.currentMidFlow.collectLatest { mid ->
                 reqId += 1L
                 authVersion += 1L
                 cache.clear()
@@ -43,11 +51,43 @@ class ImViewModel @Inject constructor(
                     currentTab = _uiState.value.currentTab,
                     isLoggedIn = mid > 0L
                 )
-                if (mid > 0L) refresh(forceLoading = true)
+                if (mid <= 0L) return@collectLatest
+                refresh(forceLoading = true)
+                observeNotificationBadges(mid)
             }
         }
         viewModelScope.launch {
             imRepo.sessionListVersion.collect { refreshIfSessionListChanged() }
+        }
+    }
+
+    fun setScreenVisible(visible: Boolean) {
+        isScreenVisible.value = visible
+    }
+
+    private suspend fun observeNotificationBadges(mid: Long) {
+        isScreenVisible.collectLatest { visible ->
+            if (!visible) return@collectLatest
+            merge(
+                notificationRefreshVersion.map { Unit },
+                flow {
+                    while (true) {
+                        delay(NOTIFICATION_REFRESH_INTERVAL_MILLIS)
+                        emit(Unit)
+                    }
+                }
+            ).conflate().collect {
+                try {
+                    val badges = imRepo.fetchNotificationBadges()
+                    if (authRepo.currentMidFlow.value == mid) {
+                        _uiState.update { it.copy(notificationBadges = badges) }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Logger.e(TAG, error) { "刷新互动消息未读数失败" }
+                }
+            }
         }
     }
 
@@ -89,7 +129,9 @@ class ImViewModel @Inject constructor(
 
     fun refresh(forceLoading: Boolean = false) {
         val state = _uiState.value
-        if (!state.isLoggedIn || state.isLoading || state.isRefreshing || state.isLoadingMore) return
+        if (!state.isLoggedIn) return
+        notificationRefreshVersion.update { it + 1L }
+        if (state.isLoading || state.isRefreshing || state.isLoadingMore) return
         reqId += 1L
         _uiState.update {
             it.copy(
@@ -304,6 +346,7 @@ class ImViewModel @Inject constructor(
     )
 
     private companion object {
+        const val NOTIFICATION_REFRESH_INTERVAL_MILLIS = 120_000L
         const val TAG = "ImViewModel"
         const val PIN_ERR = "置顶操作失败"
         const val DELETE_ERR = "删除会话失败"

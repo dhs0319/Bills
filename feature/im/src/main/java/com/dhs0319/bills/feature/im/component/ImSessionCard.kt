@@ -1,33 +1,37 @@
 package com.dhs0319.bills.feature.im.component
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dhs0319.bills.core.designsystem.component.AvatarImage
+import com.dhs0319.bills.core.designsystem.component.ImUnreadBadgeIndicator
 import com.dhs0319.bills.core.model.ImSessionItem
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import com.dhs0319.bills.core.model.ImUnreadBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ImSessionCard(
     item: ImSessionItem,
+    nowMillis: State<Long>,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
@@ -48,8 +52,10 @@ internal fun ImSessionCard(
         ) {
             buildSummary(item)
         }
-        val timeText = remember(item.timeMicros) {
-            formatImTime(item.timeMicros)
+        val unread = when (val text = item.unreadText) {
+            null -> ImUnreadBadge.None
+            "•" -> ImUnreadBadge.Dot
+            else -> ImUnreadBadge.Count(item.unreadCount, text)
         }
         Row(
             modifier = Modifier
@@ -70,6 +76,7 @@ internal fun ImSessionCard(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -79,38 +86,48 @@ internal fun ImSessionCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = timeText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    ImSessionTimeLabel(timeMicros = item.timeMicros, nowMillis = nowMillis)
                 }
 
-                Text(
-                    text = summaryText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            item.unreadText?.let { unread ->
-                Text(
-                    text = unread,
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = MaterialTheme.shapes.extraLarge
-                        )
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    maxLines = 1
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = summaryText,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    ImUnreadBadgeIndicator(
+                        unread = unread,
+                        modifier = if (unread is ImUnreadBadge.Count) {
+                            Modifier.sizeIn(minWidth = 20.dp, minHeight = 20.dp)
+                        } else Modifier
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ImSessionTimeLabel(timeMicros: Long, nowMillis: State<Long>) {
+    if (timeMicros <= 0L) return
+    val timeText by remember(timeMicros, nowMillis) {
+        derivedStateOf(structuralEqualityPolicy()) {
+            formatImSessionTime(timeMicros, nowMillis.value)
+        }
+    }
+    Text(
+        text = timeText,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+    )
 }
 
 private fun buildSummary(item: ImSessionItem): String {
@@ -121,11 +138,3 @@ private fun buildSummary(item: ImSessionItem): String {
     }.joinToString(" · ")
     return if (prefix.isBlank()) item.summary else "$prefix · ${item.summary}"
 }
-
-private fun formatImTime(micros: Long): String {
-    if (micros <= 0L) return ""
-    val instant = Instant.ofEpochMilli(micros / 1000L)
-    return IM_TIME_FORMAT.format(instant.atZone(ZoneId.systemDefault()))
-}
-
-private val IM_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")

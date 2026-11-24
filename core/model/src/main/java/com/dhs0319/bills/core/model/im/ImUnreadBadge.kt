@@ -8,3 +8,10 @@ sealed interface ImUnreadBadge {
     data object Dot : ImUnreadBadge
     data class Count(val count: Long, val text: String) : ImUnreadBadge
 }
+
+@Immutable
+data class ImNotificationBadges(
+    val repliesAndMentions: ImUnreadBadge = ImUnreadBadge.None,
+    val likes: ImUnreadBadge = ImUnreadBadge.None,
+    val followers: ImUnreadBadge = ImUnreadBadge.None
+)

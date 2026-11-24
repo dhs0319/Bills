@@ -1,6 +1,7 @@
 package com.dhs0319.bills.feature.im
 
 import androidx.compose.runtime.Immutable
+import com.dhs0319.bills.core.model.ImNotificationBadges
 import com.dhs0319.bills.core.model.ImPaginationParams
 import com.dhs0319.bills.core.model.ImSessionItem
 import com.dhs0319.bills.core.model.ImSessionTab
@@ -18,7 +19,8 @@ data class ImUiState(
     val loadMoreError: String? = null,
     val actionError: String? = null,
     val isLoggedIn: Boolean = true,
-    val connectionFailed: Boolean = false
+    val connectionFailed: Boolean = false,
+    val notificationBadges: ImNotificationBadges = ImNotificationBadges()
 ) {
     val canLoadMore: Boolean
         get() = paginationParams?.hasMore == true &&
