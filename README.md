@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  一个简约的第三方哔哩哔哩 Android 客户端。持续施工中...
+  一个简洁的第三方哔哩哔哩 Android 客户端。持续施工中...
 </p>
 
 <p align="center">
