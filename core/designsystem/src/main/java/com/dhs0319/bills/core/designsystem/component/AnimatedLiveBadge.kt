@@ -10,6 +10,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -23,6 +33,21 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
+/** Shares one animation among live badges in [content] while any of them are composed. */
+@Composable
+fun ProvideSharedLiveBadgeAnimation(content: @Composable () -> Unit) {
+    val sharedPhase = remember { SharedLiveBadgePhase() }
+    if (sharedPhase.hasBadges) {
+        val phase = rememberLiveBadgePhase()
+        DisposableEffect(sharedPhase, phase) {
+            sharedPhase.animation = phase
+            onDispose { sharedPhase.animation = null }
+        }
+    }
+
+    CompositionLocalProvider(LocalSharedLiveBadgePhase provides sharedPhase, content = content)
+}
+
 /** A looping three-bar live indicator, sized to 16.dp unless overridden with [modifier]. */
 @Composable
 fun AnimatedLiveBadge(
@@ -30,16 +55,16 @@ fun AnimatedLiveBadge(
     tint: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String? = "直播中"
 ) {
-    val transition = rememberInfiniteTransition(label = "Live badge")
-    val phase = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = FullCircle,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "Live bars"
-    )
+    val sharedPhase = LocalSharedLiveBadgePhase.current
+    val phase = if (sharedPhase == null) {
+        rememberLiveBadgePhase()
+    } else {
+        DisposableEffect(sharedPhase) {
+            sharedPhase.badgeCount++
+            onDispose { sharedPhase.badgeCount-- }
+        }
+        sharedPhase
+    }
 
     val descriptionModifier = if (contentDescription != null) {
         Modifier.semantics {
@@ -67,6 +92,31 @@ fun AnimatedLiveBadge(
             )
         }
     }
+}
+
+@Composable
+private fun rememberLiveBadgePhase(): State<Float> {
+    val transition = rememberInfiniteTransition(label = "Live badge")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = FullCircle,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Live bars"
+    )
+}
+
+private val LocalSharedLiveBadgePhase = staticCompositionLocalOf<SharedLiveBadgePhase?> { null }
+
+private class SharedLiveBadgePhase : State<Float> {
+    var badgeCount by mutableIntStateOf(0)
+    val hasBadges by derivedStateOf { badgeCount > 0 }
+    var animation by mutableStateOf<State<Float>?>(null)
+
+    override val value: Float
+        get() = animation?.value ?: 0f
 }
 
 private data class LiveBar(

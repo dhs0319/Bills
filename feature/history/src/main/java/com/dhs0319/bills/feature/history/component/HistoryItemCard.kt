@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Delete
 import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.component.AnimatedLiveBadge
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCard
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.designsystem.component.rememberHighlightedTitle
@@ -82,7 +83,7 @@ fun HistoryItemCard(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .height(3.dp),
+                        .height(4.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                 )
@@ -102,22 +103,32 @@ fun HistoryItemCard(
                 maxLines = 1
             )
             coverStatus?.let { text ->
-                Text(
-                    text = text,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(5.dp)
-                        .clip(MaterialTheme.shapes.extraSmall)
-                        .background(Color.Black.copy(alpha = 0.68f))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = if (coverWidth < 100.dp) 8.sp else 11.sp
-                    ),
-                    color = Color.White,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip
-                )
+                val badgeModifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(5.dp)
+                if (item.type == "live" && text == "直播中") {
+                    AnimatedLiveBadge(
+                        modifier = badgeModifier
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .size(13.dp),
+                        tint = Color.White
+                    )
+                } else {
+                    Text(
+                        text = text,
+                        modifier = badgeModifier
+                            .clip(MaterialTheme.shapes.extraSmall)
+                            .background(Color.Black.copy(alpha = 0.68f))
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = if (coverWidth < 100.dp) 8.sp else 11.sp
+                        ),
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip
+                    )
+                }
             }
         }
     ) {

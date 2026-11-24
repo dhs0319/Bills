@@ -41,6 +41,7 @@ import com.dhs0319.bills.core.designsystem.component.LoginRequiredState
 import com.dhs0319.bills.core.designsystem.component.PageState
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.ProvideSharedLiveBadgeAnimation
 import com.dhs0319.bills.core.model.HistoryTab
 import com.dhs0319.bills.core.model.HistoryTarget
 import com.dhs0319.bills.feature.history.component.HistoryItemCard
@@ -200,44 +201,46 @@ private fun HistoryPage(
         return
     }
 
-    AdaptiveMediaGrid(
-        items = pageState.items,
-        isRefreshing = pageState.isRefreshing || pageState.isLoading,
-        isLoadingMore = pageState.isLoadingMore,
-        onRefresh = {
-            if (isActivePage) viewModel.refresh()
-        },
-        onLoadMore = viewModel::loadMore,
-        modifier = Modifier.fillMaxSize(),
-        state = gridState,
-        columns = columns,
-        loadMoreEnabled = pageState.canLoadMore &&
-            pageState.errorMessage == null && isActivePage,
-        prefetchScreens = 1,
-        loadMoreError = pageState.errorMessage?.takeIf { pageState.errorOnLoadMore },
-        onRetryLoadMore = viewModel::loadMore,
-        errorMessage = pageState.errorMessage?.takeIf { !pageState.errorOnLoadMore },
-        errorContent = { message ->
-            StateMessageCard(
-                text = message,
-                isError = true,
-                actionText = "重试",
-                onAction = viewModel::refresh,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+    ProvideSharedLiveBadgeAnimation {
+        AdaptiveMediaGrid(
+            items = pageState.items,
+            isRefreshing = pageState.isRefreshing || pageState.isLoading,
+            isLoadingMore = pageState.isLoadingMore,
+            onRefresh = {
+                if (isActivePage) viewModel.refresh()
+            },
+            onLoadMore = viewModel::loadMore,
+            modifier = Modifier.fillMaxSize(),
+            state = gridState,
+            columns = columns,
+            loadMoreEnabled = pageState.canLoadMore &&
+                pageState.errorMessage == null && isActivePage,
+            prefetchScreens = 1,
+            loadMoreError = pageState.errorMessage?.takeIf { pageState.errorOnLoadMore },
+            onRetryLoadMore = viewModel::loadMore,
+            errorMessage = pageState.errorMessage?.takeIf { !pageState.errorOnLoadMore },
+            errorContent = { message ->
+                StateMessageCard(
+                    text = message,
+                    isError = true,
+                    actionText = "重试",
+                    onAction = viewModel::refresh,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+            },
+            endReached = pageState.items.isNotEmpty() && !pageState.hasMore,
+            key = { _, item -> item.key },
+            contentType = { _, item -> item.type },
+            loadingPlaceholderCount = columns * 8,
+            loadingContent = {
+                HorizontalVideoCardSkeleton(isTablet = isTablet)
+            }
+        ) { item ->
+            HistoryItemCard(
+                item = item,
+                onClick = { onOpenHistoryTarget(item.target) },
+                onDelete = { viewModel.deleteItem(item) }
             )
-        },
-        endReached = pageState.items.isNotEmpty() && !pageState.hasMore,
-        key = { _, item -> item.key },
-        contentType = { _, item -> item.type },
-        loadingPlaceholderCount = columns * 8,
-        loadingContent = {
-            HorizontalVideoCardSkeleton(isTablet = isTablet)
         }
-    ) { item ->
-        HistoryItemCard(
-            item = item,
-            onClick = { onOpenHistoryTarget(item.target) },
-            onDelete = { viewModel.deleteItem(item) }
-        )
     }
 }

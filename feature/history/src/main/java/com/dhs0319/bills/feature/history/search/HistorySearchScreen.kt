@@ -39,6 +39,7 @@ import com.dhs0319.bills.core.designsystem.icon.MirroredSymbols
 import com.dhs0319.bills.core.designsystem.component.AdaptiveMediaGrid
 import com.dhs0319.bills.core.designsystem.component.CollapsingTopBarScaffold
 import com.dhs0319.bills.core.designsystem.component.HorizontalVideoCardSkeleton
+import com.dhs0319.bills.core.designsystem.component.ProvideSharedLiveBadgeAnimation
 import com.dhs0319.bills.core.designsystem.component.SearchCapsuleField
 import com.dhs0319.bills.core.designsystem.component.StateMessageCard
 import com.dhs0319.bills.core.model.HistoryTarget
@@ -165,31 +166,33 @@ fun HistorySearchScreen(
                 }
 
                 else -> {
-                    AdaptiveMediaGrid(
-                        items = state.items,
-                        isRefreshing = state.isLoading,
-                        isLoadingMore = state.isLoadingMore,
-                        onRefresh = submitSearch,
-                        onLoadMore = viewModel::loadMore,
-                        modifier = Modifier.fillMaxSize(),
-                        state = gridState,
-                        columns = columns,
-                        loadMoreEnabled = state.canLoadMore && state.errorMessage == null,
-                        prefetchScreens = 1,
-                        loadMoreError = state.errorMessage,
-                        onRetryLoadMore = viewModel::loadMore,
-                        endReached = state.items.isNotEmpty() && !state.hasMore,
-                        key = { _, item -> item.key },
-                        contentType = { _, item -> item.type },
-                        loadingPlaceholderCount = columns * 8,
-                        loadingContent = {
-                            HorizontalVideoCardSkeleton(isTablet = isTablet)
+                    ProvideSharedLiveBadgeAnimation {
+                        AdaptiveMediaGrid(
+                            items = state.items,
+                            isRefreshing = state.isLoading,
+                            isLoadingMore = state.isLoadingMore,
+                            onRefresh = submitSearch,
+                            onLoadMore = viewModel::loadMore,
+                            modifier = Modifier.fillMaxSize(),
+                            state = gridState,
+                            columns = columns,
+                            loadMoreEnabled = state.canLoadMore && state.errorMessage == null,
+                            prefetchScreens = 1,
+                            loadMoreError = state.errorMessage,
+                            onRetryLoadMore = viewModel::loadMore,
+                            endReached = state.items.isNotEmpty() && !state.hasMore,
+                            key = { _, item -> item.key },
+                            contentType = { _, item -> item.type },
+                            loadingPlaceholderCount = columns * 8,
+                            loadingContent = {
+                                HorizontalVideoCardSkeleton(isTablet = isTablet)
+                            }
+                        ) { item ->
+                            HistoryItemCard(
+                                item = item,
+                                onClick = { onOpenHistoryTarget(item.target) }
+                            )
                         }
-                    ) { item ->
-                        HistoryItemCard(
-                            item = item,
-                            onClick = { onOpenHistoryTarget(item.target) }
-                        )
                     }
                 }
             }

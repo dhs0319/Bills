@@ -47,10 +47,12 @@ import com.composables.icons.materialsymbols.outlined.Play_circle
 import com.composables.icons.materialsymbols.outlined.Subtitles
 import com.composables.icons.materialsymbols.outlined.Visibility
 import com.composables.icons.materialsymbols.outlinedfilled.More_vert
+import com.dhs0319.bills.core.designsystem.component.AnimatedLiveBadge
 import com.dhs0319.bills.core.designsystem.component.showAppToast
 import com.dhs0319.bills.feature.home.paging.HomeMediaGrid
 import com.dhs0319.bills.feature.home.paging.HomePagingState
 import com.dhs0319.bills.core.designsystem.component.CoverImage
+import com.dhs0319.bills.core.designsystem.component.ProvideSharedLiveBadgeAnimation
 import com.dhs0319.bills.core.designsystem.component.UploaderBadge
 import com.dhs0319.bills.core.model.FeedItem
 import com.dhs0319.bills.core.model.LiveRoute
@@ -108,41 +110,43 @@ fun HomeVideoPage(
             shownFirstItemKey = firstItemKey
         }
     }
-    HomeMediaGrid(
-        paging = paging,
-        isActive = isActive,
-        gridState = gridState,
-        onRefresh = onRefresh,
-        onLoadMore = onLoadMore,
-        onRetryLoadMore = onRetryLoadMore,
-        key = { _, item -> item.identityKey },
-        contentType = { _, _ -> FEED_CARD_CONTENT_TYPE },
-        separatorIndex = paging.refreshBoundaryIndex,
-        separatorContent = {
-            LastSeenBoundaryCard(
-                enabled = !paging.isRefreshing,
+    ProvideSharedLiveBadgeAnimation {
+        HomeMediaGrid(
+            paging = paging,
+            isActive = isActive,
+            gridState = gridState,
+            onRefresh = onRefresh,
+            onLoadMore = onLoadMore,
+            onRetryLoadMore = onRetryLoadMore,
+            key = { _, item -> item.identityKey },
+            contentType = { _, _ -> FEED_CARD_CONTENT_TYPE },
+            separatorIndex = paging.refreshBoundaryIndex,
+            separatorContent = {
+                LastSeenBoundaryCard(
+                    enabled = !paging.isRefreshing,
+                    onClick = {
+                        onRefresh()
+                        scope.launch { gridState.scrollToItem(0) }
+                    }
+                )
+            }
+        ) { item ->
+            FeedCard(
+                item = item,
+                onOpenSpace = onOpenSpace,
+                dislikedReason = dislikedReasons[item.actionKey],
+                onDislike = onDislike,
+                onCancelDislike = onCancelDislike,
                 onClick = {
-                    onRefresh()
-                    scope.launch { gridState.scrollToItem(0) }
+                    if (item.cardGoto == "dynamic") {
+                        onOpenDynamic(item.param)
+                    } else {
+                        item.liveRoute?.let(onOpenLive)
+                            ?: item.target?.let(onOpenVideo)
+                    }
                 }
             )
         }
-    ) { item ->
-        FeedCard(
-            item = item,
-            onOpenSpace = onOpenSpace,
-            dislikedReason = dislikedReasons[item.actionKey],
-            onDislike = onDislike,
-            onCancelDislike = onCancelDislike,
-            onClick = {
-                if (item.cardGoto == "dynamic") {
-                    onOpenDynamic(item.param)
-                } else {
-                    item.liveRoute?.let(onOpenLive)
-                        ?: item.target?.let(onOpenVideo)
-                }
-            }
-        )
     }
 }
 
@@ -296,8 +300,10 @@ private fun FeedCoverMetadata(item: FeedItem, modifier: Modifier = Modifier) {
     val views = item.coverLeftText1?.takeIf(String::isNotBlank)
     val danmaku = item.coverLeftText2?.takeIf(String::isNotBlank)
         .takeIf { item.target != null }
-    val duration = item.coverRightText?.takeIf(String::isNotBlank)
-    if (views == null && danmaku == null && duration == null) return
+    val isLive = item.liveRoute != null
+    val rightLabel = item.coverRightText?.takeIf(String::isNotBlank)
+        ?: "直播".takeIf { isLive }
+    if (views == null && danmaku == null && rightLabel == null) return
 
     Box(
         modifier = modifier
@@ -334,10 +340,19 @@ private fun FeedCoverMetadata(item: FeedItem, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            duration?.let {
+            rightLabel?.let { label ->
                 Spacer(modifier = Modifier.width(6.dp))
+                if (isLive) {
+                    AnimatedLiveBadge(
+                        modifier = Modifier
+                            .padding(end = 3.dp)
+                            .size(13.dp),
+                        tint = Color.White,
+                        contentDescription = null
+                    )
+                }
                 Text(
-                    text = it,
+                    text = label,
                     color = Color.White,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1
